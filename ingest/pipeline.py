@@ -48,13 +48,11 @@ def parse_pdf_or_text_llama(path: Path) -> Dict[str, Any]:
         verbose=True,
         # Workaround for SSL issues
         check_local_models=False,
-        # DANGEROUS: For local dev only
-        ssl_verify=False,
     )
     # Force certifi CA on urllib3 globally
     try:
         urllib3.util.ssl_.DEFAULT_CIPHERS += 'HIGH:!DH:!aNULL'
-        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        ssl.create_default_context(cafile=certifi.where())
         urllib3.PoolManager(cert_reqs='CERT_REQUIRED', ca_certs=certifi.where())
     except Exception:
         pass

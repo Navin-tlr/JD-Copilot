@@ -43,8 +43,8 @@ python dev_tools/setup_and_ingest.py
 
 ### 2. Manual Ingestion (Text Files)
 ```bash
-# Works immediately with .txt files (no Docling models needed)
-python -m ingest.ingest_docling --pdf_dir data/jds
+# Works immediately with .txt files (LlamaParse pipeline)
+python -m ingest.pipeline --pdf_dir data/jds
 ```
 
 ### 3. Run Tests
@@ -55,7 +55,7 @@ PYTHONPATH=. python tests/test_ingestion.py
 ## Key Files Created/Modified
 
 ### Core Implementation
-- `ingest/ingest_docling.py` - Main ingestion with Docling-only, fail-fast
+- `ingest/pipeline.py` - Consolidated ingestion with LlamaParse and Pinecone
 - `app/rag.py` - Updated for Pinecone integration  
 - `app/config.py` - Added Pinecone and Docling model settings
 
@@ -71,7 +71,7 @@ PYTHONPATH=. python tests/test_ingestion.py
 ## Architecture
 
 ```
-Text/PDF → Docling Parser (fail-fast) → LangExtract → Chunking → 
+Text/PDF → LlamaParse (cloud) → LangExtract → Chunking → 
 Embeddings (384d) → Pinecone (cloud) → FastAPI endpoints
 ```
 
@@ -110,5 +110,5 @@ Embeddings (384d) → Pinecone (cloud) → FastAPI endpoints
 - [x] 500-char preview printing
 - [x] Automated setup scripts
 - [x] Working test with sample data
-- [x] CLI: `python -m ingest.ingest_docling --pdf_dir data/jds`
+- [x] CLI: `python -m ingest.pipeline --pdf_dir data/jds`
 - [x] Dockerized deployment ready

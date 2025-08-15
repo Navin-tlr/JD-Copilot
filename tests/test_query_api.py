@@ -9,12 +9,11 @@ from fastapi.testclient import TestClient
 def test_query_and_resume(tmp_path: Path):
     # Configure directories used by tests (Docling json storage replaced by LlamaParse outputs)
     os.environ["DOCLING_JSON_DIR"] = str(tmp_path / "docling_json")
-    os.environ["DOCLING_JSON_DIR"] = str(tmp_path / "docling_json")
     os.environ["LANGEXT_JSON_DIR"] = str(tmp_path / "langext_json")
     os.environ["LANGEXT_HTML_DIR"] = str(tmp_path / "langext_html")
 
     # Ingest a couple of sample JDs
-    import ingest.ingest_docling as ing
+    import ingest.pipeline as ing
 
     jd_dir = tmp_path / "jds"
     jd_dir.mkdir(parents=True, exist_ok=True)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Complete setup and ingestion script for jd-copilot.
-Automatically handles Docling model placement and runs ingestion.
+Uses LlamaParse (cloud) and runs ingestion.
 """
 from __future__ import annotations
 
@@ -27,94 +27,18 @@ def setup_ssl_env():
 
 
 def check_model_exists() -> bool:
-    """Check if beehive_v0.0.5 model exists in expected locations."""
-    # Check local data directory first
-    local_path = Path("data/docling_models/docling-models/model_artifacts/layout/beehive_v0.0.5/model.pt")
-    if local_path.exists() and local_path.stat().st_size > 0:
-        print(f"✓ Found beehive model at: {local_path}")
-        return True
-    
-    # Check HF cache
-    hf_cache_pattern = Path.home() / ".cache/huggingface/hub/models--ds4sd--docling-models/snapshots"
-    for snapshot_dir in hf_cache_pattern.glob("*/model_artifacts/layout/beehive_v0.0.5"):
-        model_files = list(snapshot_dir.glob("model.*"))
-        if model_files:
-            print(f"✓ Found beehive model in HF cache: {model_files[0]}")
-            return True
-    
-    print("✗ beehive_v0.0.5 model not found in expected locations")
-    return False
+    """Docling models no longer required with LlamaParse pipeline."""
+    return True
 
 
 def download_beehive_model():
-    """Download and place the beehive model file."""
-    target_dir = Path("data/docling_models/docling-models/model_artifacts/layout/beehive_v0.0.5")
-    target_file = target_dir / "model.pt"
-    
-    # Create directory structure
-    target_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Known working sources for beehive model (try in order)
-    model_sources = [
-        # GitHub release (example - adjust to actual working URL)
-        "https://github.com/DS4SD/docling-models/releases/download/v1.0.0/beehive_v0.0.5_model.pt",
-        # Direct HF blob URL (example - adjust to actual working URL)  
-        "https://huggingface.co/ds4sd/docling-models/resolve/main/model_artifacts/layout/beehive_v0.0.5/model.pt",
-        # Fallback: create a dummy model for testing (remove in production)
-        None  # Will trigger dummy creation
-    ]
-    
-    for source_url in model_sources:
-        if source_url is None:
-            # Create dummy model file for testing
-            print("⚠ Creating dummy model file for testing purposes")
-            target_file.write_bytes(b"DUMMY_MODEL_DATA_FOR_TESTING" * 1000)
-            print(f"✓ Created dummy model at: {target_file}")
-            return True
-            
-        try:
-            print(f"📥 Downloading beehive model from: {source_url}")
-            urlretrieve(source_url, target_file)
-            
-            if target_file.exists() and target_file.stat().st_size > 0:
-                print(f"✓ Downloaded beehive model to: {target_file}")
-                return True
-            else:
-                print(f"✗ Download failed or empty file: {source_url}")
-                target_file.unlink(missing_ok=True)
-                
-        except Exception as e:
-            print(f"✗ Failed to download from {source_url}: {e}")
-            target_file.unlink(missing_ok=True)
-            continue
-    
-    return False
+    """No-op with LlamaParse pipeline."""
+    return True
 
 
 def setup_docling_models():
-    """Ensure Docling models are available."""
-    if check_model_exists():
-        return True
-    
-    print("📦 Setting up Docling models...")
-    
-    # Try to run bootstrap script first
-    bootstrap_script = Path("dev_tools/bootstrap_docling_cache.sh")
-    if bootstrap_script.exists():
-        try:
-            env = os.environ.copy()
-            env["DOCLING_MODELS_DIR"] = "data/docling_models"
-            subprocess.run(["bash", str(bootstrap_script)], env=env, check=True, capture_output=True)
-            print("✓ Bootstrap script completed")
-        except subprocess.CalledProcessError as e:
-            print(f"⚠ Bootstrap script failed: {e}")
-    
-    # Check again after bootstrap
-    if check_model_exists():
-        return True
-    
-    # Download model directly
-    return download_beehive_model()
+    """Docling model setup skipped (LlamaParse is used)."""
+    return True
 
 
 def validate_pinecone_config():
@@ -131,7 +55,7 @@ def validate_pinecone_config():
 
 
 def run_ingestion():
-    """Run the Docling ingestion pipeline."""
+    """Run the ingestion pipeline (LlamaParse)."""
     pdf_dir = Path("data/jds")
     if not pdf_dir.exists():
         pdf_dir.mkdir(parents=True, exist_ok=True)
@@ -167,7 +91,7 @@ Bonus: Up to 20%
     
     try:
         result = subprocess.run([
-            sys.executable, "-m", "ingest.ingest_docling", 
+            sys.executable, "-m", "ingest.pipeline", 
             "--pdf_dir", str(pdf_dir)
         ], check=True, capture_output=True, text=True)
         

@@ -33,7 +33,7 @@ cp env.example .env
 bash run.sh
 
 # Option B: manual (Pinecone cloud-first)
-python -m ingest.ingest_llamaparse --pdf_dir data/jds
+python -m ingest.pipeline --pdf_dir data/jds
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -107,7 +107,7 @@ app/
   utils.py
 ingest/
   __init__.py
-  ingest_docling.py
+  pipeline.py
   langextract_job.py
   chunking.py
   metadata_normalize.py
@@ -146,8 +146,8 @@ Both are optional for local testing. The pipeline falls back gracefully when una
 # create venv & install deps
 python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
 
-# ingest PDFs (or .txt) and persist to Chroma
-python -m ingest.ingest_docling --pdf_dir data/jds --persist_dir data/chroma
+# ingest PDFs (or .txt) to Pinecone
+python -m ingest.pipeline --pdf_dir data/jds
 
 # start the API server
 uvicorn app.main:app --reload --port 8000

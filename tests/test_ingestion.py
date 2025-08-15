@@ -44,7 +44,7 @@ Bonus: Up to 20%
 """.strip())
         
         # Test the ingestion pipeline (text path, no Docling models needed)
-        from ingest.ingest_docling import process_file
+        from ingest.pipeline import process_file
         
         # Should succeed with text file (bypasses PDF model requirements)
         result = process_file(sample_file)
