@@ -11,36 +11,23 @@ from .metadata_normalize import canonicalize_company, canonicalize_role, parse_y
 
 
 def try_llm_extract(text: str) -> Dict[str, Any] | None:
-    """Try to extract metadata using LLM (Gemini) if available."""
-    settings = get_settings()
-    
-    if not settings.GEMINI_API_KEY:
-        return None
-        
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        # Try environment override, then fallbacks
-        model_names = [
-            settings.GEMINI_MODEL,
-            'models/gemini-2.5-pro',
-            'models/gemini-1.5-pro',
-            'models/gemini-1.5-flash',
-            'models/gemini-2.0-flash-exp',
-        ]
-        model = None
-        last_err = None
-        for name in [m for m in model_names if m]:
-            try:
-                model = genai.GenerativeModel(name)
-                break
-            except Exception as e:
-                last_err = e
-                continue
-        if model is None:
-            raise RuntimeError(f"No Gemini model usable: {last_err}")
-        
-        prompt = f"""You are an expert at extracting company information from job descriptions. 
+	"""Try to extract metadata using LLM (Gemini) if available.
+
+	This version disables safety blocks for trusted, professional documents and
+	adds robust response checks before JSON parsing.
+	"""
+	settings = get_settings()
+	
+	if not settings.GEMINI_API_KEY:
+		return None
+		
+	try:
+		import google.generativeai as genai
+		from google.generativeai.types import HarmCategory, HarmBlockThreshold
+
+		genai.configure(api_key=settings.GEMINI_API_KEY)
+		
+		prompt = f"""You are an expert at extracting company information from job descriptions. 
 
 Analyze this job description and extract metadata. Return ONLY a valid JSON object with these exact fields:
 
@@ -66,43 +53,58 @@ Job Description:
 
 JSON:"""
 
-        response = model.generate_content(prompt, 
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.1,
-                max_output_tokens=800
-            ))
-        
-        # Clean and parse JSON response
-        response_text = response.text.strip()
-        
-        # Try to extract JSON from response (handle cases where LLM adds extra text)
-        json_start = response_text.find('{')
-        json_end = response_text.rfind('}')
-        
-        if json_start != -1 and json_end != -1:
-            json_text = response_text[json_start:json_end + 1]
-            result = json.loads(json_text)
-        else:
-            # Fallback: try parsing the whole response
-            result = json.loads(response_text)
-        
-        # Add missing fields and normalize
-        result["salary_table_rows"] = []
-        result["eligibility_rules"] = {}
-        result["raw_span_map"] = {}
-        result["approximate"] = False  # LLM extraction is not approximate
-        
-        # Canonicalize company and role
-        if result.get("company"):
-            result["company"] = canonicalize_company(result["company"])
-        if result.get("role"):
-            result["role"] = canonicalize_role(result["role"])
-            
-        return result
-        
-    except Exception as e:
-        print(f"LLM extraction failed: {e}")
-        return None
+		model = genai.GenerativeModel(settings.GEMINI_MODEL)
+		
+		response = model.generate_content(
+			prompt,
+			generation_config=genai.types.GenerationConfig(
+				temperature=0.1,
+				max_output_tokens=800,
+			),
+			# Disable safety blocks for trusted enterprise documents
+			safety_settings={
+				HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+				HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+				HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+				HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+			},
+		)
+		
+		# Robust check before parsing
+		if not hasattr(response, 'text') or not (response.text or '').strip():
+			print("⚠️ LLM returned an empty or invalid response for a document. Skipping LLM extraction for this file.")
+			# Optionally inspect response object for diagnostics
+			return None
+
+		response_text = response.text.strip()
+		
+		# Try to extract JSON from response (handle cases where LLM adds extra text)
+		json_start = response_text.find('{')
+		json_end = response_text.rfind('}')
+		
+		if json_start != -1 and json_end != -1:
+			json_text = response_text[json_start:json_end + 1]
+			result = json.loads(json_text)
+		else:
+			# Fallback: try parsing the whole response
+			result = json.loads(response_text)
+		
+		# Add missing fields and normalize
+		result["salary_table_rows"] = []
+		result["eligibility_rules"] = {}
+		result["raw_span_map"] = {}
+		result["approximate"] = False
+		
+		if result.get("company"):
+			result["company"] = canonicalize_company(result["company"])
+		if result.get("role"):
+			result["role"] = canonicalize_role(result["role"])
+			
+		return result
+		
+	except Exception as e:
+		print(f"LLM extraction failed: {e}")
+		return None
 
 
 def try_langextract(text: str) -> Dict[str, Any] | None:

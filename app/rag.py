@@ -118,118 +118,75 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
 
 def synthesize_answer(question: str, snippets: List[Dict[str, Any]]) -> str | None:
     settings = get_settings()
-    if settings.OPENAI_API_KEY:
-        try:
-            from openai import OpenAI
+    
+    if not settings.GEMINI_API_KEY:
+        print("🔴 GEMINI_API_KEY is not configured. Skipping synthesis.")
+        return None
 
-            client = OpenAI(api_key=settings.OPENAI_API_KEY)
-            content = _build_prompt(question, snippets)
-            model = settings.OPENAI_MODEL or "gpt-4o-mini"
-            chat = client.chat.completions.create(
-                model=model,
-                temperature=0.0,
-                max_tokens=220,
-                messages=[
-                    {"role": "system", "content": "You are a helpful AI assistant for job description analysis. Provide clear, natural, conversational answers using the provided context. Be specific and helpful while staying focused on the question. Include company/role details when relevant and cite sources as [Company | Role]."},
-                    {"role": "user", "content": content},
-                ],
-            )
-            return chat.choices[0].message.content
-        except Exception:
-            pass
-    if settings.GEMINI_API_KEY:
-        try:
-            import google.generativeai as genai
+    # --- ADVANCED SYSTEM PROMPT (Final, "Uncaged" Version) ---
+    system_prompt = """
+You are JD-GPT, a seasoned AI career coach and industry expert. Your primary goal is to provide students with insightful, comprehensive, and well-reasoned answers about job descriptions.
 
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            # Ordered fallback list. First entry is explicit env override if provided.
-            candidates = [
-                settings.GEMINI_MODEL,
-                "models/gemini-2.5-pro",
-                "models/gemini-1.5-pro",
-                "models/gemini-1.5-flash",
-                "models/gemini-2.0-flash-exp",
-            ]
-            tried: set[str] = set()
-            content = _build_prompt(question, snippets)
-            def _extract_text(resp_obj) -> str | None:
-                try:
-                    txt = getattr(resp_obj, "text", None)
-                    if txt:
-                        return txt
-                    # Fallback to candidates/parts aggregation
-                    cand_list = getattr(resp_obj, "candidates", None)
-                    if not cand_list:
-                        return None
-                    chunks: list[str] = []
-                    for c in cand_list:
-                        content = getattr(c, "content", None)
-                        if not content:
-                            continue
-                        parts = getattr(content, "parts", None)
-                        if not parts:
-                            continue
-                        for p in parts:
-                            val = getattr(p, "text", None) or str(getattr(p, "inline_data", ""))
-                            if val:
-                                chunks.append(val)
-                    return "\n".join([s for s in chunks if s]).strip() or None
-                except Exception:
-                    return None
+**Your Core Principles:**
+1.  **Synthesize, Don't Just Summarize:** Use the provided text as your primary source, but you are encouraged to **enrich your answer with your own general knowledge** about the job market, career paths, and corporate roles.
+2.  **Explain the "Why":** When you make an inference or connect concepts (e.g., explaining that "Business Development" is a form of marketing), you must clearly explain your reasoning.
+3.  **Adopt a Conversational and Encouraging Tone:** Speak directly to the student. Be a helpful guide, not a robot. Use formatting like bold text and bullet points to make your advice easy to digest.
+4.  **Be Honest About Missing Information:** If the provided text is missing critical details (like a specific salary range), state that clearly, but you can also provide a general market estimate based on your own knowledge.
 
-            for mdl in [m for m in candidates if m and m not in tried]:
-                tried.add(mdl)  # type: ignore[arg-type]
-                try:
-                    gm = genai.GenerativeModel(mdl)  # type: ignore[arg-type]
-                    resp = gm.generate_content([
-                        "You are a helpful AI assistant for job description analysis. Provide clear, natural, conversational answers using the provided context. Be specific and helpful while staying focused on the question. Include company/role details when relevant and cite sources as [Company | Role].",
-                        content,
-                    ], generation_config={"max_output_tokens": 300, "temperature": 0.2})
-                    text = _extract_text(resp)
-                    if text:
-                        return text.strip()
-                except Exception as inner_e:
-                    print(f"Gemini model failed ({mdl}): {inner_e}")
-                    continue
-        except Exception as e:
-            print(f"Error during Gemini synthesis: {e}")
-            pass
-    # OpenRouter fallback
-    if settings.OPENROUTER_API_KEY:
-        try:
-            # Prepare messages in OpenAI-compatible format
-            content = _build_prompt(question, snippets)
-            headers = {
-                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-                "HTTP-Referer": "https://jd-copilot.local",
-                "X-Title": "jd-copilot",
-                "Content-Type": "application/json",
-            }
-            model = settings.OPENROUTER_MODEL or "openai/gpt-oss-20b:free"
-            payload = {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": "You are a helpful AI assistant for job description analysis. Provide concise, natural answers using only the provided context snippets and include inline citations [Company | Role | Year]."},
-                    {"role": "user", "content": content},
-                ],
-                "temperature": 0.2,
-                "max_tokens": 300,
-            }
-            resp = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=60)
-            if resp.ok:
-                data = resp.json()
-                txt = (
-                    data.get("choices", [{}])[0]
-                    .get("message", {})
-                    .get("content")
-                )
-                if txt:
-                    return txt.strip()
-            else:
-                print(f"OpenRouter error: {resp.status_code} {resp.text[:200]}")
-        except Exception as e:
-            print(f"OpenRouter synthesis failed: {e}")
-    return None
+**Example of a good response:**
+
+*User Question:* "Is this a marketing role?"
+
+*Your Answer:*
+Yes, absolutely. While the official title is **Business Development Associate**, this is fundamentally a marketing and sales role. In the tech industry, "Business Development" often involves a mix of sales, relationship-building, and strategic marketing to grow the company.
+
+Based on the job description, you can see this clearly:
+* The role focuses heavily on **lead generation** using techniques like cold calling and LinkedIn outreach, which are classic sales and digital marketing activities.
+* The goal of **partnership development** is a form of business-to-business (B2B) marketing, where you are essentially selling the value of TAP Academy's students to other companies.
+* The fact that a **degree in Marketing** is listed as a preferred qualification is a strong indicator that the company itself views this as a marketing-oriented position.
+"""
+
+    # --- Build the final prompt for the API call ---
+    context = "\n\n".join(
+        f"[{s.get('metadata', {}).get('company','?')} | {s.get('metadata', {}).get('role','?')} | {s.get('metadata', {}).get('year','?')}] {s['text']}"
+        for s in snippets
+    )
+    
+    final_prompt = (
+        "CONTEXT:\n"
+        "---------------------\n"
+        f"{context}\n"
+        "---------------------\n\n"
+        f"QUESTION: {question}"
+    )
+
+    print(f"🟢 Attempting synthesis with Gemini model: {settings.GEMINI_MODEL}")
+    
+    try:
+        import google.generativeai as genai
+
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        
+        model = genai.GenerativeModel(
+            model_name=settings.GEMINI_MODEL,
+            system_instruction=system_prompt  # Pass the new system prompt here
+        )
+        
+        response = model.generate_content(final_prompt)
+        
+        if getattr(response, "text", None):
+            print("✅ Successfully received answer from Gemini.")
+            return response.text.strip()
+        else:
+            print("⚠️ Gemini response was empty.")
+            # It's better to inform the user than to return nothing.
+            return "The model generated an empty response. Please try rephrasing your question."
+
+    except Exception as e:
+        print(f"❌ An error occurred during Gemini API call: {e}")
+        import traceback
+        traceback.print_exc()
+        return "An error occurred while generating the answer. Please check the server logs."
 
 
 def _build_prompt(question: str, snippets: List[Dict[str, Any]]) -> str:

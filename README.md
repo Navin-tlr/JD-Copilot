@@ -15,6 +15,8 @@ source .venv/bin/activate
 
 ```bash
 pip install -r requirements.txt
+# Install LangExtract for company extraction
+pip install langextract
 ```
 
 3) Configure environment
