@@ -17,16 +17,13 @@ from pinecone import Pinecone, ServerlessSpec
 
 
 def parse_pdf_or_text(path: Path) -> Dict[str, Any]:
-    """Parse document with Docling only. Fail fast on error or empty text."""
-    text = ""
-    basename = path.stem
-    settings = get_settings()
-    out_json = Path(settings.DOCLING_JSON_DIR) / f"{basename}.json"
-    out_md = Path(settings.DOCLING_JSON_DIR) / f"{basename}.md"
-    out_json.parent.mkdir(parents=True, exist_ok=True)
+    """Parse document: text files are loaded directly; PDFs are parsed with LlamaParse (cloud-first).
+
+    This replaces Docling. For tests with .txt files, behavior is unchanged.
+    """
+    from ingest.ingest_llamaparse import parse_pdf_or_text_llama
 
     if path.suffix.lower() == ".txt":
-        # For tests, allow .txt as source but still require non-empty content
         text = path.read_text(errors="ignore")
         if not text.strip():
             raise RuntimeError(f"Empty text in {path}")
@@ -38,50 +35,14 @@ def parse_pdf_or_text(path: Path) -> Dict[str, Any]:
             "char_start": 0,
             "char_end": len(text),
         }]
+        settings = get_settings()
+        out_json = Path(settings.DOCLING_JSON_DIR) / f"{path.stem}.json"
+        out_json.parent.mkdir(parents=True, exist_ok=True)
         out_json.write_text(json.dumps({"sections": sections}, indent=2))
-        out_md.write_text(text)
         return {"sections": sections}
 
-    # Docling only
-    from docling.document_converter import DocumentConverter  # type: ignore
-
-    # Fail-fast: ensure model assets are present in the configured models dir
-    models_base = Path(settings.DOCLING_MODELS_DIR) / "docling-models"
-    required = models_base / "model_artifacts" / "layout" / "beehive_v0.0.5"
-    if not (required.exists() and any(required.glob("**/model.*"))):
-        raise RuntimeError(
-            f"Missing required Docling model assets under {required}. Run dev_tools/bootstrap_docling_cache.sh first."
-        )
-
-    # Configure Docling to use local model artifacts
-    conv = DocumentConverter(artifacts_path=str(models_base))
-    doc = conv.convert(str(path))
-    md = doc.render_as_markdown()
-    out_md.write_text(md)
-    sections: List[Dict[str, Any]] = []
-    cursor = 0
-    sid = 0
-    for block in md.split("\n\n"):
-        block_text = block.strip()
-        if not block_text:
-            continue
-        sec_type = "table" if "|" in block_text and "---" in block_text else "text"
-        start = cursor
-        end = cursor + len(block_text)
-        sections.append({
-            "id": str(sid),
-            "type": sec_type,
-            "text": block_text,
-            "headings": [],
-            "char_start": start,
-            "char_end": end,
-        })
-        sid += 1
-        cursor = end + 2
-    if not sections:
-        raise RuntimeError(f"Docling produced no sections for {path}")
-    out_json.write_text(json.dumps({"sections": sections}, indent=2))
-    return {"sections": sections}
+    # For PDFs, delegate to LlamaParse ingestion implementation
+    return parse_pdf_or_text_llama(path)
 
 
 def upsert_chunks_pinecone(chunks: List[Dict[str, Any]], source_file: str) -> int:

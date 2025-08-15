@@ -7,8 +7,8 @@ from fastapi.testclient import TestClient
 
 
 def test_query_and_resume(tmp_path: Path):
-    # Configure temp chroma
-    os.environ["CHROMA_DIR"] = str(tmp_path / "chroma")
+    # Configure directories used by tests (Docling json storage replaced by LlamaParse outputs)
+    os.environ["DOCLING_JSON_DIR"] = str(tmp_path / "docling_json")
     os.environ["DOCLING_JSON_DIR"] = str(tmp_path / "docling_json")
     os.environ["LANGEXT_JSON_DIR"] = str(tmp_path / "langext_json")
     os.environ["LANGEXT_HTML_DIR"] = str(tmp_path / "langext_html")

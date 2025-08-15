@@ -5,13 +5,13 @@ pydantic==2.7.4
 python-dotenv==1.0.1
 tqdm==4.66.4
 sentence-transformers==3.0.1
-chromadb==0.5.3
 pdfplumber==0.11.0
 PyMuPDF==1.24.5
 langchain-text-splitters==0.2.2
 numpy==1.26.4
 scikit-learn==1.5.1
-docling==1.13.0 ; platform_system != "Darwin" or python_version >= "3.10"
+# chromadb removed: using Pinecone (cloud-first) instead
+# docling removed: using LlamaParse for PDF parsing
 google-generativeai==0.7.2
 tenacity==8.2.3
 starlette==0.37.2

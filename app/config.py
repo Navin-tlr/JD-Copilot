@@ -43,8 +43,10 @@ class Settings(BaseSettings):
     DOCLING_JSON_DIR: str = "data/docling_json"
     LANGEXT_JSON_DIR: str = "data/langext_json"
     LANGEXT_HTML_DIR: str = "data/langext_html"
-    # Docling models directory (git-cloned artifacts)
+    # Docling models directory retained for backward compatibility but not used when LLAMAPARSE is enabled
     DOCLING_MODELS_DIR: str = "data/docling_models"
+    # Deprecated Chroma local dir placeholder (no longer used)
+    CHROMA_DIR: str = "data/chroma"
 
     model_config = SettingsConfigDict(
         env_file=(".env", "env.example", ".env.example"),

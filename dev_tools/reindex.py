@@ -8,11 +8,8 @@ from app.config import get_settings
 
 def main() -> None:
     cfg = get_settings()
-    chroma_dir = Path(cfg.CHROMA_DIR)
-    if chroma_dir.exists():
-        shutil.rmtree(chroma_dir)
-    chroma_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Cleared Chroma at {chroma_dir}")
+    # Previously cleared local Chroma DB. Switch to Pinecone (cloud-first); no local reindex step.
+    print("Reindex tool is deprecated: this project now uses Pinecone (cloud-first). Use Pinecone console or API to manage indexes.")
 
 
 if __name__ == "__main__":
