@@ -1,0 +1,16 @@
+Company: Acme Corp
+Role: Software Engineer
+Year: 2024
+
+Responsibilities:
+- Build APIs in Python and FastAPI
+- Work with SQL and cloud (AWS)
+
+Compensation:
+CTC: ₹12,00,000 per annum
+
+Selection Process:
+- Online Test
+- GD
+- Technical Interview
+

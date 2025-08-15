@@ -1,0 +1,11 @@
+Org: Beta Analytics Ltd.
+Title: Data Scientist Intern
+Batch: 2025
+
+We expect skills in Python, Pandas, NumPy, ML, and SQL. Knowledge of TensorFlow or PyTorch is a plus.
+
+Salary:
+Stipend: ₹40,000 per month
+
+Process: Aptitude test, Interview
+
