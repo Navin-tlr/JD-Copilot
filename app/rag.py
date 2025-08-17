@@ -20,6 +20,13 @@ try:
 except ImportError:
     GEMINI_AVAILABLE = False
 
+# Add OpenRouter import
+try:
+    import requests
+    OPENROUTER_AVAILABLE = True
+except ImportError:
+    OPENROUTER_AVAILABLE = False
+
 
 class EmbeddingBackend:
     """Provides embeddings with local model and robust fallback for offline tests."""
@@ -164,9 +171,63 @@ Based on the job description, you can see this clearly:
         f"QUESTION: {question}"
     )
 
-    # If Gemini is configured, use it for synthesis
+    # Use OpenRouter as the primary LLM source
+    if settings.OPENROUTER_API_KEY and OPENROUTER_AVAILABLE:
+        print(f"🟢 Attempting synthesis with OpenRouter model: {settings.OPENROUTER_MODEL or 'moonshotai/kimi-k2:free'}")
+        try:
+            openrouter_model = settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free"
+            
+            payload = {
+                "model": openrouter_model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": final_prompt},
+                ],
+                "temperature": 0.0,
+                "max_tokens": 1024,
+            }
+
+            headers = {
+                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+            }
+
+            # Simple retry
+            for attempt in range(1, 3):
+                try:
+                    resp = requests.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=30,
+                    )
+                    if resp.status_code == 200:
+                        j = resp.json()
+                        choice = None
+                        if isinstance(j.get("choices"), list) and j["choices"]:
+                            choice = j["choices"][0]
+                        if choice:
+                            text = choice.get("message", {}).get("content") or choice.get("text")
+                            if text:
+                                print("✅ Successfully received answer from OpenRouter.")
+                                return text.strip()
+                        return "The model generated an empty response. Please try rephrasing your question."
+                    else:
+                        print(f"❌ OpenRouter API error (status {resp.status_code}): {resp.text}")
+                except requests.exceptions.Timeout:
+                    print(f"⏰ OpenRouter request timed out on attempt {attempt}")
+                except Exception as e:
+                    print(f"❌ OpenRouter request failed: {e}")
+            return "OpenRouter generation failed after retries."
+        except Exception as e:
+            print(f"❌ Error while calling OpenRouter: {e}")
+            import traceback
+            traceback.print_exc()
+            return f"Error calling OpenRouter: {e}"
+
+    # If OpenRouter failed, try Gemini as fallback
     if settings.GEMINI_API_KEY and GEMINI_AVAILABLE:
-        print(f"🟢 Attempting synthesis with Gemini model: {settings.GEMINI_MODEL or 'gemini-2.0-flash-exp'}")
+        print(f"🟡 Attempting synthesis with Gemini model: {settings.GEMINI_MODEL or 'gemini-2.0-flash-exp'}")
         try:
             # Configure Gemini
             genai.configure(api_key=settings.GEMINI_API_KEY)
@@ -219,9 +280,9 @@ Based on the job description, you can see this clearly:
             traceback.print_exc()
             return f"Error calling Gemini: {e}"
 
-    # If we reach here, Gemini was not configured or its call failed.
+    # If we reach here, both OpenRouter and Gemini failed or were not configured.
     # Skip synthesis and return None so the API returns retrieved snippets only.
-    print("🔴 No Gemini API key configured or Gemini generation failed. Skipping synthesis.")
+    print("🔴 No LLM API keys configured or all LLM generation failed. Skipping synthesis.")
     return None
 
 
