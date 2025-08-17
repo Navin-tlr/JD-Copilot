@@ -12,6 +12,14 @@ import os
 import certifi
 import requests
 
+# Add Gemini import
+try:
+    import google.generativeai as genai
+    from google.generativeai.types import HarmCategory, HarmBlockThreshold
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+
 
 class EmbeddingBackend:
     """Provides embeddings with local model and robust fallback for offline tests."""
@@ -118,10 +126,6 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
 
 def synthesize_answer(question: str, snippets: List[Dict[str, Any]]) -> str | None:
     settings = get_settings()
-    
-    if not settings.GEMINI_API_KEY:
-        print("🔴 GEMINI_API_KEY is not configured. Skipping synthesis.")
-        return None
 
     # --- ADVANCED SYSTEM PROMPT (Final, "Uncaged" Version) ---
     system_prompt = """
@@ -160,33 +164,65 @@ Based on the job description, you can see this clearly:
         f"QUESTION: {question}"
     )
 
-    print(f"🟢 Attempting synthesis with Gemini model: {settings.GEMINI_MODEL}")
-    
-    try:
-        import google.generativeai as genai
+    # If Gemini is configured, use it for synthesis
+    if settings.GEMINI_API_KEY and GEMINI_AVAILABLE:
+        print(f"🟢 Attempting synthesis with Gemini model: {settings.GEMINI_MODEL or 'gemini-2.0-flash-exp'}")
+        try:
+            # Configure Gemini
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            
+            # Use the specified model or default to a reliable one
+            gemini_model = settings.GEMINI_MODEL or "gemini-2.0-flash-exp"
+            
+            # Create the model instance
+            model = genai.GenerativeModel(gemini_model)
+            
+            # Combine system prompt and user prompt for Gemini
+            combined_prompt = f"{system_prompt}\n\n{final_prompt}"
+            
+            # Generate content with safety settings disabled for professional documents
+            response = model.generate_content(
+                combined_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.0,
+                    max_output_tokens=1024,
+                ),
+                safety_settings=[
+                    {
+                        "category": HarmCategory.HARM_CATEGORY_HARASSMENT,
+                        "threshold": HarmBlockThreshold.BLOCK_NONE,
+                    },
+                    {
+                        "category": HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                        "threshold": HarmBlockThreshold.BLOCK_NONE,
+                    },
+                    {
+                        "category": HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                        "threshold": HarmBlockThreshold.BLOCK_NONE,
+                    },
+                    {
+                        "category": HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                        "threshold": HarmBlockThreshold.BLOCK_NONE,
+                    },
+                ]
+            )
+            
+            if response and response.text:
+                print("✅ Successfully received answer from Gemini.")
+                return response.text.strip()
+            else:
+                return "The model generated an empty response. Please try rephrasing your question."
+                
+        except Exception as e:
+            print(f"❌ Error while calling Gemini: {e}")
+            import traceback
+            traceback.print_exc()
+            return f"Error calling Gemini: {e}"
 
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        
-        model = genai.GenerativeModel(
-            model_name=settings.GEMINI_MODEL,
-            system_instruction=system_prompt  # Pass the new system prompt here
-        )
-        
-        response = model.generate_content(final_prompt)
-        
-        if getattr(response, "text", None):
-            print("✅ Successfully received answer from Gemini.")
-            return response.text.strip()
-        else:
-            print("⚠️ Gemini response was empty.")
-            # It's better to inform the user than to return nothing.
-            return "The model generated an empty response. Please try rephrasing your question."
-
-    except Exception as e:
-        print(f"❌ An error occurred during Gemini API call: {e}")
-        import traceback
-        traceback.print_exc()
-        return "An error occurred while generating the answer. Please check the server logs."
+    # If we reach here, Gemini was not configured or its call failed.
+    # Skip synthesis and return None so the API returns retrieved snippets only.
+    print("🔴 No Gemini API key configured or Gemini generation failed. Skipping synthesis.")
+    return None
 
 
 def _build_prompt(question: str, snippets: List[Dict[str, Any]]) -> str:

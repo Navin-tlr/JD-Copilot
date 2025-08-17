@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     CHROMA_DIR: str = "data/chroma"
 
     model_config = SettingsConfigDict(
-        env_file=(".env", "env.example", ".env.example"),
+        env_file=("env.example", ".env.example", ".env"),
         case_sensitive=False,
         extra="ignore",
     )
@@ -64,6 +64,8 @@ def get_settings() -> Settings:
         os.environ.setdefault("REQUESTS_CA_BUNDLE", ca_path)
     except Exception:
         pass
+
+
 
     settings = Settings()
     # Ensure directories exist
