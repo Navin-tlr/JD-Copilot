@@ -1,0 +1,43 @@
+{
+  "company_name": "Tap Academy",
+  "year": 2024,
+  "roles": [
+    {
+      "title": "Business Development Associate",
+      "specialization": "MARKETING",
+      "location": "BTM Layout, Bangalore",
+      "salary_min_lpa": null,
+      "salary_max_lpa": null,
+      "skills": [
+        "cold calling",
+        "cold emailing",
+        "LinkedIn outreach",
+        "social media networking",
+        "CRM tools",
+        "communication",
+        "market research",
+        "networking"
+      ],
+      "requirements": [
+        "0-3 years experience (Edtech is a plus)",
+        "Bachelor’s degree in Business, Marketing, Human Resources, or related field",
+        "excellent communication skills",
+        "ability to work independently and manage multiple tasks",
+        "meet placement and performance targets"
+      ],
+      "responsibilities": [
+        "Lead Generation for Placements",
+        "Partnership Development",
+        "LinkedIn & Social Media Outreach",
+        "Placement Strategy",
+        "Market Research & Networking",
+        "Reporting & Pipeline Management"
+      ]
+    }
+  ],
+  "company_type": "Ed-Tech",
+  "industry": "Information and Technology",
+  "location": "BTM Layout, Bangalore",
+  "source_file": "Copy of Business Development Associate (1).pdf",
+  "extraction_timestamp": "2025-08-19 19:07:36.744909"
+}

@@ -1,0 +1,46 @@
+{
+  "company_name": "Madison PR",
+  "year": 2024,
+  "roles": [
+    {
+      "title": "Account Executive",
+      "specialization": "MARKETING",
+      "location": "Mumbai/Gurgaon/Bangalore",
+      "salary_min_lpa": null,
+      "salary_max_lpa": 5.5,
+      "skills": [
+        "storytelling",
+        "media engagement",
+        "public relations",
+        "Microsoft Office Suite",
+        "PR tools",
+        "content creation",
+        "influencer relations",
+        "campaign management"
+      ],
+      "requirements": [
+        "Post graduate degree in Public Relations, Communications, Marketing, or related field",
+        "Previous internship experience in public relations",
+        "Strong network of industry contacts",
+        "Exceptional written and verbal communication skills",
+        "Ability to multitask and meet tight deadlines",
+        "Proactive mindset",
+        "Familiarity with PR tools and software"
+      ],
+      "responsibilities": [
+        "Develop and execute PR strategies aligned with business objectives",
+        "Cultivate relationships with media professionals, influencers, and thought leaders",
+        "Craft press releases, media kits, and engaging content",
+        "Manage media inquiries and foster influencer relations",
+        "Monitor and analyze media coverage and campaign performance",
+        "Organize media events, press conferences, and product launches",
+        "Stay ahead of industry trends and leverage emerging opportunities"
+      ]
+    }
+  ],
+  "company_type": null,
+  "industry": "Public Relations",
+  "location": "Mumbai",
+  "source_file": "Account Executive - Madison PR Campus JD.pdf",
+  "extraction_timestamp": "2025-08-19 19:06:02.449011"
+}

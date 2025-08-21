@@ -1,0 +1,40 @@
+/* Import custom fonts for exact Figma design */
+
+/* That That New Pixel Test - for WELCOME TO Y^2 */
+@font-face {
+  font-family: 'That_That_New_Pixel_Test';
+  src: url('https://fonts.googleapis.com/css2?family=Pixel+Font&display=swap');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* Belmonte Ballpoint Trial - for large Y watermark */
+@font-face {
+  font-family: 'Belmonte_Ballpoint_Trial';
+  src: url('https://fonts.googleapis.com/css2?family=Cursive&display=swap');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* PP NeueBit - for button text */
+@font-face {
+  font-family: 'PP_NeueBit';
+  src: url('https://fonts.googleapis.com/css2?family=Neue+Bit&display=swap');
+  font-weight: bold;
+  font-style: normal;
+}
+
+/* PP Mondwest - for Create Account and Login titles */
+@font-face {
+  font-family: 'PP_Mondwest';
+  src: url('https://fonts.googleapis.com/css2?family=Mondwest&display=swap');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* Fallback fonts for better compatibility */
+.OnboardingScreen,
+.OsCreateAccount,
+.OsLogin {
+  font-family: 'That_That_New_Pixel_Test', 'PP_NeueBit', 'PP_Mondwest', 'Belmonte_Ballpoint_Trial', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}

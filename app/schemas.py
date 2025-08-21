@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
 
 class QueryFilters(BaseModel):
     company: Optional[str] = None
-    year: Optional[int] = None
+    # Accept either int or string (UI may send empty string); backend will coerce to int when needed
+    year: Optional[Union[int, str]] = None
     role_contains: Optional[str] = None
 
 

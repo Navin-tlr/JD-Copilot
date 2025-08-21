@@ -1,0 +1,74 @@
+[
+  {
+    "company_name": "Accorian",
+    "year": 2024,
+    "company_type": "Cybersecurity",
+    "industry": "Cybersecurity Advisory & Consulting",
+    "location": "New Jersey (HQ), India, Canada, UAE",
+    "batch_year": "2024-2025",
+    "roles": [
+      {
+        "title": "Associate – People Operations",
+        "specialization": "HR",
+                "location": "India",
+        "skills": ["people operations", "hr management", "cybersecurity", "consulting", "employee relations"],
+        "requirements": ["Bachelor's Degree/MBA", "Fresher", "HR operations knowledge"],
+        "responsibilities": ["People operations", "HR management", "Employee relations", "Cybersecurity consulting support"]
+      }
+    ]
+  },
+  {
+    "company_name": "Masters' Union",
+    "year": 2024,
+    "company_type": "Education",
+    "industry": "Business Education",
+    "location": "Gurgaon, Haryana",
+    "batch_year": "2024-2025",
+    "roles": [
+      {
+        "title": "Admission Counselor",
+        "specialization": "Operations",
+                "location": "Gurgaon, Haryana",
+        "skills": ["admissions", "counseling", "business education", "student recruitment", "communication"],
+        "requirements": ["Full Time", "Admissions experience", "Business education knowledge"],
+        "responsibilities": ["Student admissions", "Counseling", "Recruitment", "Business education support"]
+      }
+    ]
+  },
+  {
+    "company_name": "Target India (TII)",
+    "year": 2024,
+    "company_type": "Retail",
+    "industry": "E-commerce & Retail",
+    "location": "Bangalore",
+    "batch_year": "2024-2025",
+    "roles": [
+      {
+        "title": "Apprentice – Media Operations",
+        "specialization": "Marketing",
+                "location": "Bangalore",
+        "skills": ["media operations", "digital marketing", "retail", "e-commerce", "analytics", "team collaboration"],
+        "requirements": ["Master's in management with Marketing specialization", "CGPA requirements", "No backlogs"],
+        "responsibilities": ["Media operations", "Digital marketing", "Retail analytics", "Team collaboration"]
+      }
+    ]
+  },
+  {
+    "company_name": "TAP Academy",
+    "year": 2024,
+    "company_type": "Education",
+    "industry": "EdTech",
+    "location": "BTM Layout, Bangalore",
+    "batch_year": "2024-2025",
+    "roles": [
+      {
+        "title": "Business Development Associate",
+        "specialization": "Strategy",
+                "location": "BTM Layout, Bangalore",
+        "skills": ["business development", "edtech", "sales", "technical skills training", "student recruitment", "coaching"],
+        "requirements": ["0-3 Years experience", "Edtech experience preferred", "Business development skills"],
+        "responsibilities": ["Business development", "Student recruitment", "Technical training support", "Sales and marketing"]
+      }
+    ]
+  }
+]

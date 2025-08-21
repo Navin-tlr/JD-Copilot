@@ -8,6 +8,8 @@ from fastapi import FastAPI
 
 from .config import Health, get_settings
 from .rag import retrieve_snippets, synthesize_answer
+from .database import PlacementDatabase
+from .query_router import QueryRouter, QueryType
 from .schemas import (
     GDSimulateRequest,
     GDSimulateResponse,
@@ -31,38 +33,259 @@ def health() -> Health:
 @app.get("/companies")
 def get_companies():
     """Get all unique companies from the database for dropdown."""
-    from .rag import get_pinecone_index
-    import json
-    
     try:
-        index = get_pinecone_index()
-        # Query with a dummy vector to get some results and extract companies
-        dummy_vector = [0.1] * 384  # Assuming 384-dim embeddings
-        res = index.query(vector=dummy_vector, top_k=100, include_metadata=True)
+        # Use local database instead of Pinecone
+        db = PlacementDatabase()
+        companies_data = db.get_companies()
         
+        # Extract company names from the database
         companies = set()
-        for match in res.get("matches", []):
-            meta = match.get("metadata", {})
-            company = meta.get("company")
-            if company and company.strip():
-                companies.add(company.strip())
+        for company_info in companies_data:
+            company_name = company_info.get('company_name')
+            if company_name and company_name.strip():
+                companies.add(company_name.strip())
         
         company_list = sorted(list(companies))
         return {"companies": company_list}
     except Exception as e:
+        print(f"Error getting companies: {e}")
         return {"companies": [], "error": str(e)}
 
 
 @app.post("/query", response_model=QueryResponse)
 def query(req: QueryRequest) -> QueryResponse:
+    """Enhanced query endpoint with intelligent routing"""
     filters: Dict[str, Any] = {
         "company": req.filters.company,
         "year": req.filters.year,
         "role_contains": req.filters.role_contains,
     }
+    
+    # Use QueryRouter to determine the best approach
+    router = QueryRouter()
+    query_type, params = router.classify_query(req.question)
+    
+    print(f"🔍 Query Type: {query_type.value}")
+    print(f"📊 Parameters: {params}")
+    
+    # Route based on query type
+    if query_type == QueryType.STRUCTURED:
+        # Use structured database for counts, statistics, etc.
+        print("📊 Using STRUCTURED database approach")
+        try:
+            db = PlacementDatabase()
+            
+            # Handle company count queries
+            if "companies" in req.question.lower() and ("how many" in req.question.lower() or "count" in req.question.lower()):
+                # Use basic stats method that doesn't require offers data
+                basic_stats = db.get_basic_stats()
+                company_count = basic_stats.get('company_count', 0)
+                
+                # Get company names separately
+                companies = db.get_companies()
+                company_names = [c['company_name'] for c in companies]
+                
+                answer = f"""Based on the structured placement database, here are the current statistics:
+
+**Total Companies:** {company_count} companies are actively recruiting
+**Companies Available:** {', '.join(company_names)}
+
+**Note:** This data is from our current placement database. For historical data or specific year counts, please contact the placement office."""
+                
+                return QueryResponse(snippets=[], answer=answer)
+            
+            # Handle other structured queries
+            elif "salary" in req.question.lower():
+                # Get salary statistics
+                stats = db.get_placement_stats()
+                answer = f"""Based on the structured placement database:
+
+**Salary Statistics:**
+- Average Min Salary: {stats.get('avg_min_salary', 'Not available')} LPA
+- Average Max Salary: {stats.get('avg_max_salary', 'Not available')} LPA
+- Total Roles: {stats.get('role_count', 'Not available')}
+
+**Note:** Salary data is only available for roles where it was explicitly mentioned."""
+                
+                return QueryResponse(snippets=[], answer=answer)
+                
+        except Exception as e:
+            print(f"❌ Structured query failed: {e}")
+            # Fall back to RAG if structured query fails
+    
+    # Default to RAG for other query types
+    print("🔍 Using RAG approach")
     snippets = retrieve_snippets(req.question, req.top_k, filters)
-    answer = synthesize_answer(req.question, snippets) if snippets else None
+    answer = synthesize_answer(req.question, snippets, filters) if snippets else None
+    
     return QueryResponse(snippets=snippets, answer=answer)
+
+@app.get("/query/analyze")
+def analyze_query(question: str):
+    """Analyze query type and routing strategy"""
+    router = QueryRouter()
+    query_type, params = router.classify_query(question)
+    routing_strategy = router.get_routing_strategy(query_type, params)
+    
+    return {
+        "question": question,
+        "query_type": query_type.value,
+        "parameters": params,
+        "routing_strategy": routing_strategy
+    }
+
+@app.get("/stats/placement")
+def get_placement_stats(specialization: str = None, batch_year: str = "2024-2025"):
+    """Get placement statistics from structured database with MBA specialization support"""
+    try:
+        db = PlacementDatabase()
+        
+        # First try to get full stats with offers
+        try:
+            stats = db.get_placement_stats(specialization, batch_year)
+            if stats and stats.get('company_count', 0) > 0:
+                return {
+                    "success": True,
+                    "data": stats,
+                    "specialization": specialization,
+                    "batch_year": batch_year
+                }
+        except Exception:
+            pass
+        
+        # Fall back to basic stats if offers data is not available
+        basic_stats = db.get_basic_stats()
+        return {
+            "success": True,
+            "data": basic_stats,
+            "specialization": specialization,
+            "batch_year": batch_year,
+            "note": "Basic stats (no offers data available)"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "specialization": specialization,
+            "batch_year": batch_year
+        }
+
+@app.get("/stats/companies")
+def get_companies_stats():
+    """Get detailed company statistics"""
+    try:
+        db = PlacementDatabase()
+        companies = db.get_companies()
+        return {
+            "success": True,
+            "data": companies
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.get("/search/skills")
+def search_by_skills(skill: str, company: str = None):
+    """Search roles by skills with optional company filter"""
+    try:
+        db = PlacementDatabase()
+        results = db.search_skills(skill, company)
+        return {
+            "success": True,
+            "data": results,
+            "skill": skill,
+            "company_filter": company
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "skill": skill,
+            "company_filter": company
+        }
+
+@app.get("/specialization/companies")
+def get_companies_by_specialization(specialization: str, batch_year: str = "2024-2025"):
+    """Get companies offering roles in a specific MBA specialization"""
+    try:
+        db = PlacementDatabase()
+        results = db.get_companies_by_specialization(specialization, batch_year)
+        return {
+            "success": True,
+            "data": results,
+            "specialization": specialization,
+            "batch_year": batch_year
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "specialization": specialization,
+            "batch_year": batch_year
+        }
+
+@app.get("/specialization/insights")
+def get_specialization_insights(specialization: str, batch_year: str = "2024-2025"):
+    """Get comprehensive insights for a specific MBA specialization"""
+    try:
+        db = PlacementDatabase()
+        results = db.get_specialization_insights(specialization, batch_year)
+        return {
+            "success": True,
+            "data": results,
+            "specialization": specialization,
+            "batch_year": batch_year
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "specialization": specialization,
+            "batch_year": batch_year
+        }
+
+@app.get("/company/compare")
+def compare_company_specializations(company: str, batch_year: str = "2024-2025"):
+    """Compare different specializations within a company"""
+    try:
+        db = PlacementDatabase()
+        results = db.compare_company_specializations(company, batch_year)
+        return {
+            "success": True,
+            "data": results,
+            "company": company,
+            "batch_year": batch_year
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "company": company,
+            "batch_year": batch_year
+        }
+
+@app.get("/specialization/median-salary")
+def get_median_salary_by_specialization(specialization: str, batch_year: str = "2024-2025"):
+    """Get median salary for a specific MBA specialization"""
+    try:
+        db = PlacementDatabase()
+        median = db.get_median_salary_by_specialization(specialization, batch_year)
+        return {
+            "success": True,
+            "data": {"median_salary": median},
+            "specialization": specialization,
+            "batch_year": batch_year
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "specialization": specialization,
+            "batch_year": batch_year
+        }
 
 
 @app.post("/query/resume_match", response_model=ResumeMatchResponse)

@@ -1,0 +1,37 @@
+{
+  "company_name": "Target",
+  "year": 2024,
+  "roles": [
+    {
+      "title": "APPRENTICE – Media Operations",
+      "specialization": "MARKETING",
+      "location": "Bengaluru",
+      "salary_min_lpa": null,
+      "salary_max_lpa": null,
+      "skills": [
+        "digital media operations",
+        "retail and e-Commerce business",
+        "Media Operations tools & technologies"
+      ],
+      "requirements": [
+        "Master’s in management with Marketing specialization",
+        "CGPA or Aggregate as prescribed with no active backlogs",
+        "Passion for learning new tools & technologies",
+        "Team player mindset with a “can-do” attitude",
+        "Ability to follow through with ideas and deliver on commitments"
+      ],
+      "responsibilities": [
+        "Learn and work alongside Media Operations professionals",
+        "Gain practical, hands-on experience in digital media operations",
+        "Participate in shadow sessions and live case practice within media accounts",
+        "Enhance technical expertise and develop professional capabilities",
+        "Contribute effectively to the Media Operations field upon completion"
+      ]
+    }
+  ],
+  "company_type": "Fortune 50 company",
+  "industry": "Retail",
+  "location": "Bengaluru",
+  "source_file": "Apprentice Media Operations JD (1).pdf",
+  "extraction_timestamp": "2025-08-19 19:07:13.080049"
+}

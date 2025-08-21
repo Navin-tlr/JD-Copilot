@@ -8,6 +8,8 @@ from pinecone import Pinecone
 
 from .config import get_settings
 from .utils import cosine_similarity, filter_metadata, role_contains, slugify_company
+from .database import PlacementDatabase
+from .query_router import QueryRouter, QueryType
 import os
 import certifi
 import requests
@@ -92,6 +94,7 @@ def get_pinecone_index():
 
 
 MAX_SNIPPET_CHARS = 400
+MAX_FULL_JD_CHARS = 10000  # Much larger limit for full JD requests
 
 
 def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -100,61 +103,182 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
     embedder = EmbeddingBackend(settings.EMBED_MODEL)
     q_emb = embedder.embed([question])[0]
 
-    # If company filter provided, bias the query by appending a tag and using slug
+    # Check if this is a "full jd" request
+    is_full_jd_request = any(phrase in question.lower() for phrase in [
+        "full jd", "complete jd", "entire jd", "full job description", 
+        "complete job description", "entire job description", "show me jd", "give jd"
+    ])
+    
+    # Use larger snippet size for full JD requests
+    snippet_limit = MAX_FULL_JD_CHARS if is_full_jd_request else MAX_SNIPPET_CHARS
+    
+    # Auto-detect company from question text if not provided in filters
     company_text = filters.get("company")
-    company_slug = slugify_company(company_text) if company_text else None
-    if company_slug:
-        question = f"[company={company_slug}] {question}"
+    if not company_text:
+        # Try to extract company name from question
+        question_lower = question.lower()
+        if "of " in question_lower or "for " in question_lower:
+            # Look for patterns like "full jd of Tap academy" or "jd for Mill Story"
+            for phrase in ["of ", "for "]:
+                if phrase in question_lower:
+                    parts = question_lower.split(phrase)
+                    if len(parts) > 1:
+                        potential_company = parts[1].strip().split()[0:3]  # Take up to 3 words
+                        company_text = " ".join(potential_company)
+                        print(f"🔍 Auto-detected company from question: '{company_text}'")
+                        break
+    
+    # If company filter provided (either from filters or auto-detected), bias the query
+    if company_text:
+        question = f"[company={company_text}] {question}"
         q_emb = embedder.embed([question])[0]
 
-    res = index.query(vector=q_emb.tolist(), top_k=max(1, top_k * 2), include_metadata=True, include_values=False)
+    # Query more results to ensure we get comprehensive coverage
+    # For full JD requests, get more chunks to reconstruct the complete document
+    query_top_k = max(50, top_k * 8) if is_full_jd_request else max(20, top_k * 4)
+    res = index.query(vector=q_emb.tolist(), top_k=query_top_k, include_metadata=True, include_values=False)
     matches = res.get("matches", []) if isinstance(res, dict) else getattr(res, "matches", [])
     # We don't store the original document text in Pinecone; return metadata with preview fields
     # To provide text for snippets, include a small slice from metadata if present
     scored = []
     for m in matches:
         meta = m.get("metadata", {}) if isinstance(m, dict) else getattr(m, "metadata", {})
-        # Prefer slug exact match when provided
-        if company_slug and meta.get("company_slug") != company_slug:
-            continue
+        
+        # Company filtering - comprehensive matching
+        if company_text:
+            meta_company = meta.get("company", "")
+            if not meta_company:  # Skip chunks without company metadata
+                continue
+                
+            # Multiple matching strategies for comprehensive coverage
+            company_lower = company_text.lower().strip()
+            meta_lower = meta_company.lower().strip()
+            
+            # Strategy 1: Exact match
+            if company_lower == meta_lower:
+                should_include = True
+            # Strategy 2: Contains match (either direction)
+            elif company_lower in meta_lower or meta_lower in company_lower:
+                should_include = True
+            # Strategy 3: Word-based matching for compound names
+            company_words = set(company_lower.split())
+            meta_words = set(meta_lower.split())
+            if company_words & meta_words:  # Set intersection
+                should_include = True
+            # Strategy 4: Common abbreviations/variations
+            elif any(word in meta_lower for word in company_lower.split()):
+                should_include = True
+            # Strategy 5: Handle acronyms and variations (e.g., "Tap academy" vs "TAP Academy")
+            elif company_lower.replace(" ", "") == meta_lower.replace(" ", ""):
+                should_include = True
+            # Strategy 6: Handle case variations and partial matches
+            elif any(word.upper() in meta_lower.upper() for word in company_lower.split()):
+                should_include = True
+            else:
+                should_include = False
+                
+            if not should_include:
+                continue
+        
         if not role_contains(meta, filters.get("role_contains")):
             continue
+            
         full_text = meta.get("chunk_text") or meta.get("preview") or ""
-        text = full_text[:MAX_SNIPPET_CHARS]
+        text = full_text[:snippet_limit]
         scored.append({
             "id": m.get("id") if isinstance(m, dict) else getattr(m, "id", None),
             "text": text,
-            "score": float(m.get("score", 0.0) if isinstance(m, dict) else getattr(m, "score", 0.0)),
             "metadata": meta,
+            "score": float(m.get("score", 0.0) if isinstance(m, dict) else getattr(m, "score", 0.0)),
         })
     scored.sort(key=lambda x: x["score"], reverse=True)
+    
+    # Debug logging for company filtering
+    if company_text:
+        company_chunks = [s for s in scored if s.get("metadata", {}).get("company", "").lower() == company_text.lower()]
+        print(f"🔍 Company filter '{company_text}': Found {len(company_chunks)} chunks out of {len(scored)} total")
+    
+    # For full JD requests, return more chunks to reconstruct the complete document
+    if is_full_jd_request:
+        print(f"📄 Full JD request detected - returning up to {len(scored)} chunks for complete document reconstruction")
+        return scored[:min(len(scored), 50)]  # Return up to 50 chunks for full JD
+    
     return scored[:top_k]
 
 
-def synthesize_answer(question: str, snippets: List[Dict[str, Any]]) -> str | None:
+def synthesize_answer(question: str, snippets: List[Dict[str, Any]], filters: Dict[str, Any] = None) -> str | None:
     settings = get_settings()
 
-    # --- ADVANCED SYSTEM PROMPT (Final, "Uncaged" Version) ---
-    system_prompt = """
-You are JD-GPT, a seasoned AI career coach and industry expert. Your primary goal is to provide students with insightful, comprehensive, and well-reasoned answers about job descriptions.
+    # --- ENHANCED SYSTEM PROMPT - MBA Placement Specialist ---
+    system_prompt = """You are JD-Copilot, a Placement Cell Assistant for MBA students. 
+Your role is to act as a responsible member of the placement cell. 
+You must answer questions ONLY based on the retrieved snippets from the placement database (PDFs that were ingested). 
+You are accountable for the accuracy of your answers — if something is not present in the data, clearly state: 
+"I could not find this information in the available documents."
 
-**Your Core Principles:**
-1.  **Synthesize, Don't Just Summarize:** Use the provided text as your primary source, but you are encouraged to **enrich your answer with your own general knowledge** about the job market, career paths, and corporate roles.
-2.  **Explain the "Why":** When you make an inference or connect concepts (e.g., explaining that "Business Development" is a form of marketing), you must clearly explain your reasoning.
-3.  **Adopt a Conversational and Encouraging Tone:** Speak directly to the student. Be a helpful guide, not a robot. Use formatting like bold text and bullet points to make your advice easy to digest.
-4.  **Be Honest About Missing Information:** If the provided text is missing critical details (like a specific salary range), state that clearly, but you can also provide a general market estimate based on your own knowledge.
+🎯 Answering Guidelines:
+1. Always ground your answer in the retrieved snippets. Never invent, assume, or guess. 
+2. Present answers in a professional, clear format, as if addressing MBA students. 
+3. When information is found:
+   - Extract the exact details from snippets. 
+   - Summarize them concisely in natural language. 
+   - If multiple snippets overlap, merge the information coherently. 
+4. When information is missing:
+   - Do NOT fabricate. 
+   - Say explicitly: "Not mentioned in the available documents."
+5. Maintain a tone of responsibility, as if you are part of the Placement Cell, giving official information. 
+   - Example: "According to the placement document, TAP Academy is offering the role of Business Development Associate at BTM Layout, Bangalore."
+6. Provide structured formatting for clarity:
+   - **Job Title:** …
+   - **Location:** …
+   - **Salary Range:** …
+   - **Skills Required:** …
+   - **Other Notes:** …
+7. If the query is general (not company-specific), search across all documents and provide an aggregated answer.
+8. Never answer in a role-play style (e.g., "As TAP Academy's placement coordinator..."). 
+   Instead, speak as a placement cell officer reporting from official documents.
 
-**Example of a good response:**
+📋 SPECIAL INSTRUCTION FOR FULL JD REQUESTS:
+When the user asks for "full jd", "complete jd", "entire jd", or similar phrases:
+- Provide the COMPLETE job description from all available snippets
+- Reconstruct the full document by combining all relevant chunks
+- Include ALL details: responsibilities, requirements, qualifications, benefits, etc.
+- Do NOT truncate or summarize - give the user the complete information
+- If chunks are incomplete, clearly indicate what parts are missing
+- Structure the response as a complete, readable job description
 
-*User Question:* "Is this a marketing role?"
+🚨 CRITICAL: COMPANY-SPECIFIC QUERIES
+When a company name is mentioned in the question (e.g., "full jd of Tap academy"):
+- Focus EXCLUSIVELY on that company
+- Do NOT include information from other companies
+- If the company is not found in the database, clearly state: "I could not find any information about [Company Name] in the available documents."
+- If the company is found but has limited information, provide what's available and clearly state what's missing
 
-*Your Answer:*
-Yes, absolutely. While the official title is **Business Development Associate**, this is fundamentally a marketing and sales role. In the tech industry, "Business Development" often involves a mix of sales, relationship-building, and strategic marketing to grow the company.
+✅ Example Output for Full JD Request:
+**Complete Job Description for [Company Name]**
 
-Based on the job description, you can see this clearly:
-* The role focuses heavily on **lead generation** using techniques like cold calling and LinkedIn outreach, which are classic sales and digital marketing activities.
-* The goal of **partnership development** is a form of business-to-business (B2B) marketing, where you are essentially selling the value of TAP Academy's students to other companies.
-* The fact that a **degree in Marketing** is listed as a preferred qualification is a strong indicator that the company itself views this as a marketing-oriented position.
+**Job Title:** [Role]
+**Location:** [Location]
+**Duration:** [Duration if mentioned]
+**Start Date:** [Start date if mentioned]
+**Compensation:** [Salary/benefits if mentioned]
+
+**About the Company:**
+[Complete company description from snippets]
+
+**Job Description:**
+[Complete responsibilities and role details from all snippets]
+
+**What We're Looking For:**
+[Complete requirements and qualifications from all snippets]
+
+**What You'll Work On:**
+[Complete list of responsibilities from all snippets]
+
+**Additional Information:**
+[Any other details found in the snippets]
+
+*This is the complete job description based on all available document chunks.*
 """
 
     # --- Build the final prompt for the API call ---
@@ -163,7 +287,38 @@ Based on the job description, you can see this clearly:
         for s in snippets
     )
     
+    # Dynamic instruction based on company filter
+    company_text = filters.get("company") if filters else None
+    if company_text:
+        mode_instruction = f"""
+IMPORTANT: You are in COMPANY-SPECIFIC MODE. Focus EXCLUSIVELY on {company_text}.
+Analyze ONLY the chunks from this company and provide comprehensive, detailed insights.
+Act as the company's placement coordinator who knows every detail about their requirements.
+
+🚨 CRITICAL FILTERING INSTRUCTIONS:
+- You MUST ONLY use information from {company_text}
+- If you see chunks from other companies (like Accorian, Mill Story, etc.), IGNORE them completely
+- Only process and respond with information from {company_text}
+- If no information is found for {company_text}, clearly state: "No information found for {company_text}"
+
+📋 SPECIAL INSTRUCTION FOR FULL JD REQUESTS:
+When the user asks for "full jd", "complete jd", "entire jd", or similar phrases:
+- Provide the COMPLETE job description from all available snippets for {company_text}
+- Reconstruct the full document by combining all relevant chunks from {company_text} ONLY
+- Include ALL details: responsibilities, requirements, qualifications, benefits, etc.
+- Do NOT truncate or summarize - give the user the complete information
+- If chunks are incomplete, clearly indicate what parts are missing
+- Structure the response as a complete, readable job description for {company_text}
+"""
+    else:
+        mode_instruction = f"""
+IMPORTANT: You are in STRATEGIC CONSULTANT MODE. Analyze ALL available data across companies.
+Provide comprehensive market insights, trends, and cross-company recommendations.
+Act as a placement consultant who understands the entire landscape.
+"""
+
     final_prompt = (
+        f"{mode_instruction}\n\n"
         "CONTEXT:\n"
         "---------------------\n"
         f"{context}\n"
@@ -184,7 +339,7 @@ Based on the job description, you can see this clearly:
                     {"role": "user", "content": final_prompt},
                 ],
                 "temperature": 0.0,
-                "max_tokens": 1024,
+                "max_tokens": 2048,  # Increased from 1024 for full JD requests
             }
 
             headers = {
@@ -246,7 +401,7 @@ Based on the job description, you can see this clearly:
                 combined_prompt,
                 generation_config=genai.types.GenerationConfig(
                     temperature=0.0,
-                    max_output_tokens=1024,
+                    max_output_tokens=2048,  # Increased from 1024 for full JD requests
                 ),
                 safety_settings=[
                     {
@@ -298,5 +453,94 @@ def _build_prompt(question: str, snippets: List[Dict[str, Any]]) -> str:
         + "Question: " + question + "\n"
         + "Instructions: Answer only the question, briefly (<=120 words). Use only provided context. Include inline citations in the form [Company | Role | Year]."
     )
+
+
+def _handle_structured_query(question: str, params: Dict[str, Any], db: PlacementDatabase, snippets: List[Dict[str, Any]]) -> str:
+    """Handle structured queries using SQL database"""
+    try:
+        if params.get("entity") == "companies":
+            if params.get("year"):
+                stats = db.get_placement_stats(params["year"])
+            else:
+                stats = db.get_placement_stats()
+            
+            if stats:
+                return f"""
+**Placement Statistics:**
+- **Total Companies:** {stats.get('company_count', 0)}
+- **Total Roles:** {stats.get('role_count', 0)}
+- **Salary Range:** ₹{stats.get('min_salary', 0):.1f} - ₹{stats.get('max_salary', 0):.1f} LPA
+- **Average Salary:** ₹{stats.get('avg_min_salary', 0):.1f} - ₹{stats.get('avg_max_salary', 0):.1f} LPA
+
+**Top Skills in Demand:**
+{chr(10).join([f"- {skill['skill']}: {skill['count']} roles" for skill in stats.get('top_skills', [])])}
+
+*Data extracted from structured placement database*
+"""
+        
+        return "I'll analyze the structured data for you. Please try rephrasing your question."
+        
+    except Exception as e:
+        print(f"Structured query failed: {e}")
+        return "I encountered an error while processing the structured data. Please try again."
+
+def _handle_hybrid_query(question: str, params: Dict[str, Any], db: PlacementDatabase, snippets: List[Dict[str, Any]]) -> str:
+    """Handle hybrid queries combining SQL and RAG"""
+    try:
+        # Get structured data
+        structured_answer = _handle_structured_query(question, params, db, snippets)
+        
+        # Get RAG insights
+        rag_answer = _handle_rag_query(question, snippets, {})
+        
+        return f"""
+**Structured Data Analysis:**
+{structured_answer}
+
+**Detailed Insights from Job Descriptions:**
+{rag_answer}
+"""
+        
+    except Exception as e:
+        print(f"Hybrid query failed: {e}")
+        return "I encountered an error while processing the hybrid query. Please try again."
+
+def _handle_multi_hop_query(question: str, params: Dict[str, Any], db: PlacementDatabase, snippets: List[Dict[str, Any]]) -> str:
+    """Handle multi-hop queries with filtering then analysis"""
+    try:
+        # Step 1: Apply filters (e.g., salary threshold)
+        if params.get("salary_threshold"):
+            threshold = params["salary_threshold"]
+            operator = params.get("salary_operator", ">")
+            
+            # Get companies meeting salary criteria
+            filtered_companies = db.search_skills("", None)  # Get all for now
+            high_paying = [c for c in filtered_companies if c.get("salary_max_lpa", 0) > threshold]
+            
+            if high_paying:
+                company_list = ", ".join([c["company_name"] for c in high_paying[:5]])
+                
+                return f"""
+**Multi-Step Analysis Results:**
+
+**Step 1: Companies with Salary {operator} ₹{threshold} LPA:**
+{company_list}
+
+**Step 2: Skills Analysis for High-Paying Roles:**
+Based on the filtered companies, here are the key skills in demand:
+
+{_handle_rag_query(question, snippets, {})}
+"""
+        
+        return "I'll perform the multi-step analysis. Please try rephrasing your question."
+        
+    except Exception as e:
+        print(f"Multi-hop query failed: {e}")
+        return "I encountered an error while processing the multi-step query. Please try again."
+
+def _handle_rag_query(question: str, snippets: List[Dict[str, Any]], filters: Dict[str, Any]) -> str:
+    """Handle traditional RAG queries"""
+    # This is the existing synthesis logic
+    return synthesize_answer(question, snippets)
 
 

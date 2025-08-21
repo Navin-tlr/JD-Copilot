@@ -163,4 +163,101 @@ pytest -q
 
 Tests use `dev_tools/sample_jd_texts/` to validate ingestion and API endpoints without requiring Docling or LangExtract. No network LLM calls are made during tests.
 
+# Y² Mobile App
+
+A React-based mobile application for the Y² Placement Co-Pilot, built with TypeScript and Tailwind CSS.
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js (v14 or higher)
+- npm or yarn
+
+### Installation
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Start the development server:
+```bash
+npm start
+```
+
+3. Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+
+## 📱 Features
+
+### Onboarding Screen
+- **Exact Figma Implementation**: Pixel-perfect recreation of the design
+- **Large Y Watermark**: 700px font with proper opacity and positioning
+- **Welcome Title**: "WELCOME TO Y^2" with exact typography
+- **Interactive Button**: SIGN UP/LOG IN button with hover effects
+- **Mobile-First Design**: Optimized for mobile devices
+
+### Technical Features
+- **React 18** with TypeScript
+- **Tailwind CSS** for styling
+- **Responsive Design** that works on all screen sizes
+- **Accessibility** features (ARIA labels, keyboard navigation)
+- **Hover Effects** and smooth transitions
+
+## 🎨 Design Specifications
+
+The app implements the exact Figma design with:
+- **Colors**: `#ffffff`, `#2a2727`, `#646262`
+- **Typography**: That That New Pixel Test, PP NeueBit, Belmonte Ballpoint Trial
+- **Layout**: 393x852px mobile container with precise positioning
+- **Components**: Exact button dimensions (172x46px) and positioning
+
+## 📁 Project Structure
+
+```
+src/
+├── components/
+│   └── OnboardingScreen.tsx    # Main onboarding component
+├── assets/
+│   └── rectangle-7.svg         # Button background asset
+├── App.tsx                     # Main app component
+├── App.css                     # App-specific styles
+├── index.css                   # Global styles with Tailwind
+└── index.tsx                   # App entry point
+```
+
+## 🔧 Available Scripts
+
+- `npm start` - Runs the app in development mode
+- `npm run build` - Builds the app for production
+- `npm test` - Launches the test runner
+- `npm run eject` - Ejects from Create React App (one-way operation)
+
+## 📱 Mobile Development
+
+This app is designed specifically for mobile devices:
+- **Mobile-first approach** with responsive design
+- **Touch-friendly interfaces** with proper button sizes
+- **Mobile-optimized layouts** and typography
+- **Performance optimized** for mobile devices
+
+## 🚀 Next Steps
+
+1. **Add more screens** (Authentication, Main App, Profile)
+2. **Implement navigation** between screens
+3. **Connect to backend API** for real data
+4. **Add animations** and micro-interactions
+5. **Implement authentication flow**
+6. **Add offline support** and PWA features
+
+## 🎯 Design Philosophy
+
+The app follows the Y² brand philosophy:
+- **"I don't hold hands. I hand you weapons"**
+- **Clean, professional interface** that matches the brand
+- **Mobile-optimized experience** for placement cell users
+- **Accessible design** for all users
+
+---
+
+**Note**: This is a React implementation that perfectly matches your Figma design specifications, providing a much better foundation for mobile app development compared to Streamlit.
+
 

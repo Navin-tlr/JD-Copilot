@@ -15,8 +15,10 @@ from tqdm import tqdm
 
 from app.config import get_settings
 from app.rag import EmbeddingBackend
+from app.database import PlacementDatabase
 from app.utils import stable_chunk_id
 from ingest.company_extractor import extract_company
+from ingest.structured_extractor import StructuredExtractor
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
@@ -27,6 +29,7 @@ def _read_text_from_path(path: Path) -> str:
         if not txt.strip():
             raise RuntimeError(f"Empty text in {path}")
         return txt
+
 
     # Prefer LLAMA_CLOUD_API_KEY; fallback to LLAMAPARSE_API_KEY if present
     api_key = os.getenv("LLAMA_CLOUD_API_KEY") or os.getenv("LLAMAPARSE_API_KEY") or get_settings().LLAMAPARSE_API_KEY
@@ -191,7 +194,7 @@ def _split_into_chunks(text: str, chunk_size: int, chunk_overlap: int) -> List[T
 
 
 def process_file(path: Path) -> Tuple[int, Optional[str]]:
-    """Parse → extract company → chunk → embed → upsert. Returns (num_chunks, company)."""
+    """Parse → extract company → structured extraction → chunk → embed → upsert. Returns (num_chunks, company)."""
     settings = get_settings()
     text = _read_text_from_path(path)
     preview = text[:500]
@@ -203,6 +206,33 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
         print(f"✅ company={company_name} file={path.name}")
     else:
         print(f"❌ no company extracted file={path.name}")
+
+    # NEW: Structured extraction using LLM
+    print(f"🔍 Performing structured extraction for {path.name}...")
+    structured_extractor = StructuredExtractor()
+    extraction = structured_extractor.extract_structured_data(text)
+    
+    if extraction and extraction.company_name:
+        print(f"✅ Structured extraction successful: {extraction.company_name}")
+        # Save structured data to JSON
+        json_path = structured_extractor.save_structured_data(extraction, path.name)
+        if json_path:
+            print(f"💾 Saved structured data to: {json_path}")
+            # Insert structured extraction into the local database so UI reflects new companies
+            try:
+                db = PlacementDatabase()
+                # Read back the saved JSON and insert
+                with open(json_path, 'r', encoding='utf-8') as jf:
+                    extraction_dict = json.load(jf)
+                success = db.insert_company_extraction(extraction_dict)
+                if success:
+                    print(f"🗄️ Inserted structured extraction into DB: {extraction.company_name}")
+                else:
+                    print(f"⚠️ Failed to insert structured extraction into DB for: {extraction.company_name}")
+            except Exception as e:
+                print(f"❌ Error inserting structured extraction into DB: {e}")
+    else:
+        print(f"⚠️ Structured extraction failed for {path.name}")
 
     # Chunk using RecursiveCharacterTextSplitter
     chunk_size = int(os.getenv("CHUNK_SIZE", "700"))
@@ -239,7 +269,7 @@ def main() -> None:
     args = parser.parse_args()
 
     files: List[Path] = []
-    for ext in ("*.pdf", "*.PDF", "*.txt"):
+    for ext in ("*.pdf", "*.PDF", "*.txt", "*.docx", "*.DOCX"):
         files.extend(sorted(Path(args.pdf_dir).glob(ext)))
     if not files:
         print("No files found to ingest.")
