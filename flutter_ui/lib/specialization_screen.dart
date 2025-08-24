@@ -98,7 +98,7 @@ class _SpecializationScreenState extends State<SpecializationScreen>
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) => 
-              ChatInterfaceScreen(selectedSpecialization: specializationId),
+              ChatInterfaceScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
               opacity: CurvedAnimation(
