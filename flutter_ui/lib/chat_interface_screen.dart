@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:video_player/video_player.dart';
 
 class ChatInterfaceScreen extends StatefulWidget {
   const ChatInterfaceScreen({super.key});
@@ -9,165 +10,268 @@ class ChatInterfaceScreen extends StatefulWidget {
 }
 
 class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
+  final TextEditingController _textController = TextEditingController();
+  VideoPlayerController? _videoController;
+  bool _isVideoInitialized = false;
+  final List<Map<String, dynamic>> _messages = [];
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeVideo();
+  }
+
+  Future<void> _initializeVideo() async {
+    try {
+      _videoController = VideoPlayerController.asset('assets/videos/glyph_dither.mp4');
+      await _videoController!.initialize();
+      await _videoController!.setLooping(true);
+      await _videoController!.play();
+      setState(() {
+        _isVideoInitialized = true;
+      });
+    } catch (e) {
+      // Handle video initialization error silently in production
+      debugPrint('Error initializing video: $e');
+    }
+  }
+
+  void _sendMessage() {
+    if (_textController.text.trim().isEmpty) return;
+    
+    final userMessage = _textController.text.trim();
+    setState(() {
+      _messages.add({
+        'text': userMessage,
+        'isUser': true,
+        'timestamp': DateTime.now(),
+      });
+      _isLoading = true;
+    });
+    
+    _textController.clear();
+    
+    // Simulate AI response (replace with actual API call)
+    Future.delayed(const Duration(seconds: 2), () {
+      setState(() {
+        _messages.add({
+          'text': 'I\'m processing your request. This is where the AI response will appear.',
+          'isUser': false,
+          'timestamp': DateTime.now(),
+        });
+        _isLoading = false;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF363232), // Exact: background: #363232
+      backgroundColor: const Color(0xFF363232),
       body: Center(
         child: SizedBox(
-          width: 393, // Exact: width: 393px
-          height: 852, // Exact: height: 852px
+          width: 393,
+          height: 852,
           child: Stack(
+            alignment: Alignment.center,
             children: [
-              // Y Logo - Using y_logo.png with exact Figma styling
-              Positioned(
-                left: 51.78, // Exact: left: 51.78px
-                top: 215.68, // Exact: top: 215.68px
-                child: Container(
-                  width: 279.834, // Exact: width: 279.834px
-                  height: 435.414, // Exact: height: 435.414px
-                  decoration: BoxDecoration(
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color.fromRGBO(0, 0, 0, 0.25), // rgba(0, 0, 0, 0.25)
-                        offset: const Offset(0, 4), // 0 4px
-                        blurRadius: 4, // 4px
-                        spreadRadius: 0, // 0
-                      ),
-                    ],
-                  ),
-                  child: Opacity(
-                    opacity: 0.28, // Exact: opacity: 0.28
-                    child: Image.asset(
-                      'assets/images/y_logo.png',
-                      width: 279.834,
-                      height: 435.414,
-                      fit: BoxFit.contain,
-                      color: const Color.fromRGBO(255, 255, 255, 0.23), // fill: rgba(255, 255, 255, 0.23)
-                      colorBlendMode: BlendMode.modulate,
+              // Background Video - Using exported Unicorn Studio video
+              if (_isVideoInitialized && _videoController != null)
+                Positioned.fill(
+                  child: FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: _videoController!.value.size.width,
+                      height: _videoController!.value.size.height,
+                      child: VideoPlayer(_videoController!),
                     ),
                   ),
                 ),
-              ),
 
-              // Main Message - "I'm your placement co-pilot..."
+              // Header with Hamburger Menu and Title
               Positioned(
-                left: 96, // Center the main message (393 - 200) / 2 = 96.5
-                top: 300, // Position in the center area of the screen
-                child: Container(
-                  width: 200, // Give enough width for text
-                  color: Colors.red.withValues(alpha: 0.3), // DEBUG: Make text area visible
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'I\'m your placement co-pilot.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontFamily: 'Arial', // DEBUG: Use system font instead of 'ppmondwest'
-                          fontWeight: FontWeight.w400,
-                          height: 1.3,
-                        ),
+                left: 25,
+                top: 31,
+                right: 25,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    CustomPaint(
+                      size: const Size(24, 24),
+                      painter: _HamburgerMenuPainter(),
+                    ),
+                    const Text(
+                      'Y^2',
+                      style: TextStyle(
+                        fontFamily: 'That That New Pixel Test',
+                        fontSize: 38,
+                        color: Colors.white,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'I don\'t hold hands.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontFamily: 'Arial', // DEBUG: Use system font instead of 'ppmondwest'
-                          fontWeight: FontWeight.w400,
-                          height: 1.3,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'I hand you weapons.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontFamily: 'Arial', // DEBUG: Use system font instead of 'ppmondwest'
-                          fontWeight: FontWeight.w400,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 24), // Spacer for balance
+                  ],
                 ),
               ),
 
-              // Input Field - Frame 2 with exact specifications
+              // Chat Messages Area
               Positioned(
-                left: 16, // Exact: left: 16px
-                top: 775, // Exact: top: 775px
-                child: Container(
-                  width: 361, // Exact: width: 361px
-                  height: 50, // Exact: height: 50px
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12.47), // Exact: border-radius: 12.47px
-                    border: Border.all(
-                      color: const Color.fromRGBO(255, 255, 255, 0.56), // Exact: rgba(255, 255, 255, 0.56)
-                      width: 1.04, // Exact: outline: 1.04px
-                    ),
-                  ),
-                  child: Stack(
-                    children: [
-                      // Text: "I'm not here for chit-chat. Aim, fire, and I deliver"
-                      Positioned(
-                        left: 38.44, // Exact: left: 38.44px
-                        top: 15.58, // Exact: top: 15.58px
-                        child: SizedBox(
-                          width: 280, // Give enough width for text to wrap properly
-                          child: Text(
-                            'I\'m not here for chit-chat. Aim, fire, and I deliver',
-                            style: TextStyle(
-                              color: const Color.fromRGBO(255, 255, 255, 0.70), // Exact: rgba(255, 255, 255, 0.70)
-                              fontSize: 17.02, // Exact: font-size: 17.02px
-                              fontFamily: 'ppmondwest', // Exact: font-family: PP Mondwest
-                              fontWeight: FontWeight.w400, // Exact: font-weight: 400
+                top: 120, // Below header
+                left: 16,
+                right: 16,
+                bottom: 100, // Above input field
+                child: _messages.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Ask me anything about placements...',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                            fontFamily: 'ppmondwest',
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        reverse: true,
+                        itemCount: _messages.length + (_isLoading ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == 0 && _isLoading) {
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Row(
+                                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    'Thinking...',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          
+                          final messageIndex = _isLoading ? index - 1 : index;
+                          final message = _messages[messageIndex];
+                          final isUser = message['isUser'] as bool;
+                          
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            child: Row(
+                              mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+                              children: [
+                                Container(
+                                  constraints: BoxConstraints(
+                                    maxWidth: MediaQuery.of(context).size.width * 0.7,
+                                  ),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: isUser 
+                                        ? Colors.white.withValues(alpha: 0.2)
+                                        : Colors.black.withValues(alpha: 0.3),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.1),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    message['text'] as String,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontFamily: 'ppmondwest',
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            softWrap: true, // Enable text wrapping
-                            overflow: TextOverflow.visible, // Allow text to be visible
+                          );
+                        },
+                      ),
+              ),
+
+              // Functional Input Field with new Figma Specs
+              Positioned(
+                left: 16,
+                bottom: 27,
+                right: 16,
+                child: Container(
+                  width: 361, // Exact width from Figma
+                  height: 50, // Exact height from Figma
+                  padding: const EdgeInsets.fromLTRB(6, 11, 8.557, 11.986), // Exact padding from Figma
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12.468), // Exact border-radius from Figma
+                    border: Border.all(
+                      color: const Color.fromRGBO(255, 255, 255, 0.56), // Exact color from Figma
+                      width: 1.039, // Exact border width from Figma
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Green dots icon - positioned exactly as per Figma
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6, top: 11), // Exact positioning from Figma
+                        child: SvgPicture.asset(
+                          'assets/images/green_dot_icon.svg',
+                          width: 28, // Exact width from Figma
+                          height: 28, // Exact height from Figma
+                        ),
+                      ),
+                      const SizedBox(width: 5.429), // Exact gap from Figma
+                      Expanded(
+                        child: TextField(
+                          controller: _textController,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'ppmondwest',
+                            fontSize: 17.023, // Exact font size from Figma
+                          ),
+                          decoration: const InputDecoration(
+                            hintText: 'I\'m not here for chit-chat. Aim, fire, and I deliver',
+                            hintStyle: TextStyle(
+                              color: Color.fromRGBO(255, 255, 255, 0.70), // Exact color from Figma
+                              fontFamily: 'ppmondwest',
+                              fontSize: 17.023, // Exact font size from Figma
+                              fontWeight: FontWeight.w400,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.only(bottom: 12),
                           ),
                         ),
                       ),
-                      // Green dots icon
-                      Positioned(
-                        left: 6, // Exact: left: 6px
-                        top: 11, // Exact: top: 11px
-                        child: SvgPicture.asset(
-                          'assets/images/green_dot_icon.svg',
-                          width: 28, // Exact: width="28"
-                          height: 28, // Exact: height="28"
-                        ),
-                      ),
-                      // Send button (arrow icon)
-                      Positioned(
-                        right: 12, // Position on the right side
-                        top: 11, // Align with the green dots icon
-                        child: Icon(
+                      IconButton(
+                        icon: const Icon(
                           Icons.arrow_forward,
                           color: Colors.white,
-                          size: 24,
                         ),
+                        onPressed: _sendMessage, // Connect to send message function
                       ),
                     ],
                   ),
-                ),
-              ),
-
-              // Hamburger menu icon
-              Positioned(
-                left: 25, // Exact: left: 25px
-                top: 31, // Exact: top: 31px
-                child: CustomPaint(
-                  size: const Size(24, 24), // Exact: width="24" height="24"
-                  painter: _HamburgerMenuPainter(),
                 ),
               ),
             ],
