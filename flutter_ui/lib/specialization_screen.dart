@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'chat_interface_screen.dart';
+import 'custom_transitions.dart'; // Import the custom transitions
 
 class SpecializationScreen extends StatefulWidget {
   const SpecializationScreen({super.key});
@@ -53,7 +54,7 @@ class _SpecializationScreenState extends State<SpecializationScreen>
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _scaleController,
-      curve: Curves.easeOutBack,
+      curve: Curves.easeOutCubic, // Apple-style smooth curve, no bounce
     ));
 
 
@@ -93,45 +94,29 @@ class _SpecializationScreenState extends State<SpecializationScreen>
     // Enhanced animation sequence
     await _playSelectionAnimation();
     
-    // Navigate to chat interface with smooth transition
+    // Navigate to chat interface with slower Figma interaction transition
     if (mounted) {
       Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => 
-              ChatInterfaceScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(
-              opacity: CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeInOut,
-              ),
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 0.3),
-                  end: Offset.zero,
-                ).animate(CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeOutCubic,
-                )),
-                child: child,
-              ),
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 800),
+        FigmaInteractionRoute(
+          builder: (context) => ChatInterfaceScreen(),
         ),
       );
     }
   }
 
   Future<void> _playSelectionAnimation() async {
-    // Trigger success animation
+    // Apple-style selection feedback
+    HapticFeedback.mediumImpact();
+    
+    // Trigger success animation with Apple-like timing
     _successController.forward();
     
-    // Add success haptic feedback
+    // Add subtle scale animation for selection feedback
+    await Future.delayed(const Duration(milliseconds: 150));
     HapticFeedback.heavyImpact();
     
-    // Wait for animation to complete
-    await Future.delayed(const Duration(milliseconds: 600));
+    // Wait for animation to complete with Apple-like pacing
+    await Future.delayed(const Duration(milliseconds: 450));
   }
 
 
@@ -560,15 +545,15 @@ class _FigmaSpecializationButtonState extends State<_FigmaSpecializationButton>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 100),
+      duration: const Duration(milliseconds: 150), // Apple-style timing
       vsync: this,
     );
     _scaleAnimation = Tween<double>(
       begin: 1.0,
-      end: 0.98,
+      end: 0.96, // Slightly more scale for better feedback
     ).animate(CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeInOut,
+      curve: Curves.easeOutCubic, // Apple-style smooth curve
     ));
   }
 
@@ -615,12 +600,14 @@ class _FigmaSpecializationButtonState extends State<_FigmaSpecializationButton>
                   color: widget.isSelected 
                       ? Color(0xFF4E9816)
                       : Colors.white.withOpacity(0.5), // Exact Figma stroke
-                  width: 0.5,
+                  width: widget.isSelected ? 1.5 : 0.5, // Apple-style: thicker border when selected
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.white.withOpacity(0.25), // Exact Figma shadow
-                    blurRadius: 4,
+                    color: widget.isSelected 
+                        ? Color(0xFF4E9816).withOpacity(0.3) // Apple-style: subtle glow when selected
+                        : Colors.white.withOpacity(0.25), // Exact Figma shadow
+                    blurRadius: widget.isSelected ? 8 : 4, // Apple-style: enhanced glow
                     offset: Offset(0, 2),
                   ),
                 ],

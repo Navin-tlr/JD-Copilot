@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'specialization_screen.dart';
+import 'custom_transitions.dart'; // Import the gentle fade transition
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -66,40 +67,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen>
       // For now, simulate API call
       await _simulateAccountCreation();
       
-      // Navigate to specialization screen with enhanced transition
+      // Navigate to specialization screen with slower Figma interaction transition
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => 
-                const SpecializationScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(
-                opacity: CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeInOut,
-                ),
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.2),
-                    end: Offset.zero,
-                  ).animate(CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutCubic,
-                  )),
-                  child: ScaleTransition(
-                    scale: Tween<double>(
-                      begin: 0.95,
-                      end: 1.0,
-                    ).animate(CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOutBack,
-                    )),
-                    child: child,
-                  ),
-                ),
-              );
-            },
-            transitionDuration: const Duration(milliseconds: 800),
+          FigmaInteractionRoute(
+            builder: (context) => const SpecializationScreen(),
           ),
         );
       }

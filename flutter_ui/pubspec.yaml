@@ -36,6 +36,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_svg: ^2.2.0
   video_player: ^2.8.1
+  # Add these two lines for animations and particle physics
+  simple_animations: ^5.0.2
+  vector_math: ^2.1.4
 
 dev_dependencies:
   flutter_test:

@@ -1,5 +1,8 @@
+// flutter_ui/lib/onboarding_screen.dart
+
 import 'package:flutter/material.dart';
 import 'create_account_screen.dart'; // Import the Create Account screen
+import 'custom_transitions.dart'; // Import the gentle fade transition
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -41,10 +44,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _animationController.reverse();
     });
     
-    // Navigate to Create Account screen
+    // Navigate to Create Account screen with exact Figma interaction specifications
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const CreateAccountScreen()),
+      FigmaInteractionRoute(
+        builder: (context) => const CreateAccountScreen(),
+      ),
     );
   }
 

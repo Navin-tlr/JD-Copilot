@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'onboarding_screen.dart'; // Import your new screen
+import 'custom_transitions.dart'; // Import custom transitions
 
 void main() {
   runApp(const MyApp());
@@ -14,6 +15,15 @@ class MyApp extends StatelessWidget {
       title: 'Y^2 App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        pageTransitionsTheme: PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: FigmaInteractionPageTransitionsBuilder(),
+            TargetPlatform.iOS: FigmaInteractionPageTransitionsBuilder(),
+            TargetPlatform.macOS: FigmaInteractionPageTransitionsBuilder(),
+            TargetPlatform.windows: FigmaInteractionPageTransitionsBuilder(),
+            TargetPlatform.linux: FigmaInteractionPageTransitionsBuilder(),
+          },
+        ),
       ),
       // Set the OnboardingScreen as the home screen
       home: const OnboardingScreen(),
