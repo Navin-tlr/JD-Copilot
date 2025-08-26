@@ -1,146 +1,162 @@
 // flutter_ui/lib/onboarding_screen.dart
 
 import 'package:flutter/material.dart';
-import 'create_account_screen.dart'; // Import the Create Account screen
-import 'custom_transitions.dart'; // Import the gentle fade transition
+import 'package:flutter_svg/flutter_svg.dart';
+import 'create_account_screen.dart';
+import 'custom_transitions.dart';
 
-class OnboardingScreen extends StatefulWidget {
+class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
-
-  @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
-}
-
-class _OnboardingScreenState extends State<OnboardingScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-  bool _isHovered = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 150),
-      vsync: this,
-    );
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.95,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  void _onButtonPressed() {
-    _animationController.forward().then((_) {
-      _animationController.reverse();
-    });
-    
-    // Navigate to Create Account screen with exact Figma interaction specifications
-    Navigator.push(
-      context,
-      FigmaInteractionRoute(
-        builder: (context) => const CreateAccountScreen(),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: Container(
-          width: 393, // Exact Figma frame width
-          height: 852, // Exact Figma frame height
-          child: Stack(
-            children: [
-              // Layer 1: The background "Y" image, positioned exactly like Figma
-              Positioned(
-                left: 42.77, // Exact Figma positioning
-                top: 208.68, // Exact Figma positioning
-                child: Opacity(
-                  opacity: 0.28,
-                  child: Image.asset(
-                    'assets/images/y_logo.png',
-                    width: 279.834, // Exact Figma width
-                    height: 435.414, // Exact Figma height
-                    fit: BoxFit.contain,
-                  ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 60),
+                // New Y² Logo
+                Image.asset(
+                  'assets/images/y_logo.png', // Make sure the new logo is at this path
+                  width: 109,
+                  height: 104,
                 ),
-              ),
-
-              // Layer 2: "WELCOME TO Y^2" text, positioned exactly like Figma
-              Positioned(
-                left: 57.491, // Calculated: (393 - 278.018) / 2 = 57.491
-                top: 71.11, // Exact Figma positioning
-                child: Text(
-                  'WELCOME TO Y^2',
+                const SizedBox(height: 22),
+                // Welcome Text
+                const Text(
+                  'Welcome to Y²',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontFamily: 'That That New Pixel Test',
-                    fontSize: 38,
-                    color: Color(0xFF2A2727),
+                    color: Colors.black,
+                    fontSize: 48,
+                    fontFamily: 'PP Mondwest',
                     fontWeight: FontWeight.w400,
                   ),
                 ),
-              ),
+                const SizedBox(height: 30),
+                // Feature Sections
+                _FeatureDetail(
+                  iconPath: 'assets/images/new_model_icon.svg', // Updated
+                  title: 'RAG powered JD-queries',
+                  description:
+                      'Ask smarter questions about job opportunities. Get data on past recruiters, salaries, skills in demand, and specialization-wise trends, even compare JDs across companies.',
+                ),
+                const SizedBox(height: 35),
+                _FeatureDetail(
+                  iconPath: 'assets/images/doc_ai_icon.svg', // Updated
+                  title: 'Strategize your Resume',
+                  description:
+                      'Check ATS compatibility and get instant resume scores. Uncover skill gaps with targeted certification suggestions. Build role-based versions and boost impact with smart insights.',
+                ),
+                const SizedBox(height: 35),
+                _FeatureDetail(
+                  iconPath: 'assets/images/visual_recognition_icon.svg', // Updated
+                  title: 'Radar & Deep Research',
+                  description:
+                      'Command the field with a constant stream of intelligence, Business trends, GD topics, and shifting skills drawn from LinkedIn APIs, News APIs, Reddit, and Twitter APIs.',
+                ),
+                const SizedBox(height: 50),
+                // Get Started Button
+                _GetStartedButton(),
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-              // Layer 3: The "SIGN UP / LOG IN" button with interactions
-              Positioned(
-                left: 110, // Exact Figma positioning
-                top: 749, // Exact Figma positioning
-                child: MouseRegion(
-                  onEnter: (_) => setState(() => _isHovered = true),
-                  onExit: (_) => setState(() => _isHovered = false),
-                  child: AnimatedBuilder(
-                    animation: _scaleAnimation,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _scaleAnimation.value,
-                        child: OutlinedButton(
-                          onPressed: _onButtonPressed,
-                          style: OutlinedButton.styleFrom(
-                            fixedSize: const Size(172, 46), // Exact Figma dimensions
-                            side: BorderSide(
-                              color: _isHovered 
-                                  ? Colors.black.withOpacity(0.6) // Darker on hover
-                                  : Colors.black.withOpacity(0.3),
-                              width: _isHovered ? 2 : 1, // Thicker on hover
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            backgroundColor: _isHovered 
-                                ? Colors.black.withOpacity(0.05) // Subtle background on hover
-                                : Colors.transparent,
-                          ),
-                          child: Text(
-                            'SIGN UP / LOG IN',
-                            style: TextStyle(
-                              fontFamily: 'PP NeueBit',
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: _isHovered 
-                                  ? Colors.black.withOpacity(0.8) // Darker text on hover
-                                  : const Color(0xFF646262).withOpacity(0.7),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+// Reusable widget for feature details
+class _FeatureDetail extends StatelessWidget {
+  final String iconPath;
+  final String title;
+  final String description;
+
+  const _FeatureDetail({
+    required this.iconPath,
+    required this.title,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SvgPicture.asset(iconPath, width: 48, height: 48),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 26.29,
+                  fontFamily: 'PP NeueBit',
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                description,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 10,
+                  fontFamily: 'SF Pro',
+                  fontWeight: FontWeight.w100,
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// Widget for the 'Get Started' button
+class _GetStartedButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          FigmaInteractionRoute(builder: (context) => const CreateAccountScreen()),
+        );
+      },
+      child: Container(
+        width: 276,
+        height: 54,
+        decoration: BoxDecoration(
+          color: const Color(0xFF613DB9).withOpacity(0.70),
+          borderRadius: BorderRadius.circular(5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.25),
+              blurRadius: 4,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Text(
+            'Get started',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontFamily: 'PP NeueBit',
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ),

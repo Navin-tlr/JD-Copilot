@@ -2,7 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'dart:math' as math;
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class ChatInterfaceScreen extends StatefulWidget {
   const ChatInterfaceScreen({super.key});
@@ -12,49 +13,71 @@ class ChatInterfaceScreen extends StatefulWidget {
 }
 
 class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
-  final List<String> _messages = [];
+  final List<Map<String, String>> _messages = [];
   final TextEditingController _textController = TextEditingController();
-  // **NEW: State variable to control the background image opacity**
+  final String _baseUrl = 'http://127.0.0.1:8000';
   double _yImageOpacity = 1.0;
 
-  void _sendMessage() {
+  void _sendMessage() async {
     if (_textController.text.isNotEmpty) {
+      final userMessage = _textController.text;
       setState(() {
-        _messages.add(_textController.text);
-        _textController.clear();
-        FocusScope.of(context).unfocus(); // Dismiss keyboard
-
-        // **NEW: If this is the first message, reduce the opacity**
+        _messages.insert(0, {'sender': 'user', 'text': userMessage});
         if (_yImageOpacity == 1.0) {
-          _yImageOpacity = 0.15; // Set to a subtle 15% opacity
+          _yImageOpacity = 0.15; // Fade out the background
         }
+        _textController.clear();
+        FocusScope.of(context).unfocus();
       });
+
+      try {
+        final response = await http.post(
+          Uri.parse('$_baseUrl/query'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'question': userMessage,
+            'top_k': 3,
+            'filters': {},
+          }),
+        );
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          setState(() {
+            _messages.insert(0, {'sender': 'bot', 'text': data['answer']});
+          });
+        } else {
+          setState(() {
+            _messages.insert(0,
+                {'sender': 'bot', 'text': 'Error: ${response.statusCode}'});
+          });
+        }
+      } catch (e) {
+        setState(() {
+          _messages.insert(
+              0, {'sender': 'bot', 'text': 'Error: Could not connect.'});
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF2F2B2B),
+      backgroundColor: const Color(0xFF151515),
       body: SafeArea(
         child: Stack(
           children: [
-            // **NEW: Wrapped the image in an AnimatedOpacity widget**
-            AnimatedOpacity(
-              opacity: _yImageOpacity,
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeInOut,
-              child: Positioned(
-                top: 160,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Image.asset(
-                    'assets/images/y_black.png',
-                    width: 312,
-                    height: 486,
-                    fit: BoxFit.contain,
-                  ),
+            Center(
+              child: AnimatedOpacity(
+                opacity: _yImageOpacity,
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
+                child: SvgPicture.asset(
+                  'assets/images/chat_y_background.svg',
+                  width: 312,
+                  height: 486,
+                  fit: BoxFit.contain,
                 ),
               ),
             ),
@@ -63,12 +86,12 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
                 const Align(
                   alignment: Alignment.topRight,
                   child: Padding(
-                    padding: EdgeInsets.only(top: 16.0, right: 26.0),
-                    child: ModelSelectionCard(),
+                    padding: EdgeInsets.only(top: 38.0, right: 26.0),
+                    child: _ModelSelectionCard(),
                   ),
                 ),
                 Expanded(child: _buildChatMessages()),
-                ChatInputBar(
+                _ChatInputBar(
                   textController: _textController,
                   onSendMessage: _sendMessage,
                 ),
@@ -86,9 +109,11 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
       reverse: true,
       itemCount: _messages.length,
       itemBuilder: (context, index) {
-        final message = _messages.reversed.toList()[index];
+        final message = _messages[index];
+        final isUserMessage = message['sender'] == 'user';
         return Align(
-          alignment: Alignment.centerRight,
+          alignment:
+              isUserMessage ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.7,
@@ -98,11 +123,14 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
                 const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12.47),
-              color: const Color(0xFF433F3F),
+              color: isUserMessage
+                  ? const Color(0xFF433F3F)
+                  : const Color(0xFF2A2A2A),
             ),
             child: Text(
-              message,
-              style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 16),
+              message['text']!,
+              style:
+                  TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 16),
             ),
           ),
         );
@@ -111,29 +139,29 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
   }
 }
 
-class ModelSelectionCard extends StatefulWidget {
-  const ModelSelectionCard({super.key});
+class _ModelSelectionCard extends StatefulWidget {
+  const _ModelSelectionCard();
 
   @override
-  State<ModelSelectionCard> createState() => _ModelSelectionCardState();
+  __ModelSelectionCardState createState() => __ModelSelectionCardState();
 }
 
-class _ModelSelectionCardState extends State<ModelSelectionCard> with SingleTickerProviderStateMixin {
+class __ModelSelectionCardState extends State<_ModelSelectionCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _heightAnimation;
-  String _selectedModel = "model";
   bool _isExpanded = false;
+  String _selectedModel = 'model';
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 350),
+      duration: const Duration(milliseconds: 300),
     );
-    _heightAnimation = Tween<double>(begin: 45.0, end: 135.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _heightAnimation = Tween<double>(begin: 45.0, end: 135.0)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -163,74 +191,61 @@ class _ModelSelectionCardState extends State<ModelSelectionCard> with SingleTick
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Container(
-          width: 140,
-          height: _heightAnimation.value,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8.0),
-            gradient: const RadialGradient(
-              center: Alignment.center,
-              radius: 0.7,
-              colors: [
-                Color.fromRGBO(91, 86, 86, 0.8),
-                Color.fromRGBO(72, 73, 71, 0.8),
-              ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 17.4,
+        animation: _heightAnimation,
+        builder: (context, child) {
+          return Container(
+            width: 123,
+            height: _heightAnimation.value,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8.0),
+              gradient: const RadialGradient(
+                center: Alignment.center,
+                radius: 0.7,
+                colors: [
+                  Color.fromRGBO(91, 86, 86, 0.61),
+                  Color.fromRGBO(72, 73, 71, 0.61),
+                ],
               ),
-            ],
-          ),
-          child: SingleChildScrollView(
-            physics: const NeverScrollableScrollPhysics(),
-            child: Column(
-              children: [
-                _buildCollapsedView(),
-                if (!_controller.isDismissed) _buildExpandedOptions(),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCollapsedView() {
-    return GestureDetector(
-      onTap: _toggleExpanded,
-      child: Container(
-        height: 45,
-        padding: const EdgeInsets.symmetric(horizontal: 12.0),
-        child: Row(
-          children: [
-            SvgPicture.asset('assets/images/model_icon.svg', width: 27, height: 27),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                _selectedModel,
-                style: const TextStyle(
-                  fontFamily: 'PP Mondwest',
-                  fontSize: 19,
-                  color: Color.fromRGBO(255, 255, 255, 0.8),
-                  fontWeight: FontWeight.w400,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 17.4,
                 ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
+              ],
+            ),
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: _toggleExpanded,
+                    child: Container(
+                      height: 45,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SvgPicture.asset('assets/images/model_icon_green.svg',
+                              width: 27, height: 27),
+                          const SizedBox(width: 8),
+                          Text(
+                            _selectedModel,
+                            style: const TextStyle(
+                              fontFamily: 'PP NeueBit',
+                              fontSize: 20,
+                              color: Color.fromRGBO(255, 255, 255, 0.8),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  _buildExpandedOptions(),
+                ],
               ),
             ),
-            AnimatedRotation(
-              turns: _isExpanded ? 0.5 : 0,
-              duration: const Duration(milliseconds: 300),
-              child: const Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 20),
-            ),
-          ],
-        ),
-      ),
-    );
+          );
+        });
   }
 
   Widget _buildExpandedOptions() {
@@ -274,11 +289,13 @@ class _AnimatedOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final curvedAnimation = CurvedAnimation(
       parent: animation,
-      curve: Interval(delay, (delay + 0.6).clamp(0.0, 1.0), curve: Curves.easeOutCubic),
+      curve: Interval(delay, (delay + 0.6).clamp(0.0, 1.0),
+          curve: Curves.easeOutCubic),
     );
 
     return SlideTransition(
-      position: Tween<Offset>(begin: const Offset(0, -0.5), end: Offset.zero).animate(curvedAnimation),
+      position: Tween<Offset>(begin: const Offset(0, -0.5), end: Offset.zero)
+          .animate(curvedAnimation),
       child: FadeTransition(
         opacity: curvedAnimation,
         child: Material(
@@ -300,71 +317,62 @@ class _AnimatedOption extends StatelessWidget {
   }
 }
 
-class AnimatedExpandIcon extends StatelessWidget {
-  final bool isExpanded;
-  const AnimatedExpandIcon({super.key, required this.isExpanded});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedRotation(
-      turns: isExpanded ? 0.5 : 0.0,
-      duration: const Duration(milliseconds: 300),
-      child: const Icon(Icons.expand_more, color: Colors.white54),
-    );
-  }
-}
-
-class ChatInputBar extends StatefulWidget {
+class _ChatInputBar extends StatefulWidget {
   final TextEditingController textController;
   final VoidCallback onSendMessage;
 
-  const ChatInputBar({
-    super.key,
+  const _ChatInputBar({
     required this.textController,
     required this.onSendMessage,
   });
 
   @override
-  State<ChatInputBar> createState() => _ChatInputBarState();
+  __ChatInputBarState createState() => __ChatInputBarState();
 }
 
-class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
+class __ChatInputBarState extends State<_ChatInputBar>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
   late Animation<double> _heightAnimation;
   bool _isExpanded = false;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
+    widget.textController.addListener(() {
+      setState(() {});
+    });
+    _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    _heightAnimation = Tween<double>(begin: 65.0, end: 280.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    widget.textController.addListener(() => setState(() {}));
+    _heightAnimation = Tween<double>(begin: 65.0, end: 280.0)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   void _toggleExpand() {
     setState(() {
       _isExpanded = !_isExpanded;
+
       if (_isExpanded) {
-        _animationController.forward();
+        _controller.forward();
       } else {
-        _animationController.reverse();
+        _controller.reverse();
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool hasText = widget.textController.text.isNotEmpty;
+
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(28.0, 16.0, 28.0, 32.0),
       child: AnimatedBuilder(
@@ -372,9 +380,10 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
         builder: (context, child) {
           return Container(
             height: _heightAnimation.value,
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12.47),
-              color: const Color(0xFF433F3F),
+              color: const Color(0xFF252424),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.25),
@@ -387,8 +396,54 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
               physics: const NeverScrollableScrollPhysics(),
               child: Column(
                 children: [
-                  _buildTopInputRow(),
-                  if (_animationController.value > 0) _buildExpandedContent(),
+                  Container(
+                    height: 65,
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: AnimatedRotation(
+                            turns: _isExpanded ? 0.5 : 0,
+                            duration: const Duration(milliseconds: 300),
+                            child: const Icon(
+                              Icons.expand_more,
+                              color: Colors.white,
+                            ),
+                          ),
+                          onPressed: _toggleExpand,
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: widget.textController,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontFamily: 'PP NeueBit',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 18,
+                            ),
+                            decoration: const InputDecoration(
+                              hintText:
+                                  'What are the most sought after skills ?..',
+                              hintStyle: TextStyle(
+                                color: Color.fromRGBO(255, 255, 255, 0.70),
+                                fontSize: 18,
+                                fontFamily: 'PP NeueBit',
+                                fontWeight: FontWeight.w700,
+                              ),
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.arrow_upward,
+                            color: hasText ? Colors.white : Colors.grey,
+                          ),
+                          onPressed: hasText ? widget.onSendMessage : null,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_isExpanded) _buildExpandedContent(),
                 ],
               ),
             ),
@@ -398,92 +453,39 @@ class _ChatInputBarState extends State<ChatInputBar> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildTopInputRow() {
-    const textStyle = TextStyle(
-      color: Color.fromRGBO(255, 255, 255, 0.70),
-      fontSize: 16.24,
-      fontFamily: 'PP Mondwest',
-      fontWeight: FontWeight.w400,
-    );
-    return Container(
-      height: 65,
-      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-      child: Row(
-        children: [
-          IconButton(
-            icon: AnimatedExpandIcon(isExpanded: _isExpanded),
-            onPressed: _toggleExpand,
-          ),
-          Expanded(
-            child: TextField(
-              controller: widget.textController,
-              maxLines: 1,
-              style: textStyle,
-              decoration: const InputDecoration(
-                hintText: 'What are the most sought after skills ?..',
-                hintStyle: textStyle,
-                border: InputBorder.none,
-              ),
-            ),
-          ),
-          _buildSendButton(),
-        ],
-      ),
-    );
-  }
-
   Widget _buildExpandedContent() {
     return FadeTransition(
-      opacity: _animationController,
+      opacity: _controller,
       child: Column(
         children: [
+
           const Divider(color: Colors.white24, height: 1),
           const SizedBox(height: 15),
           _AnimatedCardRow(
-            animation: _animationController,
-            iconName: 'axe_icon.svg',
+            animation: _controller,
+            iconName: 'assets/images/axe_icon.svg',
             text: 'The Resume Strategist',
             intervalStart: 0.1,
           ),
           _AnimatedCardRow(
-            animation: _animationController,
-            iconName: 'boxes_icon.svg',
+            animation: _controller,
+            iconName: 'assets/images/boxes_icon.svg',
             text: 'The Chamber of Trials',
             intervalStart: 0.2,
           ),
           _AnimatedCardRow(
-            animation: _animationController,
-            iconName: 'battery_charging_icon.svg',
+            animation: _controller,
+            iconName: 'assets/images/battery_charging_icon.svg',
             text: 'The Last-Minute Gambit',
             intervalStart: 0.3,
           ),
           _AnimatedCardRow(
-            animation: _animationController,
-            iconName: 'signal_icon.svg',
+            animation: _controller,
+            iconName: 'assets/images/signal_icon.svg',
             text: 'The Radar (incl. live feed of policies)',
             intervalStart: 0.4,
           ),
         ],
-      ),
-    );
-  }
-  
-  Widget _buildSendButton() {
-    bool hasText = widget.textController.text.isNotEmpty;
-    return Container(
-      width: 45,
-      height: 45,
-      decoration: BoxDecoration(
-        color: hasText ? Colors.white : Colors.black.withOpacity(0.2),
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(
-          Icons.arrow_upward,
-          size: 22,
-          color: hasText ? const Color(0xFF433F3F) : Colors.white54,
-        ),
-        onPressed: hasText ? widget.onSendMessage : null,
       ),
     );
   }
@@ -505,7 +507,8 @@ class _AnimatedCardRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final intervalEnd = (intervalStart + 0.5).clamp(0.0, 1.0);
-    final curve = CurveTween(curve: Interval(intervalStart, intervalEnd, curve: Curves.easeOutCubic));
+    final curve =
+        CurveTween(curve: Interval(intervalStart, intervalEnd, curve: Curves.easeOutCubic));
 
     final slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.5),
@@ -523,10 +526,20 @@ class _AnimatedCardRow extends StatelessWidget {
         opacity: fadeAnimation,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-          child: Row(
-            children: [
-              SvgPicture.asset('assets/images/$iconName', width: 24, height: 24),
-              const SizedBox(width: 16),
+                      child: Row(
+              children: [
+                SvgPicture.asset(
+                  iconName,
+                  width: 24,
+                  height: 24,
+                  placeholderBuilder: (context) => Container(
+                    width: 24,
+                    height: 24,
+                    color: Colors.red.withOpacity(0.3),
+                    child: const Icon(Icons.error, color: Colors.red, size: 16),
+                  ),
+                ),
+                const SizedBox(width: 16),
               Expanded(
                 child: Text(
                   text,
