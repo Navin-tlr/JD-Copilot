@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "844023932526",
+    "project_id": "y2-copilot",
+    "storage_bucket": "y2-copilot.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:844023932526:android:10a1f9efc905da9ce6287f",
+        "android_client_info": {
+          "package_name": "com.example.flutter_ui"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "844023932526-ao98bouno7hhhdeeb6fi83rffbcr8uje.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQWrpwg4-XcOaBDzXGJ6qCkm3LWy6MwFM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "844023932526-ao98bouno7hhhdeeb6fi83rffbcr8uje.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'onboarding_screen.dart'; // Import your new screen
 import 'custom_transitions.dart'; // Import custom transitions
+import 'firebase_config.dart'; // Import Firebase configuration
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FirebaseConfig.initializeFirebase();
   runApp(const MyApp());
 }
 

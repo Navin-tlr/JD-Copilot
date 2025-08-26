@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'specialization_screen.dart';
 import 'custom_transitions.dart'; // Import the gentle fade transition
+import 'services/auth_service.dart'; // Import Firebase auth service
+
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -14,9 +16,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _fullNameController = TextEditingController();
   bool _isLoading = false;
   late AnimationController _buttonAnimationController;
   late Animation<double> _buttonScaleAnimation;
+  final AuthService _authService = AuthService();
 
   @override
   void initState() {
@@ -38,6 +42,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen>
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _fullNameController.dispose();
     _buttonAnimationController.dispose();
     super.dispose();
   }
@@ -46,13 +51,20 @@ class _CreateAccountScreenState extends State<CreateAccountScreen>
     if (_isLoading) return;
 
     // Validate inputs
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+    if (_emailController.text.isEmpty || 
+        _passwordController.text.isEmpty || 
+        _fullNameController.text.isEmpty) {
       _showErrorSnackBar('Please fill in all fields');
       return;
     }
 
     if (!_isValidEmail(_emailController.text)) {
       _showErrorSnackBar('Please enter a valid email address');
+      return;
+    }
+
+    if (_passwordController.text.length < 6) {
+      _showErrorSnackBar('Password must be at least 6 characters long');
       return;
     }
 
@@ -63,9 +75,13 @@ class _CreateAccountScreenState extends State<CreateAccountScreen>
     setState(() => _isLoading = true);
     
     try {
-      // TODO: Implement actual account creation logic here
-      // For now, simulate API call
-      await _simulateAccountCreation();
+      // Create account with Firebase
+      await _authService.signUpWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        fullName: _fullNameController.text.trim(),
+        specialization: '', // Will be set in specialization screen
+      );
       
       // Navigate to specialization screen with slower Figma interaction transition
       if (mounted) {
@@ -76,7 +92,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen>
         );
       }
     } catch (e) {
-      _showErrorSnackBar('Something went wrong. Please try again.');
+      _showErrorSnackBar(e.toString());
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -104,10 +120,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen>
     return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 
-  Future<void> _simulateAccountCreation() async {
-    // Simulate network call
-    await Future.delayed(const Duration(milliseconds: 800));
-  }
+
 
   void _showErrorSnackBar(String message) {
     HapticFeedback.heavyImpact();
@@ -196,10 +209,51 @@ class _CreateAccountScreenState extends State<CreateAccountScreen>
                         ),
                       ),
 
-                      // Email input field - exact Figma positioning and styling
+                      // Full Name input field - exact Figma positioning and styling
                       Positioned(
                         left: 43, // Exact Figma positioning
                         top: 221, // Exact Figma positioning
+                        child: Container(
+                          width: 250, // Exact Figma width
+                          height: 54, // Exact Figma height
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15.5), // Exact Figma: rx="15.5"
+                            border: Border.all(
+                              color: Color(0xFF646262).withOpacity(0.6), // Exact Figma: stroke="#646262" opacity="0.6"
+                              width: 1, // Exact Figma: stroke-width="1px"
+                            ),
+                          ),
+                          child: TextField(
+                            controller: _fullNameController,
+                            style: TextStyle(
+                              fontFamily: 'PP Mondwest',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w400,
+                              color: Color(0xFF2A2727),
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Full Name',
+                              hintStyle: TextStyle(
+                                fontFamily: 'PP Mondwest',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w400,
+                                color: Color(0xFF646262).withOpacity(0.6),
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 18,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Email input field - exact Figma positioning and styling
+                      Positioned(
+                        left: 43, // Exact Figma positioning
+                        top: 291, // Exact Figma positioning
                         child: Container(
                           width: 250, // Exact Figma width
                           height: 54, // Exact Figma height
@@ -240,7 +294,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen>
                       // Password input field - exact Figma positioning and styling
                       Positioned(
                         left: 43, // Exact Figma positioning
-                        top: 291, // Exact Figma positioning
+                        top: 361, // Exact Figma positioning
                         child: Container(
                           width: 250, // Exact Figma width
                           height: 54, // Exact Figma height
@@ -282,7 +336,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen>
                       // Create Account button - Apple-style with loading animation
                       Positioned(
                         left: 43, // Exact Figma positioning
-                        top: 361, // Exact Figma positioning
+                        top: 431, // Exact Figma positioning
                         child: AnimatedBuilder(
                           animation: _buttonScaleAnimation,
                           builder: (context, child) {
