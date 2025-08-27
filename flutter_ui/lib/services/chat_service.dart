@@ -7,7 +7,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 enum MessageType { user, bot, loading, error }
 
 class ChatService extends ChangeNotifier {
-  static const String baseUrl = 'http://localhost:8000';
+  static const String baseUrl = 'http://localhost:8001';
 
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;

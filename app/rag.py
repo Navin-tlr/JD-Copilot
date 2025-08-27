@@ -155,18 +155,41 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
     # Auto-detect company from question text if not provided in filters
     company_text = filters.get("company")
     if not company_text:
-        # Try to extract company name from question
+        # --- REVISED, SAFER COMPANY DETECTION LOGIC ---
         question_lower = question.lower()
-        if "of " in question_lower or "for " in question_lower:
-            # Look for patterns like "full jd of Tap academy" or "jd for Mill Story"
-            for phrase in ["of ", "for "]:
-                if phrase in question_lower:
-                    parts = question_lower.split(phrase)
-                    if len(parts) > 1:
-                        potential_company = parts[1].strip().split()[0:3]  # Take up to 3 words
-                        company_text = " ".join(potential_company)
-                        print(f"🔍 Auto-detected company from question: '{company_text}'")
-                        break
+        # Only trigger detection on explicit keywords that imply a company name will follow.
+        # Use more specific patterns to avoid false positives
+        trigger_patterns = [
+            ("full jd of ", "of "),
+            ("jd of ", "of "),
+            ("job description of ", "of "),
+            ("full jd for ", "for "),
+            ("jd for ", "for "),
+            ("job description for ", "for "),
+            ("details about ", "about "),
+            ("information about ", "about "),
+            ("jd from ", "from "),
+            ("job description from ", "from "),
+            ("full jd from ", "from "),
+            ("complete jd from ", "from "),
+            ("complete jd of ", "of "),
+            ("entire jd of ", "of "),
+            ("entire jd for ", "for "),
+            ("entire jd from ", "from ")
+        ]
+        
+        company_text = None
+        for pattern, phrase in trigger_patterns:
+            if pattern in question_lower:
+                # Extract the text *after* the trigger pattern
+                potential_company = question_lower.split(pattern, 1)[1]
+                # Clean up and limit to reasonable company name length
+                company_text = " ".join(potential_company.strip().split()[:3])
+                # Additional validation: company name should not end with common query words
+                if company_text and not any(company_text.endswith(word) for word in ['roles', 'positions', 'specializations', 'skills', 'requirements']):
+                    print(f"🔍 Auto-detected potential company: '{company_text}'")
+                    break
+        # --- END OF REVISED LOGIC ---
     
     # If company filter provided (either from filters or auto-detected), bias the query
     if company_text:

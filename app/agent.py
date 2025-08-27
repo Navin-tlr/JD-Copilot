@@ -4,6 +4,8 @@ Replaces the rigid query_router with a dynamic, reasoning-based system.
 """
 
 import os
+import json
+import sqlite3
 from langchain.tools import tool
 from langchain.tools import Tool as LC_Tool
 from langchain_openai import ChatOpenAI
@@ -22,15 +24,40 @@ from .rag import retrieve_snippets, synthesize_answer # Assuming get_vectorstore
 from .sql_tool import run_deterministic_sql_query
 from .final_sql_tool import run_llama_index_sql_query
 
-# Register new deterministic SQL tool for LangChain
-structured_database_query = LC_Tool(
-    name="structured_database_query",
-    func=run_deterministic_sql_query,
-    description=(
-        "Use for ANY questions about structured data in SQLite (companies, roles, skills, counts, lists). "
-        "This tool uses canonical SQL first (deterministic) and a reliable fallback when needed."
-    ),
-)
+# Import our NEW validator and schema functions
+from .sql_validator import validate_sql_query, get_dynamic_schema
+
+# --- 1. Redefine the SQL Tool with Built-in Validation ---
+@tool
+def structured_database_query(generated_sql: str) -> str:
+    """
+    Use this tool to execute a VALIDATED SQLite query against the placements database.
+    The query is first validated against the database schema.
+    Only use this tool with a syntactically correct SQLite query.
+    The agent should generate the SQL query and pass it to this tool.
+    """
+    db_path = "data/placement_data.db"  # Or get from settings
+
+    # THE CRITICAL VALIDATION STEP
+    is_valid, reason = validate_sql_query(generated_sql, db_path)
+
+    if not is_valid:
+        # If validation fails, STOP and return the error.
+        # This feedback loop teaches the LLM what a valid query looks like.
+        return f"Invalid SQL Query: {reason}. Please correct the query based on the schema and try again."
+
+    # Only execute if the query is valid
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(generated_sql)
+            results = cursor.fetchall()
+            if not results:
+                return "Query executed successfully, but returned no results."
+            # You would format these results more nicely for the LLM to synthesize an answer
+            return json.dumps(results)
+    except Exception as e:
+        return f"SQL Execution Error: {e}"
 
 def get_database_schema():
     """
@@ -513,60 +540,81 @@ def create_final_agent():
 
 def create_production_agent():
     """
-    Simplified production agent that just routes between:
-    - structured_data_query_tool (LlamaIndex-based)
-    - query_unstructured_job_descriptions (RAG)
+    Creates the production-ready agent with dynamic schema loading,
+    a strict JSON-based prompt, and a validation-enforced SQL tool.
     """
     settings = get_settings()
+    db_path = "data/placement_data.db"
+
+    # Step A: Dynamically fetch the schema and format as JSON
+    schema_json = json.dumps(get_dynamic_schema(db_path), indent=2)
+
+    # Step B: Create the strict, machine-readable prompt
+    # Note: Using the correct template variables for LangChain
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", """
+You are a world-class Text-to-SQL agent. Your purpose is to answer user questions by using the structured_database_query tool to execute SQL queries against the database.
+
+**Database Schema (JSON format):**
+```json
+{schema}
+```
+
+**CRITICAL RULES:**
+
+1.  You MUST use the structured_database_query tool to execute SQL queries. Do not just generate SQL text.
+
+2.  When the user asks a question, generate the appropriate SQL query and pass it to the structured_database_query tool.
+
+3.  You MUST generate queries that ONLY use the tables and columns explicitly defined in the schema above. Do not hallucinate any tables or columns.
+
+4.  If the user's question cannot be answered using the provided schema, you MUST return the exact text: "I cannot answer this question with the available data."
+
+5.  **IMPORTANT: Handle Case Sensitivity Automatically**
+    - Specializations in the database are stored in UPPERCASE (e.g., 'FINANCE', 'HR', 'MARKETING', 'OPERATIONS')
+    - Students may ask for 'Finance', 'finance', 'FINANCE', 'Marketing', etc.
+    - ALWAYS use case-insensitive queries for specializations using UPPER() function
+    - Example: `WHERE UPPER(r.specialization) = UPPER('Finance')` or `WHERE UPPER(r.specialization) LIKE '%FINANCE%'`
+
+6.  **CRITICAL: You MUST Execute the SQL Query**
+    - Do NOT just explain the SQL - you MUST execute it using the structured_database_query tool
+    - Always call structured_database_query with your generated SQL
+    - The tool will validate and execute the query, returning actual results
+    - Then provide the answer based on those results
+
+7.  **Robust Query Examples:**
+    - For "Finance roles": `SELECT COUNT(DISTINCT c.company_name) FROM companies c JOIN roles r ON c.id = r.company_id WHERE UPPER(r.specialization) LIKE '%FINANCE%'`
+    - For "HR positions": `SELECT COUNT(DISTINCT c.company_name) FROM companies c JOIN roles r ON c.id = r.company_id WHERE UPPER(r.specialization) LIKE '%HR%'`
+    - For "Marketing jobs": `SELECT COUNT(DISTINCT c.company_name) FROM companies c JOIN roles r ON c.id = r.company_id WHERE UPPER(r.specialization) LIKE '%MARKETING%'`
+
+8.  **Workflow:**
+    - Generate SQL query
+    - Call structured_database_query tool with the SQL
+    - Get the actual result (e.g., [[1]] means 1 company)
+    - Provide answer: "There are X companies that came for [specialization] roles"
+        """),
+        ("user", "{input}"),
+        ("assistant", "{agent_scratchpad}"),
+    ])
+    
+    # Step C: Define the tools available to the agent
+    # We only expose our new, hardened tool.
+    tools = [structured_database_query, query_unstructured_job_descriptions]  # Add back your RAG tool
+
+    # Step D: Initialize the LLM and create the agent
     if settings.OPENROUTER_API_KEY:
         agent_llm = ChatOpenAI(
-            model="moonshotai/kimi-k2",
+            model="anthropic/claude-3-haiku",  # Haiku is excellent and fast for tool use
             temperature=0,
             openai_api_key=settings.OPENROUTER_API_KEY,
             openai_api_base="https://openrouter.ai/api/v1",
         )
     else:
-        agent_llm = ChatOpenAI(
-            model="gpt-3.5-turbo",
-            temperature=0,
-            openai_api_key=settings.OPENAI_API_KEY,
-        )
+        # Fallback LLM
+        agent_llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
 
-    tools = [
-        LC_Tool(
-            name="structured_data_query_tool",
-            func=run_llama_index_sql_query,
-            description=(
-                "USE THIS TOOL for any questions that require specific, factual data from the database. "
-                "This includes all requests for counts (e.g., 'how many companies'), lists "
-                "(e.g., 'list all skills'), or specific details about companies, job titles, "
-                "experience, and education."
-            ),
-        ),
-        LC_Tool(
-            name="unstructured_data_rag_tool",
-            func=query_unstructured_job_descriptions,
-            description=(
-                "USE THIS TOOL for general, open-ended, or summary-based questions. "
-                "This is best for questions about company culture, day-to-day responsibilities, "
-                "or summarizing job descriptions."
-            ),
-        ),
-    ]
-
-    prompt = ChatPromptTemplate.from_messages([
-        (
-            "system",
-            (
-                "You are JD-Copilot. Choose one tool that best answers the question.\\n\\n"
-                "Rules:\\n- Use structured_data_query_tool for ANY numeric, count, list, or factual DB lookups.\\n"
-                "- Do not call another tool after a successful structured call.\\n"
-                "- Use unstructured_data_rag_tool only for qualitative summaries/explanations from JD text."
-            ),
-        ),
-        ("user", "{input}"),
-        ("assistant", "{agent_scratchpad}"),
-    ])
-
-    agent = create_openai_tools_agent(agent_llm, tools, prompt)
+    # Create a partial prompt with the schema
+    partial_prompt = prompt.partial(schema=schema_json)
+    
+    agent = create_openai_tools_agent(agent_llm, tools, partial_prompt)
     return AgentExecutor(agent=agent, tools=tools, verbose=True)
