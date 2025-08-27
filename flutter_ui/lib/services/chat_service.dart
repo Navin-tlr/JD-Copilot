@@ -1,281 +1,219 @@
-import 'package:flutter/material.dart';
-import 'backend_service.dart';
+import 'dart:convert';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_markdown/flutter_markdown.dart';
 
-class ChatMessage {
-  final String sender; // 'user' or 'bot'
-  final String text;
-  final DateTime timestamp;
-  final MessageType type;
-  final Map<String, dynamic>? metadata;
-
-  ChatMessage({
-    required this.sender,
-    required this.text,
-    required this.timestamp,
-    this.type = MessageType.text,
-    this.metadata,
-  });
-}
-
-enum MessageType {
-  text,
-  error,
-  loading,
-  stats,
-  companies,
-  skills,
-}
+enum MessageType { user, bot, loading, error }
 
 class ChatService extends ChangeNotifier {
+  static const String baseUrl = 'http://localhost:8000';
+
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   bool _isConnected = false;
   bool _thinkingExiting = false;
+  String _loadingMessage = 'Working on it…';
 
-  List<ChatMessage> get messages => List.unmodifiable(_messages);
+  List<ChatMessage> get messages => _messages;
   bool get isLoading => _isLoading;
+  String get loadingMessage => _loadingMessage;
   bool get isConnected => _isConnected;
   bool get thinkingExiting => _thinkingExiting;
 
   ChatService() {
-    _initializeChat();
+    // Attempt to ping backend on startup
+    _pingBackend();
   }
 
-  String _stripEmojis(String input) {
-    final emojiRegex = RegExp(
-      r"[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}\u{FE0F}]",
-      unicode: true,
-    );
-    return input.replaceAll(emojiRegex, '');
-  }
-
-  void _initializeChat() async {
-    // Check backend connection
-    _isConnected = await BackendService.checkHealth();
-    notifyListeners();
-
-    if (_isConnected) {
-      _addBotMessage(
-        "Hello! I'm your JD Copilot assistant. I can help you with:\n\n"
-        "• Placement statistics and insights\n"
-        "• Company information and comparisons\n"
-        "• Skills analysis and recommendations\n"
-        "• Resume matching with job descriptions\n"
-        "• GD simulation and feedback\n\n"
-        "What would you like to know?",
-      );
-    } else {
-      _addBotMessage(
-        "Backend connection failed. Please ensure the server is running on http://127.0.0.1:8000",
-        type: MessageType.error,
-      );
-    }
-  }
-
-  void _addBotMessage(String text, {MessageType type = MessageType.text}) {
-    final cleaned = _stripEmojis(text);
-    _messages.insert(0, ChatMessage(
-      sender: 'bot',
-      text: cleaned,
-      timestamp: DateTime.now(),
-      type: type,
-    ));
-    notifyListeners();
-  }
-
-  void _addUserMessage(String text) {
-    _messages.insert(0, ChatMessage(
-      sender: 'user',
+  // Add a message to the chat (compat with UI expectations)
+  void addMessage(String text, bool isUser, {MessageType? type}) {
+    _messages.add(ChatMessage(
       text: text,
+      sender: isUser ? 'user' : 'assistant',
+      type: type ?? (isUser ? MessageType.user : MessageType.bot),
       timestamp: DateTime.now(),
     ));
     notifyListeners();
   }
 
-  void _addLoadingMessage() {
-    _thinkingExiting = false;
-    _isLoading = true;
-    _messages.insert(0, ChatMessage(
-      sender: 'bot',
-      text: 'Working on it…',
-      timestamp: DateTime.now(),
-      type: MessageType.loading,
-    ));
-    notifyListeners();
-  }
-
-  void _removeLoadingMessage() {
-    _isLoading = false;
-    _messages.removeWhere((msg) => msg.type == MessageType.loading);
-    notifyListeners();
-  }
-
-  Future<void> sendMessage(String text) async {
-    if (text.trim().isEmpty) return;
-
-    _addUserMessage(text);
-    
-    if (!_isConnected) {
-      _addBotMessage(
-        "Cannot connect to backend. Please check if the server is running.",
-        type: MessageType.error,
-      );
-      return;
-    }
-
-    _addLoadingMessage();
-
+  Future<void> _pingBackend() async {
     try {
-      // Analyze the message to determine the best backend endpoint
-      final response = await _processMessage(text);
-      // Begin graceful exit: trigger fade-out
-      _thinkingExiting = true;
-      notifyListeners();
-      await Future.delayed(const Duration(milliseconds: 250));
-      _removeLoadingMessage();
-      _addBotMessage(response);
-    } catch (e) {
-      _thinkingExiting = true;
-      notifyListeners();
-      await Future.delayed(const Duration(milliseconds: 250));
-      _removeLoadingMessage();
-      _addBotMessage(
-        "Error: ${e.toString()}",
-        type: MessageType.error,
-      );
+      final resp = await http.get(Uri.parse('$baseUrl/health')).timeout(const Duration(seconds: 3));
+      _isConnected = resp.statusCode == 200;
+    } catch (_) {
+      _isConnected = false;
     }
-  }
-
-  Future<String> _processMessage(String text) async {
-    // Use the main LLM endpoint for ALL queries - it's smarter!
-    return await _handleGeneralQuery(text);
-  }
-
-  // Unused specialized handlers retained for future routing; commented to satisfy lints
-  // Future<String> _handleCompanyQuery(String text) async {
-  //   try {
-  //     final companies = await BackendService.getCompanies();
-  //     final companyStats = await BackendService.getCompanyStats();
-      
-  //     return "Company Information\n\n"
-  //         "Total Companies: ${companies.length}\n"
-  //         "Active Companies: ${companies.take(10).join(', ')}${companies.length > 10 ? '...' : ''}\n\n"
-  //         "Top Recruiters:\n"
-  //         "${companyStats['top_companies']?.map((c) => '• ${c['name']}: ${c['count']} placements').join('\n') ?? 'Data not available'}\n\n"
-  //         "Ask me about specific companies or placement trends!";
-  //   } catch (e) {
-  //     return "Failed to fetch company information: ${e.toString()}";
-  //   }
-  // }
-
-  // Future<String> _handleStatsQuery(String text) async {
-  //   try {
-  //     final placementStats = await BackendService.getPlacementStats();
-      
-  //     return "Placement Statistics\n\n"
-  //         "Total Placements: ${placementStats['total_placements'] ?? 'N/A'}\n"
-  //         "Average Package: ${placementStats['average_package'] ?? 'N/A'}\n"
-  //         "Highest Package: ${placementStats['highest_package'] ?? 'N/A'}\n"
-  //         "Placement Rate: ${placementStats['placement_rate'] ?? 'N/A'}%\n\n"
-  //         "Top Specializations:\n"
-  //         "${placementStats['top_specializations']?.map((s) => '• ${s['name']}: ${s['count']} students').join('\n') ?? 'Data not available'}";
-  //   } catch (e) {
-  //     return "Failed to fetch statistics: ${e.toString()}";
-  //   }
-  // }
-
-  // Future<String> _handleSkillsQuery(String text) async {
-  //   try {
-  //     // Extract skills from the query
-  //     final skills = await BackendService.searchSkills(text);
-      
-  //     if (skills.isNotEmpty) {
-  //       return "Skills Analysis\n\n"
-  //           "Relevant Skills Found:\n"
-  //           "${skills.map((skill) => '• $skill').join('\n')}\n\n"
-  //           "Recommendation: Focus on developing these skills to improve your placement prospects.";
-  //     } else {
-  //       return "Skills Search\n\n"
-  //           "I couldn't find specific skills matching your query. Try asking about:\n"
-  //           "• Technical skills (Python, Java, etc.)\n"
-  //           "• Soft skills (Leadership, Communication)\n"
-  //           "• Domain-specific skills (AI/ML, Web Development)";
-  //     }
-  //   } catch (e) {
-  //     return "Failed to search skills: ${e.toString()}";
-  //   }
-  // }
-
-  // Future<String> _handleResumeQuery(String text) async {
-  //   return "Resume Analysis\n\n"
-  //       "I can help you analyze your resume and match it with job descriptions!\n\n"
-  //       "To get started:\n"
-  //       "1. Share your resume text or key skills\n"
-  //       "2. I'll match it with available job descriptions\n"
-  //       "3. Get personalized recommendations and upskilling plans\n\n"
-  //       "Example: 'Analyze my resume for software engineering roles'";
-  // }
-
-  // Future<String> _handleGDQuery(String text) async {
-  //   return "Group Discussion Simulation\n\n"
-  //       "I can simulate and evaluate your GD performance!\n\n"
-  //       "How it works:\n"
-  //       "1. Share your GD transcript or key points\n"
-  //       "2. I'll analyze your communication, logic, and leadership\n"
-  //       "3. Get detailed feedback and improvement suggestions\n\n"
-  //       "Example: 'Simulate my GD on AI ethics'";
-  // }
-
-  Future<String> _handleGeneralQuery(String text) async {
-    try {
-      final response = await BackendService.query(question: text);
-      final answer = response['answer'] as String?;
-      final snippets = (response['snippets'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-
-      // Build grounded citations table from snippets metadata only (no guessing)
-      final rows = <String>[];
-      final seen = <String>{};
-      for (final sn in snippets) {
-        final meta = (sn['metadata'] as Map?)?.cast<String, dynamic>() ?? const {};
-        final company = (meta['company'] ?? '').toString().trim();
-        final role = (meta['role'] ?? '').toString().trim();
-        final year = (meta['year'] ?? '').toString().trim();
-        final skillsList = (meta['extracted_skills'] as List?)?.cast<String>() ?? const [];
-        if (company.isEmpty && role.isEmpty && year.isEmpty && skillsList.isEmpty) continue;
-        final key = [company, role, year, skillsList.take(3).join(',')].join('|');
-        if (seen.contains(key)) continue;
-        seen.add(key);
-        final skills = skillsList.isNotEmpty ? skillsList.take(6).join(', ') : 'Not mentioned';
-        rows.add('| ${company.isEmpty ? 'Not mentioned' : company} | ${role.isEmpty ? 'Not mentioned' : role} | ${year.isEmpty ? 'Not mentioned' : year} | $skills |');
-      }
-
-      String citations = '';
-      final hasMeaningful = rows.any((r) => !r.contains('Not mentioned | Not mentioned | Not mentioned |'));
-      if (rows.isNotEmpty && hasMeaningful) {
-        citations = '\n\nCitations from job descriptions (grounded):\n\n'
-            '| Company | Role | Year | Skills cited |\n'
-            '|---|---|---|---|\n'
-            '${rows.join('\n')}';
-      }
-
-      final safeAnswer = answer ?? "I couldn't find a specific answer to your question.";
-      return safeAnswer + citations;
-    } catch (e) {
-      return "Query failed: ${e.toString()}";
-    }
-  }
-
-  void clearChat() {
-    _messages.clear();
-    _initializeChat();
+    notifyListeners();
   }
 
   Future<void> reconnect() async {
-    _isConnected = await BackendService.checkHealth();
+    await _pingBackend();
+  }
+
+  // Send a message and get response from the AI agent
+  Future<void> sendMessage(String message) async {
+    if (message.trim().isEmpty) return;
+    
+    // Add user message
+    addMessage(message, true, type: MessageType.user);
+    
+    // Set loading state
+    _isLoading = true;
+    _loadingMessage = 'Working on it…';
+    _thinkingExiting = false;
+    // Add a transient loading message for the UI bubble
+    _messages.add(ChatMessage(
+      text: _loadingMessage,
+      sender: 'assistant',
+      type: MessageType.loading,
+      timestamp: DateTime.now(),
+    ));
     notifyListeners();
     
-    if (_isConnected) {
-      _addBotMessage("Backend connection restored!");
+    try {
+      // ensure backend connectivity state is fresh
+      if (!_isConnected) {
+        await _pingBackend();
+      }
+      final response = await http.post(
+        Uri.parse('$baseUrl/chat'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'question': message,
+          'session_id': 'default'
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final answer = data['answer'] ?? 'No response received';
+        
+        // Strip emojis from the answer
+        final cleanAnswer = _stripEmojis(answer);
+
+        // Begin exit for thinking animation, then replace loading bubble
+        _thinkingExiting = true;
+        notifyListeners();
+        await Future.delayed(const Duration(milliseconds: 250));
+        _removeLastLoadingMessageIfAny();
+        addMessage(cleanAnswer, false, type: MessageType.bot);
+        
+        // Process citations if available
+        if (data['citations'] != null && data['citations'].isNotEmpty) {
+          final citationsTable = _buildCitationsTable(data['citations']);
+          if (citationsTable.isNotEmpty) {
+            addMessage(citationsTable, false);
+          }
+        }
+        
+      } else {
+        _thinkingExiting = true;
+        notifyListeners();
+        await Future.delayed(const Duration(milliseconds: 250));
+        _removeLastLoadingMessageIfAny();
+        addMessage('Sorry, I encountered an error. Please try again.', false, type: MessageType.error);
+      }
+    } catch (e) {
+      _thinkingExiting = true;
+      notifyListeners();
+      await Future.delayed(const Duration(milliseconds: 250));
+      _removeLastLoadingMessageIfAny();
+      addMessage('Sorry, I couldn\'t connect to the server. Please check your connection.', false, type: MessageType.error);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
+
+  void _removeLastLoadingMessageIfAny() {
+    for (int i = _messages.length - 1; i >= 0; i--) {
+      if (_messages[i].type == MessageType.loading) {
+        _messages.removeAt(i);
+        break;
+      }
+    }
+  }
+  
+  // Strip emojis from text
+  String _stripEmojis(String text) {
+    // Remove common emojis and emoticons
+    return text
+        .replaceAll(RegExp(r'[\u{1F600}-\u{1F64F}]'), '') // Emoticons
+        .replaceAll(RegExp(r'[\u{1F300}-\u{1F5FF}]'), '') // Misc symbols
+        .replaceAll(RegExp(r'[\u{1F680}-\u{1F6FF}]'), '') // Transport
+        .replaceAll(RegExp(r'[\u{1F1E0}-\u{1F1FF}]'), '') // Flags
+        .replaceAll(RegExp(r'[\u{2600}-\u{26FF}]'), '') // Misc symbols
+        .replaceAll(RegExp(r'[\u{2700}-\u{27BF}]'), '') // Dingbats
+        .trim();
+  }
+  
+  // Build citations table in markdown format
+  String _buildCitationsTable(List<dynamic> citations) {
+    if (citations.isEmpty) return '';
+    
+    // Filter out citations without meaningful data
+    final validCitations = citations.where((citation) {
+      final company = citation['company']?.toString().trim() ?? '';
+      final role = citation['role']?.toString().trim() ?? '';
+      final year = citation['year']?.toString().trim() ?? '';
+      return company.isNotEmpty || role.isNotEmpty || year.isNotEmpty;
+    }).toList();
+    
+    if (validCitations.isEmpty) return '';
+    
+    StringBuffer table = StringBuffer();
+    table.writeln('## Sources & Citations');
+    table.writeln('');
+    table.writeln('| Company | Role | Year | Skills |');
+    table.writeln('|---------|------|------|--------|');
+    
+    for (final citation in validCitations) {
+      final company = citation['company']?.toString().trim() ?? '-';
+      final role = citation['role']?.toString().trim() ?? '-';
+      final year = citation['year']?.toString().trim() ?? '-';
+      
+      // Handle skills array
+      String skills = '-';
+      if (citation['extracted_skills'] != null) {
+        final skillsList = citation['extracted_skills'] as List;
+        if (skillsList.isNotEmpty) {
+          skills = skillsList.take(3).join(', '); // Show first 3 skills
+          if (skillsList.length > 3) {
+            skills += '...';
+          }
+        }
+      }
+      
+      table.writeln('| $company | $role | $year | $skills |');
+    }
+    
+    return table.toString();
+  }
+  
+  // Clear chat history
+  void clearChat() {
+    _messages.clear();
+    notifyListeners();
+  }
+  
+  // Update loading message
+  void updateLoadingMessage(String message) {
+    _loadingMessage = message;
+    notifyListeners();
+  }
+}
+
+class ChatMessage {
+  final String text;
+  final String sender; // 'user' or 'assistant'
+  final MessageType type;
+  final DateTime timestamp;
+  
+  ChatMessage({
+    required this.text,
+    required this.sender,
+    required this.type,
+    required this.timestamp,
+  });
 }

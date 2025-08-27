@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 from pinecone import Pinecone
+import sqlite3
+import json
 
 from .config import get_settings
 from .utils import cosine_similarity, filter_metadata, role_contains, slugify_company
@@ -366,9 +368,9 @@ Act as a placement consultant who understands the entire landscape.
 
     # Use OpenRouter as the primary LLM source
     if settings.OPENROUTER_API_KEY and OPENROUTER_AVAILABLE:
-        print(f"🟢 Attempting synthesis with OpenRouter model: {settings.OPENROUTER_MODEL or 'moonshotai/kimi-k2:free'}")
+        print(f"🟢 Attempting synthesis with OpenRouter model: moonshotai/kimi-k2")
         try:
-            openrouter_model = settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free"
+            openrouter_model = "moonshotai/kimi-k2"
             
             payload = {
                 "model": openrouter_model,
@@ -477,6 +479,158 @@ Act as a placement consultant who understands the entire landscape.
     # Skip synthesis and return None so the API returns retrieved snippets only.
     print("🔴 No LLM API keys configured or all LLM generation failed. Skipping synthesis.")
     return None
+
+
+# ----------------------------- TEXT-TO-SQL (GUARDED) -----------------------------
+
+TEXT2SQL_PROMPT = """You are an expert SQLite developer. Given a user's question, create a syntactically correct SQLite SELECT query.
+
+CRUCIAL INSTRUCTIONS:
+1) You MUST only use tables and columns from the schema provided below.
+2) NEVER invent table or column names. If the user asks for 'skills', use the 'skills' table and the 'skill_name' column.
+3) If the answer cannot be obtained from the given schema, output exactly: I cannot answer this question with the available data.
+4) Use appropriate JOINs across tables by their foreign keys when needed. Prefer readable column aliases.
+5) LIMIT results to 100 rows unless the user explicitly asks for all rows.
+
+You have access to these tables. Here is the schema:
+{schema}
+
+Helpful mapping hints:
+- companies.company_name is the company name.
+- roles.title is the role title, roles.specialization is the MBA specialization.
+- offers has salary_min_lpa, salary_max_lpa, batch_year.
+- skills.skill_name contains the skill text linked to roles.
+- requirements.requirement_text contains requirement text linked to roles.
+
+Question: {question}
+SQLQuery:"""
+
+
+def _introspect_sqlite_schema(db_path: str) -> str:
+    tables = ["companies", "roles", "offers", "skills", "requirements"]
+    schema_lines: List[str] = []
+    try:
+        with sqlite3.connect(db_path) as conn:
+            for t in tables:
+                cur = conn.execute(f"PRAGMA table_info({t})")
+                cols = cur.fetchall()
+                if not cols:
+                    continue
+                col_defs = ", ".join([f"{c[1]} {c[2]}" for c in cols])
+                schema_lines.append(f"CREATE TABLE {t} ({col_defs});")
+    except Exception:
+        # Fallback to known schema (from database.py)
+        schema_lines = [
+            "CREATE TABLE companies (id INTEGER PRIMARY KEY, company_name TEXT, company_type TEXT, industry TEXT, location TEXT, batch_year TEXT);",
+            "CREATE TABLE roles (id INTEGER PRIMARY KEY, company_id INTEGER, title TEXT, specialization TEXT, location TEXT, role_description TEXT);",
+            "CREATE TABLE offers (id INTEGER PRIMARY KEY, role_id INTEGER, batch_year TEXT, salary_min_lpa REAL, salary_max_lpa REAL, expected_hires INTEGER);",
+            "CREATE TABLE skills (id INTEGER PRIMARY KEY, role_id INTEGER, skill_name TEXT, skill_type TEXT, skill_priority INTEGER);",
+            "CREATE TABLE requirements (id INTEGER PRIMARY KEY, role_id INTEGER, requirement_text TEXT, requirement_type TEXT, requirement_priority INTEGER);",
+        ]
+    return "\n".join(schema_lines)
+
+
+def _llm_generate_sql(question: str, schema: str) -> str | None:
+    settings = get_settings()
+    prompt = TEXT2SQL_PROMPT.format(schema=schema, question=question)
+    # Prefer OpenRouter
+    if settings.OPENROUTER_API_KEY and OPENROUTER_AVAILABLE:
+        try:
+            payload = {
+                "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2",
+                "messages": [
+                    {"role": "system", "content": "You output only the SQL query or the fixed error sentence. No explanations."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.0,
+                "max_tokens": 300,
+            }
+            headers = {
+                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+            }
+            resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=20)
+            if resp.status_code == 200:
+                content = resp.json()["choices"][0]["message"]["content"].strip()
+                return content
+        except Exception:
+            pass
+    # No key or failure
+    return None
+
+
+def _is_safe_select(sql: str) -> bool:
+    s = sql.strip().rstrip(";")
+    if not s.lower().startswith("select"):
+        return False
+    forbidden = [";", "--", "drop ", "delete ", "insert ", "update ", "pragma ", "attach ", "alter "]
+    return not any(tok in s.lower() for tok in forbidden)
+
+
+def _execute_sql(db_path: str, sql: str) -> Tuple[List[str], List[tuple]]:
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.execute(sql)
+        cols = [d[0] for d in cur.description] if cur.description else []
+        rows = cur.fetchall()
+    return cols, rows
+
+
+def _format_sql_result(question: str, columns: List[str], rows: List[tuple]) -> str:
+    # If no LLM key, do a simple textual rendering
+    settings = get_settings()
+    if not settings.OPENROUTER_API_KEY or not OPENROUTER_AVAILABLE:
+        if not rows:
+            return "I could not find any matching results in the database."
+        preview = []
+        limit = min(len(rows), 10)
+        for r in rows[:limit]:
+            preview.append(", ".join(f"{c}: {v}" for c, v in zip(columns, r)))
+        return "\n".join(preview)
+
+    # Ask LLM to format nicely
+    try:
+        data = {"columns": columns, "rows": rows[:50]}
+        payload = {
+            "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free",
+            "messages": [
+                {"role": "system", "content": "Format DB query results into a concise, natural language answer. Do not invent data."},
+                {"role": "user", "content": (
+                    "Based on the user's question, format the following data into a clear answer.\n\n"
+                    f"Question: {question}\nData: {json.dumps(data)}\n\nAnswer:"
+                )},
+            ],
+            "temperature": 0.0,
+            "max_tokens": 400,
+        }
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=20)
+        if resp.status_code == 200:
+            return resp.json()["choices"][0]["message"]["content"].strip()
+    except Exception:
+        pass
+    return "I could not find any matching results in the database."
+
+
+def answer_from_text2sql(question: str) -> str | None:
+    """Top-level helper for structured, free-form DB questions using guarded Text-to-SQL."""
+    db = PlacementDatabase()
+    schema = _introspect_sqlite_schema(db.db_path)
+    sql = _llm_generate_sql(question, schema)
+    if not sql:
+        return None
+    if sql.strip().startswith("I cannot answer this question with the available data."):
+        return sql.strip()
+    # Ensure safety
+    if not _is_safe_select(sql):
+        return "I cannot answer this question with the available data."
+    try:
+        columns, rows = _execute_sql(db.db_path, sql)
+    except Exception as e:
+        return f"I cannot answer this question with the available data. (SQL error: {e})"
+    return _format_sql_result(question, columns, rows)
 
 
 def _build_prompt(question: str, snippets: List[Dict[str, Any]]) -> str:

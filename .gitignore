@@ -1,1 +1,96 @@
+# Virtual Environment
 .venv/
+venv/
+env/
+
+# Environment Variables (contains API keys)
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Data directories (may contain sensitive information)
+data/
+results/
+
+# Logs
+*.log
+logs/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Flutter
+flutter_ui/build/
+flutter_ui/.dart_tool/
+flutter_ui/.flutter-plugins
+flutter_ui/.flutter-plugins-dependencies
+flutter_ui/.packages
+flutter_ui/.pub-cache/
+flutter_ui/.pub/
+
+# Node.js
+mobile-app/node_modules/
+mobile-app/npm-debug.log*
+mobile-app/yarn-debug.log*
+mobile-app/yarn-error.log*
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# API Keys and Secrets (additional safety)
+*secret*
+*key*
+*password*
+*credential*

@@ -34,7 +34,7 @@ Year: 2024
 ```bash
 cd /Users/navinsivakumar/Desktop/jd-copilot
 source .venv/bin/activate
-export PINECONE_API_KEY=pcsk_3ENdZB_Aivnd7hk52nwywuPV4RkWTG6ba4FYdFGnxDgayAWJmwAobFdQCgho4DJrpqkTsM
+export PINECONE_API_KEY=your_pinecone_api_key_here
 export PINECONE_INDEX_NAME=jd-copilot
 
 # Run comprehensive setup + ingestion

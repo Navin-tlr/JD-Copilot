@@ -32,3 +32,12 @@ llama-index-core==0.10.54
 llama-index-readers-llama-parse==0.1.4
 pypdf==5.0.0
 
+langchain
+langchain-openai
+langchainhub
+langchain-community
+tiktoken
+sqlalchemy
+llama-index
+llama-index-llms-openai
+

@@ -438,3 +438,25 @@ class ChatMemoryManager:
 
 # Global memory manager instance
 memory_manager = ChatMemoryManager()
+
+
+# Simple ChatMemory class for the new agent architecture
+class ChatMemory:
+    """Simple chat memory interface for the new agent architecture"""
+    
+    def __init__(self):
+        self.memory_manager = memory_manager
+    
+    def add_message(self, session_id: str, role: str, content: str):
+        """Add a message to the specified session"""
+        session = self.memory_manager.get_session(session_id)
+        session.add_message(role, content)
+    
+    def get_messages(self, session_id: str):
+        """Get messages from the specified session"""
+        session = self.memory_manager.get_session(session_id)
+        return [msg.to_dict() for msg in session.messages]
+    
+    def clear_session(self, session_id: str):
+        """Clear the specified session"""
+        self.memory_manager.clear_session(session_id)

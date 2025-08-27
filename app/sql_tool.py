@@ -1,0 +1,198 @@
+import os
+import sqlite3
+from typing import Optional
+from sqlalchemy import create_engine, text
+
+# --- LAYER 1: CANONICAL (PRE-DEFINED) QUERIES ---
+# Note: Order matters; specialization-specific come first for higher specificity.
+CANONICAL_QUERIES = {
+    # Marketing
+    "count_marketing_companies": {
+        "keywords": [
+            "companies came for marketing",
+            "marketing role",
+            "marketing companies",
+            "companies for mkt",
+            "count companies for mkt",
+            "for marketing",
+        ],
+        "query": (
+            "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'marketing';"
+        ),
+    },
+    "list_marketing_companies": {
+        "keywords": ["list companies for marketing", "marketing companies list", "list companies for mkt"],
+        "query": (
+            "SELECT DISTINCT c.company_name FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'marketing' ORDER BY c.company_name;"
+        ),
+    },
+    # HR
+    "count_hr_companies": {
+        "keywords": ["companies came for hr", "hr role", "count companies for hr", "for hr"],
+        "query": (
+            "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'hr';"
+        ),
+    },
+    "list_hr_companies": {
+        "keywords": ["list companies for hr", "hr companies list"],
+        "query": (
+            "SELECT DISTINCT c.company_name FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'hr' ORDER BY c.company_name;"
+        ),
+    },
+    # Finance
+    "count_finance_companies": {
+        "keywords": ["companies came for finance", "finance role", "count companies for finance", "for finance"],
+        "query": (
+            "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'finance';"
+        ),
+    },
+    "list_finance_companies": {
+        "keywords": ["list companies for finance", "finance companies list"],
+        "query": (
+            "SELECT DISTINCT c.company_name FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'finance' ORDER BY c.company_name;"
+        ),
+    },
+    # Operations
+    "count_operations_companies": {
+        "keywords": ["companies came for operations", "operations role", "count companies for operations", "for operations"],
+        "query": (
+            "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'operations';"
+        ),
+    },
+    "list_operations_companies": {
+        "keywords": ["list companies for operations", "operations companies list"],
+        "query": (
+            "SELECT DISTINCT c.company_name FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'operations' ORDER BY c.company_name;"
+        ),
+    },
+    # Generic totals and lists (kept last, lowest specificity)
+    "count_distinct_companies": {
+        "keywords": ["how many companies", "count companies", "number of companies", "total companies"],
+        "query": "SELECT COUNT(DISTINCT company_name) FROM companies;",
+    },
+    "list_all_companies": {
+        "keywords": ["list all companies", "show me the companies", "what companies are there", "all companies"],
+        "query": "SELECT DISTINCT company_name FROM companies ORDER BY company_name;",
+    },
+}
+
+
+def get_canonical_query(question: str) -> Optional[str]:
+    q = question.lower()
+    # exact keyword containment pass (ordered by specificity via dict order)
+    for item in CANONICAL_QUERIES.values():
+        for kw in item["keywords"]:
+            if kw in q:
+                return item["query"]
+    # Heuristic fallback for agent-proposed SQL or loosely phrased inputs
+    try:
+        if ("count" in q or "how many" in q) and "marketing" in q:
+            return CANONICAL_QUERIES["count_marketing_companies"]["query"]
+        if ("list" in q or "distinct" in q) and "marketing" in q:
+            return CANONICAL_QUERIES["list_marketing_companies"]["query"]
+
+        if ("count" in q or "how many" in q) and (" hr" in q or "human resources" in q or q.strip().startswith("hr")):
+            return CANONICAL_QUERIES["count_hr_companies"]["query"]
+        if ("list" in q or "distinct" in q) and (" hr" in q or "human resources" in q or q.strip().startswith("hr")):
+            return CANONICAL_QUERIES["list_hr_companies"]["query"]
+
+        if ("count" in q or "how many" in q) and "finance" in q:
+            return CANONICAL_QUERIES["count_finance_companies"]["query"]
+        if ("list" in q or "distinct" in q) and "finance" in q:
+            return CANONICAL_QUERIES["list_finance_companies"]["query"]
+
+        if ("count" in q or "how many" in q) and "operations" in q:
+            return CANONICAL_QUERIES["count_operations_companies"]["query"]
+        if ("list" in q or "distinct" in q) and "operations" in q:
+            return CANONICAL_QUERIES["list_operations_companies"]["query"]
+
+        if ("list" in q and "companies" in q) or ("select" in q and " from companies" in q):
+            return CANONICAL_QUERIES["list_all_companies"]["query"]
+        if ("count" in q and "companies" in q) or ("count(distinct" in q and ("company" in q or "companies" in q)):
+            return CANONICAL_QUERIES["count_distinct_companies"]["query"]
+    except Exception:
+        pass
+    return None
+
+
+# --- LAYER 2: LLAMAINDEX SQL ENGINE (RELIABLE FALLBACK) ---
+_engine = None
+_query_engine = None
+
+
+def _create_sql_query_engine():
+    global _engine, _query_engine
+    if _query_engine is not None:
+        return _query_engine
+
+    # Lazy import to avoid hard dependency
+    try:
+        from llama_index.core import SQLDatabase
+        from llama_index.core.indices.struct_store import NLSQLTableQueryEngine
+        from llama_index.llms.openai import OpenAI
+    except Exception:
+        return None
+
+    db_path = os.getenv("DATABASE_PATH", "data/placement_data.db")
+    _engine = create_engine(f"sqlite:///{db_path}")
+    sql_db = SQLDatabase(_engine)
+
+    openai_key = os.getenv("OPENAI_API_KEY")
+    if not openai_key:
+        return None
+
+    llm = OpenAI(api_key=openai_key, model="gpt-4-turbo")
+    _query_engine = NLSQLTableQueryEngine(sql_database=sql_db, tables=None, llm=llm)
+    return _query_engine
+
+
+# --- THE MAIN TOOL FUNCTION ---
+
+def run_sql_query(question: str) -> str:
+    """
+    Deterministic structured DB query tool:
+    1) Try canonical, hand-written SQL (100% deterministic)
+    2) Fallback to LlamaIndex NLSQLTableQueryEngine (if available)
+    """
+    canonical_sql = get_canonical_query(question)
+    if canonical_sql:
+        try:
+            db_path = os.getenv('DATABASE_PATH', 'data/placement_data.db')
+            with sqlite3.connect(db_path) as conn:
+                cur = conn.execute(canonical_sql)
+                rows = cur.fetchall()
+            return str(rows)
+        except Exception as e:
+            return f"Error executing canonical query: {e}"
+
+    qe = _create_sql_query_engine()
+    if qe is None:
+        return "Structured query engine not available (fallback disabled)."
+    try:
+        resp = qe.query(question)
+        return str(resp)
+    except Exception as e:
+        return f"Error using SQL engine: {e}"
+
+
+def run_deterministic_sql_query(query: str) -> str:
+    """
+    Public wrapper expected by the final agent. Delegates to run_sql_query.
+    """
+    return run_sql_query(query)
