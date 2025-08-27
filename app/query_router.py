@@ -9,6 +9,7 @@ import requests
 from typing import Dict, List, Optional, Tuple, Any
 from enum import Enum
 import logging
+from .database import PlacementDatabase
 
 class QueryType(Enum):
     """Types of queries the system can handle"""
@@ -520,3 +521,142 @@ Provide both the filtered dataset and comprehensive analysis.
 """
         
         return f"Query: {params.get('query', '')}"
+
+    def _handle_hybrid_query(self, question: str, params: Dict[str, Any], db: PlacementDatabase, snippets: List[Dict[str, Any]]) -> str:
+        """Handle hybrid queries combining SQL and RAG"""
+        try:
+            # Step 1: Get structured data using SQL
+            from app.rag import answer_from_text2sql
+            structured_answer = answer_from_text2sql(question)
+            
+            # Step 2: Get RAG insights for additional context
+            from app.rag import synthesize_answer
+            rag_answer = synthesize_answer(question, snippets, {})
+            
+            # Step 3: Combine and format the response
+            if structured_answer and rag_answer:
+                combined_answer = f"""
+**Data Analysis & Statistics:**
+{structured_answer}
+
+**Additional Context & Insights:**
+{rag_answer}
+"""
+                return combined_answer
+            elif structured_answer:
+                return f"{structured_answer}\n\n*Note: Additional context could not be retrieved.*"
+            elif rag_answer:
+                return f"{rag_answer}\n\n*Note: Structured data could not be retrieved.*"
+            else:
+                return "I couldn't retrieve either structured data or contextual information for this query."
+            
+        except Exception as e:
+            logging.error(f"Hybrid query failed: {e}")
+            return f"Error processing hybrid query: {e}"
+
+    def _handle_multi_hop_query(self, question: str, params: Dict[str, Any], db: PlacementDatabase, snippets: List[Dict[str, Any]]) -> str:
+        """Handle multi-hop queries requiring sequential reasoning"""
+        try:
+            # Step 1: Execute first query (usually structured filtering)
+            from app.rag import answer_from_text2sql
+            first_results = answer_from_text2sql(question)
+            
+            if not first_results:
+                return "I couldn't process the first step of this multi-hop query."
+            
+            # Step 2: Use results to constrain second query (RAG analysis)
+            # Extract key information from first results for filtering
+            filtered_params = self._extract_filtered_params(first_results, params)
+            
+            # Step 3: Execute second query with filtered context
+            from app.rag import synthesize_answer
+            second_results = synthesize_answer(question, snippets, filtered_params)
+            
+            # Step 4: Combine results
+            if second_results:
+                return f"""
+**Step 1 - Data Filtering & Analysis:**
+{first_results}
+
+**Step 2 - Detailed Insights (Based on Filtered Results):**
+{second_results}
+"""
+            else:
+                return f"""
+**Data Analysis:**
+{first_results}
+
+*Note: Additional contextual analysis could not be retrieved.*
+"""
+            
+        except Exception as e:
+            logging.error(f"Multi-hop query failed: {e}")
+            return f"Error processing multi-hop query: {e}"
+
+    def _handle_structured_query(self, question: str, params: Dict[str, Any], db: PlacementDatabase, snippets: List[Dict[str, Any]]) -> str:
+        """Handle structured queries using SQL database"""
+        try:
+            from app.rag import answer_from_text2sql
+            return answer_from_text2sql(question) or "No structured data found for this query."
+        except Exception as e:
+            logging.error(f"Structured query failed: {e}")
+            return f"Error processing structured query: {e}"
+
+    def _extract_filtered_params(self, first_results: str, original_params: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract parameters from first query results to constrain second query"""
+        filtered_params = original_params.copy()
+        
+        # Extract company names if mentioned in results
+        import re
+        company_matches = re.findall(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', first_results)
+        if company_matches:
+            filtered_params["company_filter"] = company_matches[0]  # Use first company found
+        
+        # Extract salary information if mentioned
+        salary_match = re.search(r'(\d+(?:\.\d+)?)\s*LPA', first_results)
+        if salary_match:
+            filtered_params["salary_threshold"] = float(salary_match.group(1))
+        
+        # Extract specialization if mentioned
+        specializations = ["Marketing", "Finance", "HR", "Operations", "Strategy", "IT", "Analytics"]
+        for spec in specializations:
+            if spec in first_results:
+                filtered_params["specialization_filter"] = spec
+                break
+        
+        return filtered_params
+
+    def route_query(self, question: str) -> str:
+        """Main method to route and execute queries"""
+        try:
+            # Step 1: Classify the query
+            query_type, params = self.classify_query(question)
+            
+            # Step 2: Get routing strategy
+            strategy = self.get_routing_strategy(query_type, params)
+            
+            # Step 3: Execute based on query type
+            if query_type == QueryType.STRUCTURED:
+                return self._handle_structured_query(question, params, None, [])
+            
+            elif query_type == QueryType.UNSTRUCTURED:
+                from app.rag import retrieve_snippets, synthesize_answer
+                snippets = retrieve_snippets(question, top_k=5, filters={})
+                return synthesize_answer(question, snippets, {}) or "No relevant information found."
+            
+            elif query_type == QueryType.HYBRID:
+                from app.rag import retrieve_snippets
+                snippets = retrieve_snippets(question, top_k=5, filters={})
+                return self._handle_hybrid_query(question, params, None, snippets)
+            
+            elif query_type == QueryType.MULTI_HOP:
+                from app.rag import retrieve_snippets
+                snippets = retrieve_snippets(question, top_k=5, filters={})
+                return self._handle_multi_hop_query(question, params, None, snippets)
+            
+            else:
+                return "I couldn't determine how to process this query."
+                
+        except Exception as e:
+            logging.error(f"Query routing failed: {e}")
+            return f"Error processing query: {e}"

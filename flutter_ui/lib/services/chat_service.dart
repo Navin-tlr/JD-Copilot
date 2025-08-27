@@ -7,7 +7,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 enum MessageType { user, bot, loading, error }
 
 class ChatService extends ChangeNotifier {
-  static const String baseUrl = 'http://localhost:8001';
+  static const String baseUrl = 'http://127.0.0.1:8001';
 
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
@@ -27,12 +27,13 @@ class ChatService extends ChangeNotifier {
   }
 
   // Add a message to the chat (compat with UI expectations)
-  void addMessage(String text, bool isUser, {MessageType? type}) {
+  void addMessage(String text, bool isUser, {MessageType? type, List<Map<String, dynamic>>? snippets}) {
     _messages.add(ChatMessage(
       text: text,
       sender: isUser ? 'user' : 'assistant',
       type: type ?? (isUser ? MessageType.user : MessageType.bot),
       timestamp: DateTime.now(),
+      snippets: snippets, // Pass snippets to the message
     ));
     notifyListeners();
   }
@@ -76,6 +77,10 @@ class ChatService extends ChangeNotifier {
       if (!_isConnected) {
         await _pingBackend();
       }
+      
+      print('🔍 Sending request to: $baseUrl/chat');
+      print('🔍 Request body: ${json.encode({"question": message, "session_id": "default"})}');
+      
       final response = await http.post(
         Uri.parse('$baseUrl/chat'),
         headers: {'Content-Type': 'application/json'},
@@ -84,6 +89,9 @@ class ChatService extends ChangeNotifier {
           'session_id': 'default'
         }),
       );
+      
+      print('🔍 Response status: ${response.statusCode}');
+      print('🔍 Response body: ${response.body}');
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -105,20 +113,20 @@ class ChatService extends ChangeNotifier {
         // Strip emojis from the answer
         final cleanAnswer = _stripEmojis(answer);
 
+        // Get snippets if available
+        List<Map<String, dynamic>>? snippets;
+        if (data['snippets'] != null && data['snippets'] is List) {
+          snippets = List<Map<String, dynamic>>.from(data['snippets']);
+        }
+
         // Begin exit for thinking animation, then replace loading bubble
         _thinkingExiting = true;
         notifyListeners();
         await Future.delayed(const Duration(milliseconds: 250));
         _removeLastLoadingMessageIfAny();
-        addMessage(cleanAnswer, false, type: MessageType.bot);
+        addMessage(cleanAnswer, false, type: MessageType.bot, snippets: snippets);
         
-        // Process citations if available
-        if (data['citations'] != null && data['citations'].isNotEmpty) {
-          final citationsTable = _buildCitationsTable(data['citations']);
-          if (citationsTable.isNotEmpty) {
-            addMessage(citationsTable, false);
-          }
-        }
+        // Remove the old citations table logic since we're using snippets now
         
       } else {
         _thinkingExiting = true;
@@ -128,11 +136,12 @@ class ChatService extends ChangeNotifier {
         addMessage('Sorry, I encountered an error. Please try again.', false, type: MessageType.error);
       }
     } catch (e) {
+      print('❌ Error in sendMessage: $e');
       _thinkingExiting = true;
       notifyListeners();
       await Future.delayed(const Duration(milliseconds: 250));
       _removeLastLoadingMessageIfAny();
-      addMessage('Sorry, I couldn\'t connect to the server. Please check your connection.', false, type: MessageType.error);
+      addMessage('Connection error: $e', false, type: MessageType.error);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -150,14 +159,14 @@ class ChatService extends ChangeNotifier {
   
   // Strip emojis from text
   String _stripEmojis(String text) {
-    // Remove common emojis and emoticons
+    // Remove common emojis and emoticons using valid Dart regex syntax
     return text
-        .replaceAll(RegExp(r'[\u{1F600}-\u{1F64F}]'), '') // Emoticons
-        .replaceAll(RegExp(r'[\u{1F300}-\u{1F5FF}]'), '') // Misc symbols
-        .replaceAll(RegExp(r'[\u{1F680}-\u{1F6FF}]'), '') // Transport
-        .replaceAll(RegExp(r'[\u{1F1E0}-\u{1F1FF}]'), '') // Flags
-        .replaceAll(RegExp(r'[\u{2600}-\u{26FF}]'), '') // Misc symbols
-        .replaceAll(RegExp(r'[\u{2700}-\u{27BF}]'), '') // Dingbats
+        .replaceAll(RegExp(r'[\u{1F600}-\u{1F64F}]', unicode: true), '') // Emoticons
+        .replaceAll(RegExp(r'[\u{1F300}-\u{1F5FF}]', unicode: true), '') // Misc symbols
+        .replaceAll(RegExp(r'[\u{1F680}-\u{1F6FF}]', unicode: true), '') // Transport
+        .replaceAll(RegExp(r'[\u{1F1E0}-\u{1F1FF}]', unicode: true), '') // Flags
+        .replaceAll(RegExp(r'[\u{2600}-\u{26FF}]', unicode: true), '') // Misc symbols
+        .replaceAll(RegExp(r'[\u{2700}-\u{27BF}]', unicode: true), '') // Dingbats
         .trim();
   }
   
@@ -222,11 +231,13 @@ class ChatMessage {
   final String sender; // 'user' or 'assistant'
   final MessageType type;
   final DateTime timestamp;
+  final List<Map<String, dynamic>>? snippets; // Add snippets to the message
   
   ChatMessage({
     required this.text,
     required this.sender,
     required this.type,
     required this.timestamp,
+    this.snippets, // Initialize snippets
   });
 }

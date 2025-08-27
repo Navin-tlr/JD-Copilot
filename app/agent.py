@@ -1,620 +1,537 @@
 """
-AI Agent for Intelligent Query Routing and Execution
-Replaces the rigid query_router with a dynamic, reasoning-based system.
+Simple LLM-based Query Router (No LangChain Agents)
+Routes queries to either structured database or vector search based on user intent.
 """
 
-import os
 import json
 import sqlite3
-from langchain.tools import tool
-from langchain.tools import Tool as LC_Tool
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_community.utilities.sql_database import SQLDatabase
-from langchain_community.agent_toolkits import create_sql_agent
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain import hub
-from langchain.agents import AgentExecutor, create_openai_tools_agent
+import requests
 from typing import Dict, List, Optional, Tuple
 
 from .config import get_settings
 from .database import PlacementDatabase
-from .rag import retrieve_snippets, synthesize_answer # Assuming get_vectorstore is implicitly handled by retrieve_snippets
-from .sql_tool import run_deterministic_sql_query
-from .final_sql_tool import run_llama_index_sql_query
+from .rag import retrieve_snippets, synthesize_answer
 
-# Import our NEW validator and schema functions
-from .sql_validator import validate_sql_query, get_dynamic_schema
+# LlamaIndex imports for robust SQL querying
+from llama_index.core import SQLDatabase, ServiceContext
+from llama_index.core.llms import LLM, LLMMetadata, ChatMessage, ChatResponse, CompletionResponse
+from llama_index.core.query_engine import NLSQLTableQueryEngine
+from typing import Optional, List
+from pydantic import Field
 
-# --- 1. Redefine the SQL Tool with Built-in Validation ---
-@tool
-def structured_database_query(generated_sql: str) -> str:
-    """
-    Use this tool to execute a VALIDATED SQLite query against the placements database.
-    The query is first validated against the database schema.
-    Only use this tool with a syntactically correct SQLite query.
-    The agent should generate the SQL query and pass it to this tool.
-    """
-    db_path = "data/placement_data.db"  # Or get from settings
+# Custom OpenRouter LLM wrapper for LlamaIndex
+class OpenRouterLLM(LLM):
+    """Custom LLM wrapper for OpenRouter API to work with LlamaIndex."""
+    
+    model: str = Field(default="moonshotai/kimi-k2", description="OpenRouter model name")
+    api_key: str = Field(default=None, description="OpenRouter API key")
+    
+    @property
+    def metadata(self) -> LLMMetadata:
+        return LLMMetadata(
+            context_window=8192,    # adjust based on model
+            num_output=512,         # typical safe default
+            is_chat_model=True,
+            is_function_calling_model=False
+        )
+    
+    def complete(self, prompt: str, **kwargs) -> CompletionResponse:
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "temperature": 0,
+            "max_tokens": 512
+        }
+        resp = requests.post("https://openrouter.ai/api/v1/completions", json=payload, headers=headers)
+        text = resp.json()["choices"][0]["text"]
+        return CompletionResponse(text=text)
+    
+    def chat(self, messages: List[ChatMessage], **kwargs) -> ChatResponse:
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": self.model,
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "temperature": 0,
+            "max_tokens": 512
+        }
+        resp = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers)
+        text = resp.json()["choices"][0]["message"]["content"]
+        return ChatResponse(message=ChatMessage(role="assistant", content=text))
+    
+    def stream_complete(self, prompt, **kwargs):
+        """Stream completion (not implemented for simplicity)."""
+        raise NotImplementedError("Streaming not implemented for OpenRouter LLM")
+    
+    def stream_chat(self, messages, **kwargs):
+        """Stream chat (not implemented for simplicity)."""
+        raise NotImplementedError("Streaming not implemented for OpenRouter LLM")
+    
+    def acomplete(self, prompt, **kwargs):
+        """Async complete (not implemented for simplicity)."""
+        raise NotImplementedError("Async not implemented for OpenRouter LLM")
+    
+    def achat(self, messages, **kwargs):
+        """Async chat (not implemented for simplicity)."""
+        raise NotImplementedError("Async not implemented for OpenRouter LLM")
+    
+    def astream_complete(self, prompt, **kwargs):
+        """Async stream complete (not implemented for simplicity)."""
+        raise NotImplementedError("Async not implemented for OpenRouter LLM")
+    
+    def astream_chat(self, messages, **kwargs):
+        """Async stream chat (not implemented for simplicity)."""
+        raise NotImplementedError("Async not implemented for OpenRouter LLM")
 
-    # THE CRITICAL VALIDATION STEP
-    is_valid, reason = validate_sql_query(generated_sql, db_path)
+# Global LlamaIndex query engine for structured queries
+_llama_index_engine = None
 
-    if not is_valid:
-        # If validation fails, STOP and return the error.
-        # This feedback loop teaches the LLM what a valid query looks like.
-        return f"Invalid SQL Query: {reason}. Please correct the query based on the schema and try again."
+def get_llama_index_engine():
+    """Initialize and return the LlamaIndex SQL query engine."""
+    global _llama_index_engine
+    
+    if _llama_index_engine is None:
+        try:
+            # Connect to SQLite database using SQLAlchemy connection string
+            from sqlalchemy import create_engine
+            engine = create_engine("sqlite:///data/placement_data.db")
+            sql_database = SQLDatabase(engine)
+            
+            # Create strict guardrailed prompt for Text2SQL
+            TEXT2SQL_PROMPT = """You are an expert SQL query generator for the JD-Copilot system.
+Your job is to translate user questions into SAFE SQLite queries against the given schema.
 
-    # Only execute if the query is valid
+SCHEMA (you may ONLY use these tables and columns):
+- companies(id, company_name, company_type, industry, location, batch_year, created_at)
+- roles(id, company_id, title, specialization, location, role_description, created_at)
+- offers(id, role_id, batch_year, salary_min_lpa, salary_max_lpa, expected_hires, created_at)
+- skills(id, role_id, skill_name, skill_type, skill_priority, created_at)
+- requirements(id, role_id, requirement_text, requirement_type, requirement_priority, created_at)
+- specializations(id, name, description, created_at)
+
+STRICT RULES:
+1. Use ONLY the tables and columns listed above. Never invent new tables or columns.
+2. If the user's question cannot be answered from this schema, respond with:
+   I cannot answer this question with the available data.
+3. Always return a full, runnable SQL SELECT statement. Do not return explanations or partial queries.
+4. Prefer the simplest valid query. 
+   - Example: For "How many companies?", use `SELECT COUNT(*) FROM companies;`
+   - Only use JOINs if the question explicitly requires role, salary, skill, or requirement details.
+5. Never hallucinate rows or output imaginary results. Query only what exists in the database.
+"""
+            
+            # Initialize custom OpenRouter LLM
+            settings = get_settings()
+            if settings.OPENROUTER_API_KEY:
+                llm = OpenRouterLLM(
+                    model="moonshotai/kimi-k2",
+                    api_key=settings.OPENROUTER_API_KEY
+                )
+                print(f"✅ OpenRouter LLM initialized with model: {llm.model}")
+            else:
+                print("⚠️ No OpenRouter API key available for LlamaIndex. Using fallback.")
+                return None
+            
+            # Configure service context to avoid embedding model issues
+            service_context = ServiceContext.from_defaults(
+                llm=llm,
+                embed_model=None  # Disable embeddings for SQL queries
+            )
+            
+            _llama_index_engine = NLSQLTableQueryEngine(
+                sql_database=sql_database,
+                service_context=service_context,
+                text2sql_prompt=TEXT2SQL_PROMPT
+            )
+            
+            print("✅ LlamaIndex SQL query engine initialized successfully")
+            
+        except Exception as e:
+            print(f"❌ Failed to initialize LlamaIndex engine: {e}")
+            _llama_index_engine = None
+    
+    return _llama_index_engine
+
+def get_database_schema() -> Dict[str, List[str]]:
+    """Get the actual database schema to prevent hallucination."""
     try:
+        db_path = "data/placement_data.db"
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute(generated_sql)
-            results = cursor.fetchall()
-            if not results:
-                return "Query executed successfully, but returned no results."
-            # You would format these results more nicely for the LLM to synthesize an answer
-            return json.dumps(results)
-    except Exception as e:
-        return f"SQL Execution Error: {e}"
-
-def get_database_schema():
-    """
-    Get the actual database schema to prevent hallucination.
-    """
-    try:
-        db = PlacementDatabase()
-        db_path = db.db_path
-        sql_db = SQLDatabase.from_uri(f"sqlite:///{db_path}")
-        
-        # Get actual table names and schemas
-        tables = sql_db.get_table_names()
-        schemas = {}
-        
-        for table in tables:
-            try:
-                schema = sql_db.get_table_info(table)
-                schemas[table] = schema
-            except Exception as e:
-                print(f"Warning: Could not get schema for table {table}: {e}")
-        
-        return tables, schemas
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = [table[0] for table in cursor.fetchall()]
+            
+            schema = {}
+            for table in tables:
+                cursor.execute(f"PRAGMA table_info('{table}')")
+                columns = [info[1] for info in cursor.fetchall()]
+                schema[table] = columns
+            return schema
     except Exception as e:
         print(f"Error getting database schema: {e}")
-        return [], {}
+        return {}
 
-def validate_sql_query(sql_query: str, actual_tables: list) -> tuple[bool, str]:
-    """
-    Validate SQL query to prevent hallucination of table names.
-    """
-    if not sql_query:
-        return False, "Empty SQL query"
-    
-    # Check for common hallucination patterns
-    sql_lower = sql_query.lower()
-    
-    # Check if query references non-existent tables
-    for table in actual_tables:
-        if table.lower() in sql_lower:
-            continue
-    
-    # Look for common hallucinated table names
-    hallucinated_tables = ['jobs', 'job', 'employee', 'employees', 'applicant', 'applicants']
-    for hallucinated in hallucinated_tables:
-        if hallucinated in sql_lower:
-            return False, f"Query references non-existent table '{hallucinated}'. Available tables: {actual_tables}"
-    
-    # Check for basic SQL syntax
-    if 'select' not in sql_lower:
-        return False, "Query must contain SELECT statement"
-    
-    return True, "Query appears valid"
-
-def _fetch_all_company_names(sql_db: SQLDatabase) -> List[str]:
+def execute_sql_query(sql_query: str) -> str:
+    """Execute SQL query and return formatted results."""
     try:
-        result = sql_db.run("SELECT company_name FROM companies")
-        if not result:
-            return []
-        lines = [r.strip() for r in result.split("\n") if r.strip()]
-        # sql_db.run often returns rows formatted like "('Name',)"; normalize greedily
-        cleaned: List[str] = []
-        for line in lines:
-            name = line.strip()
-            if name.startswith("(") and "," in name:
-                name = name.strip("()")
-                parts = [p.strip().strip("'") for p in name.split(",")]
-                if parts:
-                    name = parts[0]
-            cleaned.append(name)
-        return cleaned
-    except Exception:
-        return []
+        db_path = "data/placement_data.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql_query)
+            results = cursor.fetchall()
+            
+            if not results:
+                return "No results found."
+            
+            # Format results for LLM processing
+            if len(results) == 1 and len(results[0]) == 1:
+                return f"Result: {results[0][0]}"
+            elif len(results) <= 10:
+                formatted = []
+                for i, row in enumerate(results, 1):
+                    if len(row) == 1:
+                        formatted.append(f"{i}. {row[0]}")
+                    else:
+                        formatted.append(f"{i}. {' | '.join(str(val) for val in row)}")
+                return "Results:\n" + "\n".join(formatted)
+            else:
+                return f"Found {len(results)} results. First 5: " + " | ".join(str(val) for val in results[0])
+                
+    except Exception as e:
+        return f"SQL Error: {e}"
 
-def _normalize_specialization(user_text: str) -> Optional[str]:
-    text = user_text.strip().lower()
-    mapping = {
-        "marketing": "marketing",
-        "mkt": "marketing",
-        "finance": "finance",
-        "fin": "finance",
-        "hr": "hr",
-        "human resources": "hr",
-        "operations": "operations",
-        "ops": "operations",
-        "business analytics": "business analytics",
-        "analytics": "business analytics",
-    }
-    # exact match first
-    if text in mapping:
-        return mapping[text]
-    # fallback: find key contained in text
-    for k, v in mapping.items():
-        if k in text:
-            return v
-    return None
+def execute_simple_sql_query(user_question: str) -> str:
+    """Simple fallback SQL execution for basic queries when LlamaIndex is not available."""
+    try:
+        # Simple mapping for common queries
+        question_lower = user_question.lower()
+        
+        if "how many companies" in question_lower or "companies came" in question_lower:
+            sql = "SELECT COUNT(*) FROM companies;"
+        elif "which companies" in question_lower and "finance" in question_lower:
+            sql = "SELECT DISTINCT c.company_name FROM companies c JOIN roles r ON c.id = r.company_id WHERE r.specialization = 'Finance';"
+        elif "which companies" in question_lower and "marketing" in question_lower:
+            sql = "SELECT DISTINCT c.company_name FROM companies c JOIN roles r ON c.id = r.company_id WHERE r.specialization = 'Marketing';"
+        elif "which companies" in question_lower and "hr" in question_lower:
+            sql = "SELECT DISTINCT c.company_name FROM companies c JOIN roles r ON c.id = r.company_id WHERE r.specialization = 'HR';"
+        elif "highest salary" in question_lower:
+            sql = "SELECT MAX(salary_max_lpa) FROM offers;"
+        elif "average salary" in question_lower:
+            sql = "SELECT AVG((salary_min_lpa + salary_max_lpa) / 2) FROM offers WHERE salary_min_lpa IS NOT NULL AND salary_max_lpa IS NOT NULL;"
+        else:
+            return "I cannot answer this question with the available data. Please try rephrasing."
+        
+        return execute_sql_query(sql)
+        
+    except Exception as e:
+        return f"Fallback query failed: {str(e)}"
 
-def _intent_from_query(query: str) -> Tuple[str, Dict[str, str]]:
-    q = query.strip().lower()
-    # Count companies by specialization
-    if ("how many" in q or "count" in q) and ("companies" in q) and ("marketing" in q or "finance" in q or "hr" in q or "operations" in q or "analytics" in q):
-        spec = _normalize_specialization(q) or ""
-        return ("count_companies_by_specialization", {"specialization": spec})
-    # List all companies
-    if ("list" in q or "show" in q) and ("all companies" in q or ("companies" in q and "all" in q)):
-        return ("list_companies_all", {})
-    # List companies by specialization
-    if ("list" in q or "show" in q) and ("companies" in q) and ("marketing" in q or "finance" in q or "hr" in q or "operations" in q or "analytics" in q):
-        spec = _normalize_specialization(q) or ""
-        return ("list_companies_by_specialization", {"specialization": spec})
-    # List skills by company
-    if ("skills" in q) and ("for" in q or "at" in q):
-        # naive company extraction: longest matching company from DB will be used later
-        return ("list_skills_by_company", {})
-    return ("unknown", {})
-
-def _execute_deterministic(sql_db: SQLDatabase, intent: str, params: Dict[str, str]) -> Optional[str]:
-    # Only allow listed tables/columns
-    allowed_tables = {"companies", "roles", "skills", "offers", "requirements"}
-    # Intent handlers
-    if intent == "count_companies_by_specialization":
-        spec = params.get("specialization", "")
-        if not spec:
-            return "I need a specialization (e.g., marketing, finance, hr, operations, business analytics)."
-        if spec not in {"marketing", "finance", "hr", "operations", "business analytics"}:
-            return "Unsupported specialization."
-        query = (
-            "SELECT COUNT(DISTINCT c.company_name) as company_count "
-            "FROM roles r JOIN companies c ON r.company_id = c.id "
-            "WHERE LOWER(r.specialization) = '" + spec + "'"
-        )
-        result = sql_db.run(query)
-        return f"Based on verified database query: {result} companies came for {spec} roles."
-    if intent == "list_companies_all":
-        result = sql_db.run("SELECT company_name FROM companies ORDER BY company_name")
-        if not result:
-            return "No companies found in the database."
-        lines = [r.strip() for r in result.split("\n") if r.strip()]
-        return "Here are all companies in the database:\n" + "\n".join(f"- {l}" for l in lines)
-    if intent == "list_companies_by_specialization":
-        spec = params.get("specialization", "")
-        if not spec:
-            return "I need a specialization (e.g., marketing, finance, hr, operations, business analytics)."
-        query = (
-            "SELECT DISTINCT c.company_name "
-            "FROM roles r JOIN companies c ON r.company_id = c.id "
-            "WHERE LOWER(r.specialization) = '" + spec + "' "
-            "ORDER BY c.company_name"
-        )
-        result = sql_db.run(query)
-        if not result:
-            return f"No companies found for {spec}."
-        lines = [r.strip() for r in result.split("\n") if r.strip()]
-        return "Companies offering roles in " + spec + ":\n" + "\n".join(f"- {l}" for l in lines)
-    if intent == "list_skills_by_company":
-        all_names = _fetch_all_company_names(sql_db)
-        if not all_names:
-            return "No companies found in the database."
-        # We cannot safely extract company name; return instruction message
-        return "Please specify an exact company name from: " + ", ".join(sorted(all_names))
-    return None
-
-@tool
-def query_job_database(query: str) -> str:
+def normalize_query_with_schema_helper(user_question: str) -> str:
     """
-    Use this tool to answer specific, factual questions about job data which can likely be found in a structured database.
-    This includes queries about company names, job titles, required skills, education levels, and years of experience.
-    Example questions: 'List all jobs from Alstom', 'What skills are required for a Data Scientist role?'
+    Schema Helper: Normalizes MBA student questions into schema-aligned SQL tasks.
+    This ensures LlamaIndex gets clear instructions that match the database schema.
     """
-    print("--- Using SQL Database Tool ---")
+    schema_helper_prompt = f"""You are a schema-aware query rewriter for the JD-Copilot system.
+Your only job is to restate the user's question as a structured SQL task 
+that matches the database schema.
+
+Database schema reminders:
+- Companies → companies.company_name
+- Roles → roles.title
+- Specializations → roles.specialization (values: FINANCE, MARKETING, HR, OPERATIONS, STRATEGY, ANALYTICS, IT)
+- Salaries → offers.salary_min_lpa / salary_max_lpa
+- Skills → skills.skill_name
+- Requirements → requirements.requirement_text
+
+Rules:
+- Always normalize specialization with UPPER().
+- JOIN tables correctly:
+  • roles.company_id = companies.id
+  • offers.role_id = roles.id
+  • skills.role_id = roles.id
+  • requirements.role_id = roles.id
+- If the user says "placements" or "came for", map it to companies or roles count.
+- Never invent columns, tables, or data.
+
+User Question: {user_question}
+
+Output format:
+{{
+  "query_type": "STRUCTURED",
+  "sql_task": "<natural language instruction for SQL>"
+}}"""
+
+    # Use OpenRouter API to get schema-normalized query
+    settings = get_settings()
+    if not settings.OPENROUTER_API_KEY:
+        print("⚠️ No OpenRouter API key for Schema Helper. Using fallback.")
+        return user_question
     
     try:
-        # Step 0: Get actual database schema to prevent hallucination
-        actual_tables, schemas = get_database_schema()
-        print(f"Available tables: {actual_tables}")
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "moonshotai/kimi-k2",
+            "messages": [{"role": "user", "content": schema_helper_prompt}],
+            "temperature": 0.0,
+            "max_tokens": 200,
+        }
         
-        # Use our existing PlacementDatabase for now
-        db = PlacementDatabase()
-        db_path = db.db_path
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=20
+        )
         
-        # Create SQLDatabase connection
-        sql_db = SQLDatabase.from_uri(f"sqlite:///{db_path}")
-        
-        # CRITICAL: Use deterministic queries for common questions to ensure consistency
-        query_lower = query.lower()
-        
-        # Marketing role count - ALWAYS use the verified query
-        if "how many companies" in query_lower and "marketing" in query_lower:
-            print("🔒 Using deterministic query for marketing role count...")
+        if response.status_code == 200:
+            result = response.json()["choices"][0]["message"]["content"]
+            
+            # Try to extract the sql_task from JSON response
             try:
-                deterministic_query = """
-                SELECT COUNT(DISTINCT c.company_name) as company_count
-                FROM roles r 
-                JOIN companies c ON r.company_id = c.id 
-                WHERE LOWER(r.specialization) = 'marketing'
-                """
-                deterministic_result = sql_db.run(deterministic_query)
-                print(f"Deterministic query result: {deterministic_result}")
-                
-                if deterministic_result:
-                    return f"Based on verified database query: {deterministic_result} companies came for marketing roles."
+                import json
+                parsed = json.loads(result)
+                if "sql_task" in parsed:
+                    print(f"🔧 Schema Helper normalized: '{user_question}' → '{parsed['sql_task']}'")
+                    return parsed["sql_task"]
                 else:
-                    return "Based on verified database query: 0 companies came for marketing roles."
-            except Exception as det_error:
-                print(f"Deterministic query failed: {det_error}")
-                return f"Error executing verified query: {det_error}"
-        
-        # List all companies - ALWAYS use the verified query
-        elif "list all companies" in query_lower or "all companies" in query_lower:
-            print("🔒 Using deterministic query for company list...")
-            try:
-                deterministic_query = "SELECT company_name FROM companies ORDER BY company_name"
-                deterministic_result = sql_db.run(deterministic_query)
-                print(f"Deterministic query result: {deterministic_result}")
-                
-                if deterministic_result:
-                    # Parse the result to get company names
-                    companies = [row.strip() if isinstance(row, str) else str(row) for row in deterministic_result.split('\n') if row.strip()]
-                    return f"Here are all companies in the database:\n" + "\n".join([f"- {company}" for company in companies])
-                else:
-                    return "No companies found in the database."
-            except Exception as det_error:
-                print(f"Deterministic query failed: {det_error}")
-                return f"Error executing verified query: {det_error}"
-        
-        # For other queries, use the LangChain SQL agent with validation
+                    print(f"⚠️ Schema Helper response missing sql_task: {result}")
+                    return user_question
+            except json.JSONDecodeError:
+                print(f"⚠️ Schema Helper response not valid JSON: {result}")
+                return user_question
         else:
-            print("🔄 Using LangChain SQL agent for complex queries...")
+            print(f"❌ Schema Helper API error: {response.status_code}")
+            return user_question
+            
+    except Exception as e:
+        print(f"❌ Schema Helper failed: {e}")
+        return user_question
+
+def route_query(user_question: str) -> str:
+    """
+    Simple LLM-based query router that determines whether to use structured DB or vector search.
+    """
+    settings = get_settings()
+    
+    # Get database schema
+    schema = get_database_schema()
+    schema_json = json.dumps(schema, indent=2)
+    
+    # Create routing prompt using direct string formatting (no LangChain)
+    system_prompt = """You are the Query Router for JD-Copilot. Your sole responsibility is to classify user queries into the correct execution mode so the system can choose the right database(s). You must never fabricate or provide answers yourself.
+
+⸻
+
+Categories
+	•	STRUCTURED
+	•	Use when the query can be answered directly from the structured SQL database.
+	•	Typical cases: counts, company names, lists, salaries, locations, role titles, skill frequencies.
+	•	Examples:
+	•	"How many companies came for finance roles?"
+	•	"Which companies hired for marketing?"
+	•	"What is the highest salary offered?"
+	•	UNSTRUCTURED
+	•	Use when the query requires qualitative or descriptive information from job descriptions (vector search).
+	•	Typical cases: role descriptions, responsibilities, culture, benefits.
+	•	Examples:
+	•	"Tell me about the Business Development role at TAP Academy."
+	•	"What is the company culture at Masters' Union?"
+	•	"Give me the full job description of Accorian."
+	•	HYBRID
+	•	Use when the query requires both structured facts and descriptive/contextual details.
+	•	Typical cases: comparisons, insights across companies, structured data + explanation.
+	•	Examples:
+	•	"Which companies are hiring for HR roles, and what trends can we see?"
+	•	"Compare salaries and skills across companies."
+	•	MULTI_HOP
+	•	Use when the query requires sequential reasoning across structured and unstructured databases.
+	•	Typical cases: filtering by one data source before querying the other.
+	•	Examples:
+	•	"Among the highest-paying companies, what skills are most valued?"
+	•	"Which companies in Bangalore hired for Finance roles, and what skills do they emphasize?"
+	•	"Show me companies with salaries above 15 LPA and summarize their role expectations."
+
+⸻
+
+Rules
+	1.	Never generate or explain answers — only classify.
+	2.	Always choose STRUCTURED for pure counts, lists, or simple fact lookups.
+	3.	Always choose UNSTRUCTURED for full JDs, responsibilities, culture, or descriptive content.
+	4.	Choose HYBRID when both structured facts and descriptive analysis are needed.
+	5.	Choose MULTI_HOP if results from one database are required to constrain a query in the other.
+	6.	If uncertain between STRUCTURED and HYBRID, default to HYBRID.
+	7.	If uncertain between UNSTRUCTURED and MULTI_HOP, default to MULTI_HOP.
+
+⸻
+
+Response Format
+
+Output only one word:
+STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
+
+    user_prompt = f"User Question: {user_question}"
+    
+    # Initialize LLM using direct API calls (no LangChain)
+    if settings.OPENROUTER_API_KEY:
+        # Use direct OpenRouter API call
+        payload = {
+            "model": "moonshotai/kimi-k2",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.0,
+            "max_tokens": 10,
+        }
         
-        # Step 1: Generate SQL using mistralai/mistral-7b-instruct (optimized for code/SQL generation)
-        settings = get_settings()
-        if settings.OPENROUTER_API_KEY:
-            sql_generator_llm = ChatOpenAI(
-                model="mistralai/mistral-7b-instruct",
-                temperature=0,
-                openai_api_key=settings.OPENROUTER_API_KEY,
-                openai_api_base="https://openrouter.ai/api/v1"
-            )
-        else:
-            # Fallback to OpenAI if configured
-            sql_generator_llm = ChatOpenAI(
-                model="gpt-3.5-turbo",
-                temperature=0,
-                openai_api_key=settings.OPENAI_API_KEY
-            )
-        
-        # Step 2: Validate SQL using moonshotai/kimi-k2 (prevent hallucination)
-        if settings.OPENROUTER_API_KEY:
-            sql_validator_llm = ChatOpenAI(
-                model="moonshotai/kimi-k2",
-                temperature=0,
-                openai_api_key=settings.OPENROUTER_API_KEY,
-                openai_api_base="https://openrouter.ai/api/v1"
-            )
-        else:
-            sql_validator_llm = sql_generator_llm
-        
-        # Create a dedicated SQL Agent with validation
-        # This is more reliable than a simple Text-to-SQL chain
-        sql_agent_executor = create_sql_agent(sql_generator_llm, db=sql_db, agent_type="openai-tools", verbose=False)
-        
-        # Step 3: Execute the query with validation
-        response = sql_agent_executor.invoke({"input": query})
-        sql_result = response.get("output", "I was unable to retrieve an answer from the database.")
-        
-        # Step 4: Validate the result using the validator LLM
-        validation_prompt = f"""
-        You are a SQL validation expert. Review the following SQL query result and ensure it's accurate.
-        
-        User Question: {query}
-        SQL Result: {sql_result}
-        Available Tables: {actual_tables}
-        
-        Please validate:
-        1. Does the result answer the user's question correctly?
-        2. Are the numbers/statistics logical given the database context?
-        3. Does the result match what would be expected from a placement database?
-        4. Are there any obvious errors or inconsistencies?
-        
-        CRITICAL: If the user asks for "how many companies came for marketing role", 
-        the answer should be a small number (likely 2-5 companies) since this is a placement database.
-        If the result shows more than 10 companies, it's likely incorrect.
-        
-        If you find any issues, provide a corrected answer.
-        If the result looks correct, confirm it.
-        
-        Validation Result:
-        """
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+        }
         
         try:
-            validation_response = sql_validator_llm.invoke(validation_prompt)
-            validation_result = validation_response.content
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=20,
+            )
             
-            # Additional validation: Check if the count makes sense
-            if "how many companies" in query.lower() and "marketing" in query.lower():
-                # For marketing role queries, verify the count is reasonable
-                if any(str(num) in sql_result for num in range(10, 100)):
-                    print("⚠️ Count seems too high for marketing roles, double-checking...")
-                    # Execute a simple verification query
-                    try:
-                        verification_query = "SELECT COUNT(DISTINCT c.company_name) FROM roles r JOIN companies c ON r.company_id = c.id WHERE LOWER(r.specialization) = 'marketing'"
-                        verification_result = sql_db.run(verification_query)
-                        print(f"Verification query result: {verification_result}")
-                        
-                        # If verification gives a different result, use it
-                        if verification_result and verification_result != sql_result:
-                            print("🔄 Using verified result instead of agent result")
-                            return f"Based on database verification: {verification_result} companies came for marketing roles."
-                    except Exception as verify_error:
-                        print(f"Verification query failed: {verify_error}")
-            
-            # If validation finds issues, return the corrected version
-            if "issue" in validation_result.lower() or "incorrect" in validation_result.lower():
-                print("⚠️ SQL validation found issues, providing corrected answer")
-                return validation_result
+            if response.status_code == 200:
+                routing_decision = response.json()["choices"][0]["message"]["content"].strip().upper()
             else:
-                print("✅ SQL validation passed")
-                return sql_result
+                print(f"❌ OpenRouter API error: {response.status_code}")
+                routing_decision = "UNSTRUCTURED"  # Default fallback
                 
-        except Exception as validation_error:
-            print(f"Warning: SQL validation failed: {validation_error}")
-            return sql_result
-        
-    except Exception as e:
-        return f"Error querying the database: {e}. Please try rephrasing your question."
-
-
-# --- Tool 2: Vector Store Tool ---
-# This tool answers semantic or open-ended questions by searching through the raw text of the job descriptions.
-
-@tool
-def query_unstructured_job_descriptions(query: str) -> str:
-    """
-    Use this tool to answer general, open-ended, or semantic questions that require
-    a deep, contextual understanding of the full text of job descriptions. This is best for
-    questions about day-to-day responsibilities, company culture, specific qualifications, or for summarizing JDs.
-    Example questions: 'Summarize the company culture at Alstom', 'What are the daily tasks for an HR role?'
-    """
-    print("--- Using Vector Store Tool ---")
+        except Exception as e:
+            print(f"❌ OpenRouter API call failed: {e}")
+            routing_decision = "UNSTRUCTURED"  # Default fallback
+    else:
+        print("❌ No OpenRouter API key available")
+        routing_decision = "UNSTRUCTURED"  # Default fallback
     
-    try:
-        # Use moonshotai/kimi-k2 for RAG (paid model, optimized for text understanding and generation)
-        settings = get_settings()
-        if settings.OPENROUTER_API_KEY:
-            # For RAG, we'll use the existing synthesize_answer function but ensure it uses the right model
-            snippets = retrieve_snippets(query, top_k=8, filters={})
-            
-            if not snippets:
-                return "I could not find any relevant information in the available documents."
-            
-            # Synthesize answer using our existing logic
-            answer = synthesize_answer(query, snippets, {})
-            return answer or "I could not generate a comprehensive answer from the available information."
-        else:
-            # Fallback to existing RAG functions
-            snippets = retrieve_snippets(query, top_k=8, filters={})
-            
-            if not snippets:
-                return "I could not find any relevant information in the available documents."
-            
-            # Synthesize answer using our existing logic
-            answer = synthesize_answer(query, snippets, {})
-            return answer or "I could not generate a comprehensive answer from the available information."
+    print(f"🔍 Routing decision: {routing_decision}")
+    
+    # Route based on decision
+    if routing_decision == "STRUCTURED":
+        # Structured database query - use LlamaIndex NLSQLTableQueryEngine
+        print(f"🔍 Executing structured query for: {user_question}")
         
-    except Exception as e:
-        return f"Error searching the documents: {e}. Please try rephrasing your question."
+        # Normalize the query using the schema helper
+        normalized_sql_task = normalize_query_with_schema_helper(user_question)
+        
+        # Use LlamaIndex for robust SQL querying
+        llama_engine = get_llama_index_engine()
+        if llama_engine:
+            try:
+                response = llama_engine.query(normalized_sql_task)
+                if response and hasattr(response, 'response'):
+                    return response.response
+                else:
+                    return "I couldn't process this structured query. Please try rephrasing."
+            except Exception as e:
+                print(f"❌ LlamaIndex query failed: {e}")
+                return f"I encountered an error processing this query: {str(e)}"
+        else:
+            # Fallback to simple SQL execution
+            print("⚠️ Using fallback SQL execution")
+            return execute_simple_sql_query(user_question)
+        
+    elif routing_decision == "UNSTRUCTURED":
+        # Vector search query
+        print(f"🔍 Using vector search for: {user_question}")
+        
+        # Use existing RAG system
+        from .rag import retrieve_snippets, synthesize_answer
+        snippets = retrieve_snippets(user_question, top_k=5, filters={})
+        if snippets:
+            answer = synthesize_answer(user_question, snippets, {})
+            return answer or "I couldn't generate a comprehensive answer from the available information."
+        else:
+            return "I couldn't find any relevant information in the available documents."
+    
+    elif routing_decision == "HYBRID":
+        # Hybrid query - both structured and unstructured
+        print(f"🔍 Executing hybrid query for: {user_question}")
+        
+        # Get structured data first using LlamaIndex with schema helper
+        normalized_sql_task = normalize_query_with_schema_helper(user_question)
+        llama_engine = get_llama_index_engine()
+        structured_answer = ""
+        if llama_engine:
+            try:
+                response = llama_engine.query(normalized_sql_task)
+                if response and hasattr(response, 'response'):
+                    structured_answer = response.response
+            except Exception as e:
+                print(f"❌ LlamaIndex query failed in hybrid: {e}")
+                structured_answer = "Could not retrieve structured data."
+        else:
+            # Fallback to simple SQL execution
+            structured_answer = execute_simple_sql_query(user_question)
+        
+        # Get RAG insights
+        from .rag import retrieve_snippets, synthesize_answer
+        snippets = retrieve_snippets(user_question, top_k=5, filters={})
+        rag_answer = ""
+        if snippets:
+            rag_answer = synthesize_answer(user_question, snippets, {})
+        
+        # Combine results
+        if structured_answer and rag_answer:
+            return f"""
+**Data Analysis:**
+{structured_answer}
 
+**Additional Context & Insights:**
+{rag_answer}
+"""
+        elif structured_answer:
+            return f"{structured_answer}\n\n*Note: Additional context could not be retrieved.*"
+        elif rag_answer:
+            return f"{rag_answer}\n\n*Note: Structured data could not be retrieved.*"
+        else:
+            return "I couldn't process this hybrid query. Please try rephrasing."
+    
+    elif routing_decision == "MULTI_HOP":
+        # Multi-hop query - sequential reasoning
+        print(f"🔍 Executing multi-hop query for: {user_question}")
+        
+        # Use the advanced query router for multi-hop processing
+        from .query_router import QueryRouter
+        router = QueryRouter()
+        result = router.route_query(user_question)
+        if result:
+            return result
+        else:
+            return "I couldn't process this multi-hop query. Please try rephrasing."
+    
+    else:
+        # Unknown routing
+        return f"I'm not sure how to answer this question. The router returned: {routing_decision}"
+
+# Legacy functions - now redirect to the simple router
+def create_production_agent():
+    """Legacy function - now uses simple LLM router."""
+    return None
 
 def create_jd_agent():
-    """
-    This function creates and configures the main agent that will orchestrate the tools.
-    """
-    tools = [
-        structured_database_query,
-        query_job_database,
-        query_unstructured_job_descriptions,
-    ]
-    
-    # Use moonshotai/kimi-k2 for the main agent (orchestrator)
-    settings = get_settings()
-    if settings.OPENROUTER_API_KEY:
-        agent_llm = ChatOpenAI(
-            model="moonshotai/kimi-k2",
-            temperature=0,
-            openai_api_key=settings.OPENROUTER_API_KEY,
-            openai_api_base="https://openrouter.ai/api/v1"
-        )
-    else:
-        agent_llm = ChatOpenAI(
-            model="gpt-3.5-turbo",
-            temperature=0,
-            openai_api_key=settings.OPENAI_API_KEY
-        )
+    """Legacy function - now uses simple LLM router."""
+    return None
 
-    custom_prompt = ChatPromptTemplate.from_template("""
-    You are JD-Copilot, an intelligent placement cell assistant for MBA students.
-    
-    Tools:
-    - structured_database_query: For ALL structured DB questions (counts, lists, skills, roles, companies). Prefer this first.
-    - query_job_database: Legacy SQL tool (use only if structured_database_query fails).
-    - query_unstructured_job_descriptions: For qualitative insights from unstructured documents.
-    
-    CRITICAL:
-    - For "how many companies came for marketing role" and similar count/list intents, always use structured_database_query.
-    - Do NOT write SQL yourself; call the tools.
-    """)
-
-    agent = create_openai_tools_agent(agent_llm, tools, custom_prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
-    return agent_executor
-
-
-# Convenience function for easy integration
 def create_placement_agent():
-    """Create and return a configured placement agent."""
-    return create_jd_agent()
-
+    """Legacy function - now uses simple LLM router."""
+    return None
 
 def create_final_agent():
-    """
-    Final agent exposing two primary tools:
-    - structured_database_query (deterministic SQL first, with guarded fallback)
-    - query_unstructured_job_descriptions (vector RAG)
-    """
-    # Replace structured tool with the self-contained LlamaIndex tool
-    final_structured_tool = LC_Tool(
-        name="structured_data_query_tool",
-        func=run_llama_index_sql_query,
-        description=(
-            "USE THIS TOOL for any factual DB queries: counts, lists, company/role/skill details. "
-            "This tool internally converts NL->SQL and executes safely."
-        ),
-    )
-
-    tools = [final_structured_tool, query_unstructured_job_descriptions]
-
-    settings = get_settings()
-    if settings.OPENROUTER_API_KEY:
-        agent_llm = ChatOpenAI(
-            model="moonshotai/kimi-k2",
-            temperature=0,
-            openai_api_key=settings.OPENROUTER_API_KEY,
-            openai_api_base="https://openrouter.ai/api/v1",
-        )
-    else:
-        agent_llm = ChatOpenAI(
-            model="gpt-3.5-turbo",
-            temperature=0,
-            openai_api_key=settings.OPENAI_API_KEY,
-        )
-
-    # Strict tool selection policy while preserving required variables for tools agent
-    try:
-        prompt = hub.pull("hwchase17/openai-tools-agent")
-        # The hub prompt includes required variables: input, tools, tool_names, agent_scratchpad
-        # We rely on strong tool descriptions to steer routing; no extra injection needed here.
-    except Exception:
-        # Fallback prompt that explicitly includes all required variables
-        prompt = ChatPromptTemplate.from_messages([
-            (
-                "system",
-                (
-                    "You are JD-Copilot. Choose one tool that best answers the question.\\n\\n"
-                    "HARD RULES:\\n"
-                    "- Use structured_database_query for ANY numeric, count, list, table, or entity-specific facts from the structured DB.\\n"
-                    "  Examples: 'how many', 'count', 'list', 'show all', 'distinct', specific fields like companies, roles, skills.\\n"
-                    "- After a successful call to structured_database_query, DO NOT call any other tool (no verification with RAG).\\n"
-                    "- Only use query_unstructured_job_descriptions for qualitative, descriptive, or summarization questions about JD text (culture, responsibilities, summaries).\\n"
-                    "  Never use it for counts/lists, even to verify.\\n"
-                    "- If the user explicitly asks to cross-check with documents, you may then use RAG.\\n\\n"
-                    "Available tools: {tools}. You may refer to them by name from: {tool_names}."
-                ),
-            ),
-            ("user", "{input}"),
-            ("assistant", "{agent_scratchpad}"),
-        ])
-
-    agent = create_openai_tools_agent(agent_llm, tools, prompt)
-    return AgentExecutor(agent=agent, tools=tools, verbose=False)
-
-
-def create_production_agent():
-    """
-    Creates the production-ready agent with dynamic schema loading,
-    a strict JSON-based prompt, and a validation-enforced SQL tool.
-    """
-    settings = get_settings()
-    db_path = "data/placement_data.db"
-
-    # Step A: Dynamically fetch the schema and format as JSON
-    schema_json = json.dumps(get_dynamic_schema(db_path), indent=2)
-
-    # Step B: Create the strict, machine-readable prompt
-    # Note: Using the correct template variables for LangChain
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """
-You are a world-class Text-to-SQL agent. Your purpose is to answer user questions by using the structured_database_query tool to execute SQL queries against the database.
-
-**Database Schema (JSON format):**
-```json
-{schema}
-```
-
-**CRITICAL RULES:**
-
-1.  You MUST use the structured_database_query tool to execute SQL queries. Do not just generate SQL text.
-
-2.  When the user asks a question, generate the appropriate SQL query and pass it to the structured_database_query tool.
-
-3.  You MUST generate queries that ONLY use the tables and columns explicitly defined in the schema above. Do not hallucinate any tables or columns.
-
-4.  If the user's question cannot be answered using the provided schema, you MUST return the exact text: "I cannot answer this question with the available data."
-
-5.  **IMPORTANT: Handle Case Sensitivity Automatically**
-    - Specializations in the database are stored in UPPERCASE (e.g., 'FINANCE', 'HR', 'MARKETING', 'OPERATIONS')
-    - Students may ask for 'Finance', 'finance', 'FINANCE', 'Marketing', etc.
-    - ALWAYS use case-insensitive queries for specializations using UPPER() function
-    - Example: `WHERE UPPER(r.specialization) = UPPER('Finance')` or `WHERE UPPER(r.specialization) LIKE '%FINANCE%'`
-
-6.  **CRITICAL: You MUST Execute the SQL Query**
-    - Do NOT just explain the SQL - you MUST execute it using the structured_database_query tool
-    - Always call structured_database_query with your generated SQL
-    - The tool will validate and execute the query, returning actual results
-    - Then provide the answer based on those results
-
-7.  **Robust Query Examples:**
-    - For "Finance roles": `SELECT COUNT(DISTINCT c.company_name) FROM companies c JOIN roles r ON c.id = r.company_id WHERE UPPER(r.specialization) LIKE '%FINANCE%'`
-    - For "HR positions": `SELECT COUNT(DISTINCT c.company_name) FROM companies c JOIN roles r ON c.id = r.company_id WHERE UPPER(r.specialization) LIKE '%HR%'`
-    - For "Marketing jobs": `SELECT COUNT(DISTINCT c.company_name) FROM companies c JOIN roles r ON c.id = r.company_id WHERE UPPER(r.specialization) LIKE '%MARKETING%'`
-
-8.  **Workflow:**
-    - Generate SQL query
-    - Call structured_database_query tool with the SQL
-    - Get the actual result (e.g., [[1]] means 1 company)
-    - Provide answer: "There are X companies that came for [specialization] roles"
-        """),
-        ("user", "{input}"),
-        ("assistant", "{agent_scratchpad}"),
-    ])
-    
-    # Step C: Define the tools available to the agent
-    # We only expose our new, hardened tool.
-    tools = [structured_database_query, query_unstructured_job_descriptions]  # Add back your RAG tool
-
-    # Step D: Initialize the LLM and create the agent
-    if settings.OPENROUTER_API_KEY:
-        agent_llm = ChatOpenAI(
-            model="moonshotai/kimi-k2",  # Using the specified model
-            temperature=0,
-            openai_api_key=settings.OPENROUTER_API_KEY,
-            openai_api_base="https://openrouter.ai/api/v1",
-        )
-    else:
-        # Fallback LLM
-        agent_llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
-
-    # Create a partial prompt with the schema
-    partial_prompt = prompt.partial(schema=schema_json)
-    
-    agent = create_openai_tools_agent(agent_llm, tools, partial_prompt)
-    return AgentExecutor(agent=agent, tools=tools, verbose=False)
+    """Legacy function - now uses simple LLM router."""
+    return None

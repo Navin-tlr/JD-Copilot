@@ -17,7 +17,7 @@ from datetime import datetime
 from .config import get_settings
 from .database import PlacementDatabase
 from .rag import retrieve_snippets, synthesize_answer
-from .agent import create_final_agent, create_production_agent
+from .agent import route_query  # Import the simple router instead of agent functions
 from .chat_memory import ChatMemory
 from .sql_tool import run_sql_query
 
@@ -35,20 +35,12 @@ app.add_middleware(
 # Initialize chat memory
 chat_memory = ChatMemory()
 
-# Initialize the AI agent when the application starts
-# This ensures it's ready to handle requests without delay
-jd_agent = None
+# Simple LLM router system (no more complex agents)
+# The route_query function handles all query processing
 
 def get_jd_agent():
-    """Get or create the JD agent."""
-    global jd_agent
-    if jd_agent is None:
-        try:
-            jd_agent = create_production_agent()
-        except Exception as e:
-            print(f"Warning: Could not initialize JD agent: {e}")
-            jd_agent = None
-    return jd_agent
+    """This function is no longer needed as we use the simple router."""
+    return None
 
 class QueryRequest(BaseModel):
     question: str
@@ -75,7 +67,7 @@ class StructuredResponse(BaseModel):
     answer: str
 
 @app.post("/query", response_model=QueryResponse)
-async def query_endpoint(request: ChatRequest = Body(...), agent = Depends(get_jd_agent)):
+async def query_endpoint(request: ChatRequest = Body(...)):
     """
     This endpoint receives a user query and uses the AI agent to generate a response.
     """
@@ -85,15 +77,36 @@ async def query_endpoint(request: ChatRequest = Body(...), agent = Depends(get_j
         # Add user message to chat memory
         chat_memory.add_message(request.session_id, "user", request.query)
         
-        if agent:
-            print("🚀 Using AI agent for intelligent query processing")
-            # The main logic is now a single call to the agent executor
-            response = agent.invoke({
-                "input": request.query,
-                # If you implement memory, you'll pass chat_history here
-            })
+        # Use the simple router to process the query
+        print("🚀 Using simple LLM router for query processing")
+        try:
+            answer = route_query(request.query)
+            print(f"🔍 Router answer: {answer}")
             
-            answer = response.get("output", "I couldn't process your query. Please try again.")
+            if not answer or answer.strip() == "":
+                answer = "I couldn't process your query. Please try again."
+                
+            print(f"🔍 Final answer: {answer}")
+        except Exception as router_error:
+            print(f"❌ Router error: {router_error}")
+            # Return a graceful error response instead of crashing
+            return ChatResponse(
+                answer=f"Sorry, I encountered an error while processing your query: {str(router_error)}",
+                snippets=[],
+                citations=[],
+                error=True
+            )
+            
+            # Extract snippets from the answer if available
+            snippets = []
+            try:
+                # Try to get relevant snippets for citations
+                temp_snippets = retrieve_snippets(request.query, top_k=3, filters={})
+                if temp_snippets:
+                    snippets = temp_snippets
+            except Exception as e:
+                print(f"Warning: Could not retrieve snippets for citations: {e}")
+            
         else:
             print("⚠️ AI agent not available, falling back to basic RAG")
             # Fallback to basic RAG if agent fails
@@ -105,69 +118,6 @@ async def query_endpoint(request: ChatRequest = Body(...), agent = Depends(get_j
         
         # Add assistant response to chat memory
         chat_memory.add_message(request.session_id, "assistant", answer)
-        
-        return QueryResponse(answer=answer, sources=[])  # You can enhance this to return sources later
-
-    except Exception as e:
-        # Log the error for debugging
-        print(f"An error occurred: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="An error occurred while processing your query.")
-
-@app.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(request: QueryRequest, agent = Depends(get_jd_agent)):
-    """
-    Legacy chat endpoint that maintains backward compatibility.
-    """
-    try:
-        question = request.question.strip()
-        session_id = request.session_id
-        
-        print(f"🤖 Processing query: {question}")
-        
-        # Add user message to chat memory
-        chat_memory.add_message(session_id, "user", question)
-        
-        # Use the AI agent to process the query
-        if agent:
-            print("🚀 Using AI agent for intelligent query processing")
-            try:
-                response = agent.invoke({
-                    "input": question,
-                })
-                answer = response.get("output", "I couldn't process your query. Please try again.")
-            except Exception as agent_error:
-                print(f"❌ Agent execution error: {agent_error}")
-                # Return a graceful error response instead of crashing
-                return ChatResponse(
-                    answer=f"Sorry, I encountered an error while processing your query: {str(agent_error)}",
-                    snippets=[],
-                    citations=[],
-                    error=True
-                )
-            
-            # Extract snippets from the answer if available
-            snippets = []
-            try:
-                # Try to get relevant snippets for citations
-                temp_snippets = retrieve_snippets(question, top_k=3, filters={})
-                if temp_snippets:
-                    snippets = temp_snippets
-            except Exception as e:
-                print(f"Warning: Could not retrieve snippets for citations: {e}")
-            
-        else:
-            print("⚠️ AI agent not available, falling back to basic RAG")
-            # Fallback to basic RAG if agent fails
-            snippets = retrieve_snippets(question, top_k=8, filters={})
-            if snippets:
-                answer = synthesize_answer(question, snippets, {})
-            else:
-                answer = "I couldn't find any relevant information to answer your question."
-        
-        # Add assistant response to chat memory
-        chat_memory.add_message(session_id, "assistant", answer)
         
         # Prepare citations
         citations = []
@@ -203,6 +153,81 @@ async def chat_endpoint(request: QueryRequest, agent = Depends(get_jd_agent)):
             citations=[],
             error=True  # Add error flag for frontend handling
         )
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat_endpoint(request: QueryRequest):
+    """
+    Legacy chat endpoint that maintains backward compatibility.
+    """
+    try:
+        question = request.question.strip()
+        session_id = request.session_id
+        
+        print(f"🤖 Processing query: {question}")
+        
+        # Add user message to chat memory
+        chat_memory.add_message(session_id, "user", question)
+        
+        # Use the simple router to process the query
+        print("🚀 Using simple LLM router for query processing")
+        try:
+            answer = route_query(question)
+            print(f"🔍 Router answer: {answer}")
+            
+            if not answer or answer.strip() == "":
+                answer = "I couldn't process your query. Please try again."
+                
+            print(f"🔍 Final answer: {answer}")
+        except Exception as router_error:
+            print(f"❌ Router error: {router_error}")
+            # Return a graceful error response instead of crashing
+            return ChatResponse(
+                answer=f"Sorry, I encountered an error while processing your query: {str(router_error)}",
+                snippets=[],
+                citations=[],
+                error=True
+            )
+        
+        # Extract snippets from the answer if available
+        snippets = []
+        try:
+            # Try to get relevant snippets for citations
+            temp_snippets = retrieve_snippets(question, top_k=3, filters={})
+            if temp_snippets:
+                snippets = temp_snippets
+        except Exception as e:
+            print(f"Warning: Could not retrieve snippets for citations: {e}")
+        
+        # Prepare citations for the response object (but don't add to answer text)
+        citations = []
+        if snippets:
+            for snippet in snippets:
+                metadata = snippet.get("metadata", {})
+                if metadata.get("company") or metadata.get("role") or metadata.get("year"):
+                    citations.append({
+                        "company": metadata.get("company", ""),
+                        "role": metadata.get("role", ""),
+                        "year": metadata.get("year", ""),
+                        "extracted_skills": metadata.get("extracted_skills", [])
+                    })
+        
+        # Add assistant response to chat memory
+        chat_memory.add_message(session_id, "assistant", answer)
+        
+        print(f"✅ Query processed successfully. Answer length: {len(answer)} chars")
+        
+        return ChatResponse(
+            answer=answer,
+            snippets=snippets,
+            citations=citations
+        )
+        
+    except Exception as e:
+        # Log the error for debugging
+        print(f"An error occurred: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="An error occurred while processing your query.")
 
 @app.post("/structured", response_model=StructuredResponse)
 async def structured_endpoint(request: StructuredRequest = Body(...)):

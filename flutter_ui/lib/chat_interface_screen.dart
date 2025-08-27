@@ -174,7 +174,7 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
         final isDark = theme.brightness == Brightness.dark;
         return ListView.builder(
           padding: const EdgeInsets.all(16.0),
-          reverse: true,
+          reverse: false,
           itemCount: chatService.messages.length,
           itemBuilder: (context, index) {
             final message = chatService.messages[index];
@@ -185,101 +185,229 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
             return Align(
               alignment:
                   isUserMessage ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.7,
-                ),
-                margin: const EdgeInsets.symmetric(vertical: 5.0),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12.47),
-                  color: isLoading
-                      ? Colors.transparent
-                      : isUserMessage
-                      ? (isDark ? const Color(0xFF433F3F) : const Color(0xFFE6F0FF))
-                      : isError 
-                          ? (isDark ? Colors.red.withOpacity(0.2) : Colors.red.withOpacity(0.12))
-                          : (isDark ? const Color(0xFF2A2A2A) : Colors.white),
-                ),
-                child: isLoading
-                    ? EphemeralThinking(exiting: context.read<ChatService>().thinkingExiting)
-                    : _FadeInOnBuild(
-                        child: MarkdownBody(
-                          data: message.text,
-                          selectable: false,
-                          softLineBreak: true,
-                          styleSheet: MarkdownStyleSheet(
-                            p: TextStyle(
-                              color: isDark ? Colors.white.withOpacity(0.90) : Colors.black87,
-                              fontSize: 16,
-                              height: 1.35,
-                              fontWeight: FontWeight.w400,
-                            ),
-                            h1: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? const Color(0xFFEFEFEF) : Colors.black,
-                            ),
-                            h2: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? const Color(0xFFEFEFEF) : Colors.black87,
-                            ),
-                            h3: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? const Color(0xFFEFEFEF) : Colors.black87,
-                            ),
-                            strong: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? const Color(0xFFF5F5F5) : Colors.black,
-                            ),
-                            em: TextStyle(
-                              fontStyle: FontStyle.italic,
-                              color: isDark ? Colors.white.withOpacity(0.9) : Colors.black.withOpacity(0.75),
-                            ),
-                            blockquoteDecoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF333333) : const Color(0xFFF0F0F0),
-                              border: Border(left: BorderSide(color: isDark ? Colors.white24 : Colors.black12, width: 3)),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            codeblockDecoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
-                            ),
-                            code: TextStyle(
-                              fontSize: 14,
-                              color: isDark ? const Color(0xFFE0E0E0) : Colors.black87,
-                              fontWeight: FontWeight.w400,
-                            ),
-                            listBullet: TextStyle(
-                              color: isDark ? Colors.white.withOpacity(0.85) : Colors.black54,
-                              fontSize: 16,
-                            ),
-                            listBulletPadding: const EdgeInsets.only(right: 8),
-                            tableHead: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? const Color(0xFFF0F0F0) : Colors.black,
-                            ),
-                            tableBody: TextStyle(
-                              color: isDark ? Colors.white.withOpacity(0.85) : Colors.black87,
-                              fontSize: 15,
-                            ),
-                            tableBorder: TableBorder.all(color: isDark ? Colors.white12 : Colors.black12, width: 1),
-                            tableCellsPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                            horizontalRuleDecoration: BoxDecoration(
-                              border: Border(bottom: BorderSide(color: isDark ? Colors.white24 : Colors.black12, width: 1)),
-                            ),
-                          ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!isUserMessage && !isLoading) 
+                    GestureDetector(
+                      onTap: () => _showSnippets(context, message),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8.0, top: 10.0),
+                        padding: const EdgeInsets.all(6.0),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.blue.withOpacity(0.2) : Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: isDark ? Colors.blue[300] : Colors.blue[600],
                         ),
                       ),
+                    ),
+                  Flexible(
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.7,
+                      ),
+                      margin: const EdgeInsets.symmetric(vertical: 5.0),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12.47),
+                        color: isLoading
+                            ? Colors.transparent
+                            : isUserMessage
+                            ? (isDark ? const Color(0xFF433F3F) : const Color(0xFFE6F0FF))
+                            : isError 
+                                ? (isDark ? Colors.red.withOpacity(0.2) : Colors.red.withOpacity(0.12))
+                                : (isDark ? const Color(0xFF2A2A2A) : Colors.white),
+                      ),
+                      child: isLoading
+                          ? EphemeralThinking(exiting: context.read<ChatService>().thinkingExiting)
+                          : _FadeInOnBuild(
+                              child: MarkdownBody(
+                                data: message.text,
+                                selectable: false,
+                                softLineBreak: true,
+                                styleSheet: MarkdownStyleSheet(
+                                  p: TextStyle(
+                                    color: isDark ? Colors.white.withOpacity(0.90) : Colors.black87,
+                                    fontSize: 16,
+                                    height: 1.35,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  h1: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? const Color(0xFFEFEFEF) : Colors.black,
+                                  ),
+                                  h2: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? const Color(0xFFEFEFEF) : Colors.black87,
+                                  ),
+                                  h3: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? const Color(0xFFEFEFEF) : Colors.black87,
+                                  ),
+                                  strong: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? const Color(0xFFF5F5F5) : Colors.black,
+                                  ),
+                                  em: TextStyle(
+                                    fontStyle: FontStyle.italic,
+                                    color: isDark ? Colors.white.withOpacity(0.9) : Colors.black.withOpacity(0.75),
+                                  ),
+                                  blockquoteDecoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF333333) : const Color(0xFFF0F0F0),
+                                    border: Border(left: BorderSide(color: isDark ? Colors.white24 : Colors.black12, width: 3)),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  codeblockDecoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+                                  ),
+                                  code: TextStyle(
+                                    fontSize: 14,
+                                    color: isDark ? const Color(0xFFE0E0E0) : Colors.black87,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  listBullet: TextStyle(
+                                    color: isDark ? Colors.white.withOpacity(0.85) : Colors.black54,
+                                    fontSize: 16,
+                                  ),
+                                  listBulletPadding: const EdgeInsets.only(right: 8),
+                                  tableHead: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? const Color(0xFFF0F0F0) : Colors.black,
+                                  ),
+                                  tableBody: TextStyle(
+                                    color: isDark ? Colors.white.withOpacity(0.85) : Colors.black87,
+                                    fontSize: 15,
+                                  ),
+                                  tableBorder: TableBorder.all(color: isDark ? Colors.white12 : Colors.black12, width: 1),
+                                  tableCellsPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                                  horizontalRuleDecoration: BoxDecoration(
+                                    border: Border(bottom: BorderSide(color: isDark ? Colors.white24 : Colors.black12, width: 1)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             );
           },
         );
       },
+    );
+  }
+
+  void _showSnippets(BuildContext context, ChatMessage message) {
+    // Get snippets from the message if available
+    final snippets = message.snippets ?? [];
+    
+    if (snippets.isEmpty) {
+      // Show a simple message if no snippets
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('No Sources Available'),
+          content: const Text('This response doesn\'t have any source documents attached.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Show snippets in a modal
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.8,
+          height: MediaQuery.of(context).size.height * 0.7,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Sources & References',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const Divider(),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: snippets.length,
+                  itemBuilder: (context, index) {
+                    final snippet = snippets[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (snippet['metadata']?['company'] != null)
+                              Text(
+                                'Company: ${snippet['metadata']['company']}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            if (snippet['metadata']?['role'] != null)
+                              Text(
+                                'Role: ${snippet['metadata']['role']}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            if (snippet['metadata']?['year'] != null)
+                              Text(
+                                'Year: ${snippet['metadata']['year']}',
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            const SizedBox(height: 8),
+                            Text(
+                              snippet['text'] ?? 'No text available',
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
