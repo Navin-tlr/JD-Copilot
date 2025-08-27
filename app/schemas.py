@@ -15,6 +15,7 @@ class QueryRequest(BaseModel):
     question: str
     filters: QueryFilters = Field(default_factory=QueryFilters)
     top_k: int = 5
+    session_id: Optional[str] = "default"  # For chat memory tracking
 
 
 class Snippet(BaseModel):
@@ -26,6 +27,7 @@ class Snippet(BaseModel):
 class QueryResponse(BaseModel):
     snippets: List[Snippet]
     answer: Optional[str] = None
+    context_used: Optional[Dict[str, Any]] = None  # Information about context resolution
 
 
 class ResumeMatchRequest(BaseModel):

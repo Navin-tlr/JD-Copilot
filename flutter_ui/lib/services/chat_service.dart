@@ -1,183 +1,281 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../firebase_config.dart';
-
+import 'package:flutter/material.dart';
+import 'backend_service.dart';
 
 class ChatMessage {
-  final String id;
-  final String senderId;
-  final String senderName;
-  final String message;
+  final String sender; // 'user' or 'bot'
+  final String text;
   final DateTime timestamp;
-  final String? specialization;
-  final bool isUserMessage;
+  final MessageType type;
+  final Map<String, dynamic>? metadata;
 
   ChatMessage({
-    required this.id,
-    required this.senderId,
-    required this.senderName,
-    required this.message,
+    required this.sender,
+    required this.text,
     required this.timestamp,
-    this.specialization,
-    required this.isUserMessage,
+    this.type = MessageType.text,
+    this.metadata,
   });
-
-  factory ChatMessage.fromFirestore(Map<String, dynamic> data, String id) {
-    return ChatMessage(
-      id: id,
-      senderId: data['senderId'] ?? '',
-      senderName: data['senderName'] ?? '',
-      message: data['message'] ?? '',
-      timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      specialization: data['specialization'],
-      isUserMessage: data['isUserMessage'] ?? false,
-    );
-  }
-
-  Map<String, dynamic> toFirestore() {
-    return {
-      'senderId': senderId,
-      'senderName': senderName,
-      'message': message,
-      'timestamp': timestamp,
-      'specialization': specialization,
-      'isUserMessage': isUserMessage,
-    };
-  }
 }
 
-class ChatService {
-  final FirebaseFirestore _firestore = FirebaseConfig.firestore;
+enum MessageType {
+  text,
+  error,
+  loading,
+  stats,
+  companies,
+  skills,
+}
 
-  // Get chat messages for a user
-  Stream<List<ChatMessage>> getChatMessages(String userId) {
-    return _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('chat')
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        return ChatMessage.fromFirestore(doc.data(), doc.id);
-      }).toList();
-    });
+class ChatService extends ChangeNotifier {
+  final List<ChatMessage> _messages = [];
+  bool _isLoading = false;
+  bool _isConnected = false;
+  bool _thinkingExiting = false;
+
+  List<ChatMessage> get messages => List.unmodifiable(_messages);
+  bool get isLoading => _isLoading;
+  bool get isConnected => _isConnected;
+  bool get thinkingExiting => _thinkingExiting;
+
+  ChatService() {
+    _initializeChat();
   }
 
-  // Send a user message
-  Future<void> sendUserMessage({
-    required String userId,
-    required String message,
-    required String specialization,
-  }) async {
-    try {
-      // Add user message to Firestore
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('chat')
-          .add({
-        'senderId': userId,
-        'senderName': 'You',
-        'message': message,
-        'timestamp': FieldValue.serverTimestamp(),
-        'specialization': specialization,
-        'isUserMessage': true,
-      });
-
-      // TODO: Here you would typically call your AI/LLM service
-      // For now, we'll add a placeholder response
-      await _addAIResponse(userId, message, specialization);
-    } catch (e) {
-      throw 'Failed to send message: $e';
-    }
+  String _stripEmojis(String input) {
+    final emojiRegex = RegExp(
+      r"[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}\u{FE0F}]",
+      unicode: true,
+    );
+    return input.replaceAll(emojiRegex, '');
   }
 
-  // Add AI response (placeholder for now)
-  Future<void> _addAIResponse(
-    String userId,
-    String userMessage,
-    String specialization,
-  ) async {
-    try {
-      // This is a placeholder response
-      // In a real app, you would call your AI service here
-      String aiResponse = _generatePlaceholderResponse(userMessage, specialization);
+  void _initializeChat() async {
+    // Check backend connection
+    _isConnected = await BackendService.checkHealth();
+    notifyListeners();
 
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('chat')
-          .add({
-        'senderId': 'ai',
-        'senderName': 'Y² Assistant',
-        'message': aiResponse,
-        'timestamp': FieldValue.serverTimestamp(),
-        'specialization': specialization,
-        'isUserMessage': false,
-      });
-    } catch (e) {
-      throw 'Failed to get AI response: $e';
-    }
-  }
-
-  // Generate placeholder response (replace with actual AI integration)
-  String _generatePlaceholderResponse(String userMessage, String specialization) {
-    // Simple keyword-based responses for demonstration
-    if (userMessage.toLowerCase().contains('hello') ||
-        userMessage.toLowerCase().contains('hi')) {
-      return 'Hello! I\'m your Y² Assistant. How can I help you with your $specialization journey today?';
-    } else if (userMessage.toLowerCase().contains('help')) {
-      return 'I\'m here to help! I can assist you with job search strategies, resume tips, interview preparation, and more. What specific area would you like to focus on?';
-    } else if (userMessage.toLowerCase().contains('resume')) {
-      return 'Great question about resumes! I can help you create a compelling resume that highlights your $specialization skills. Would you like me to review your current resume or help you create a new one?';
-    } else if (userMessage.toLowerCase().contains('interview')) {
-      return 'Interview preparation is crucial! I can help you with common $specialization interview questions, behavioral questions, and tips to make a great impression. What type of interview are you preparing for?';
+    if (_isConnected) {
+      _addBotMessage(
+        "Hello! I'm your JD Copilot assistant. I can help you with:\n\n"
+        "• Placement statistics and insights\n"
+        "• Company information and comparisons\n"
+        "• Skills analysis and recommendations\n"
+        "• Resume matching with job descriptions\n"
+        "• GD simulation and feedback\n\n"
+        "What would you like to know?",
+      );
     } else {
-      return 'Thank you for your message! I\'m here to support your $specialization career goals. Feel free to ask me anything about job searching, career development, or industry insights.';
+      _addBotMessage(
+        "Backend connection failed. Please ensure the server is running on http://127.0.0.1:8000",
+        type: MessageType.error,
+      );
     }
   }
 
-  // Clear chat history for a user
-  Future<void> clearChatHistory(String userId) async {
-    try {
-      QuerySnapshot messages = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('chat')
-          .get();
+  void _addBotMessage(String text, {MessageType type = MessageType.text}) {
+    final cleaned = _stripEmojis(text);
+    _messages.insert(0, ChatMessage(
+      sender: 'bot',
+      text: cleaned,
+      timestamp: DateTime.now(),
+      type: type,
+    ));
+    notifyListeners();
+  }
 
-      WriteBatch batch = _firestore.batch();
-      for (DocumentSnapshot doc in messages.docs) {
-        batch.delete(doc.reference);
+  void _addUserMessage(String text) {
+    _messages.insert(0, ChatMessage(
+      sender: 'user',
+      text: text,
+      timestamp: DateTime.now(),
+    ));
+    notifyListeners();
+  }
+
+  void _addLoadingMessage() {
+    _thinkingExiting = false;
+    _isLoading = true;
+    _messages.insert(0, ChatMessage(
+      sender: 'bot',
+      text: 'Working on it…',
+      timestamp: DateTime.now(),
+      type: MessageType.loading,
+    ));
+    notifyListeners();
+  }
+
+  void _removeLoadingMessage() {
+    _isLoading = false;
+    _messages.removeWhere((msg) => msg.type == MessageType.loading);
+    notifyListeners();
+  }
+
+  Future<void> sendMessage(String text) async {
+    if (text.trim().isEmpty) return;
+
+    _addUserMessage(text);
+    
+    if (!_isConnected) {
+      _addBotMessage(
+        "Cannot connect to backend. Please check if the server is running.",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    _addLoadingMessage();
+
+    try {
+      // Analyze the message to determine the best backend endpoint
+      final response = await _processMessage(text);
+      // Begin graceful exit: trigger fade-out
+      _thinkingExiting = true;
+      notifyListeners();
+      await Future.delayed(const Duration(milliseconds: 250));
+      _removeLoadingMessage();
+      _addBotMessage(response);
+    } catch (e) {
+      _thinkingExiting = true;
+      notifyListeners();
+      await Future.delayed(const Duration(milliseconds: 250));
+      _removeLoadingMessage();
+      _addBotMessage(
+        "Error: ${e.toString()}",
+        type: MessageType.error,
+      );
+    }
+  }
+
+  Future<String> _processMessage(String text) async {
+    // Use the main LLM endpoint for ALL queries - it's smarter!
+    return await _handleGeneralQuery(text);
+  }
+
+  // Unused specialized handlers retained for future routing; commented to satisfy lints
+  // Future<String> _handleCompanyQuery(String text) async {
+  //   try {
+  //     final companies = await BackendService.getCompanies();
+  //     final companyStats = await BackendService.getCompanyStats();
+      
+  //     return "Company Information\n\n"
+  //         "Total Companies: ${companies.length}\n"
+  //         "Active Companies: ${companies.take(10).join(', ')}${companies.length > 10 ? '...' : ''}\n\n"
+  //         "Top Recruiters:\n"
+  //         "${companyStats['top_companies']?.map((c) => '• ${c['name']}: ${c['count']} placements').join('\n') ?? 'Data not available'}\n\n"
+  //         "Ask me about specific companies or placement trends!";
+  //   } catch (e) {
+  //     return "Failed to fetch company information: ${e.toString()}";
+  //   }
+  // }
+
+  // Future<String> _handleStatsQuery(String text) async {
+  //   try {
+  //     final placementStats = await BackendService.getPlacementStats();
+      
+  //     return "Placement Statistics\n\n"
+  //         "Total Placements: ${placementStats['total_placements'] ?? 'N/A'}\n"
+  //         "Average Package: ${placementStats['average_package'] ?? 'N/A'}\n"
+  //         "Highest Package: ${placementStats['highest_package'] ?? 'N/A'}\n"
+  //         "Placement Rate: ${placementStats['placement_rate'] ?? 'N/A'}%\n\n"
+  //         "Top Specializations:\n"
+  //         "${placementStats['top_specializations']?.map((s) => '• ${s['name']}: ${s['count']} students').join('\n') ?? 'Data not available'}";
+  //   } catch (e) {
+  //     return "Failed to fetch statistics: ${e.toString()}";
+  //   }
+  // }
+
+  // Future<String> _handleSkillsQuery(String text) async {
+  //   try {
+  //     // Extract skills from the query
+  //     final skills = await BackendService.searchSkills(text);
+      
+  //     if (skills.isNotEmpty) {
+  //       return "Skills Analysis\n\n"
+  //           "Relevant Skills Found:\n"
+  //           "${skills.map((skill) => '• $skill').join('\n')}\n\n"
+  //           "Recommendation: Focus on developing these skills to improve your placement prospects.";
+  //     } else {
+  //       return "Skills Search\n\n"
+  //           "I couldn't find specific skills matching your query. Try asking about:\n"
+  //           "• Technical skills (Python, Java, etc.)\n"
+  //           "• Soft skills (Leadership, Communication)\n"
+  //           "• Domain-specific skills (AI/ML, Web Development)";
+  //     }
+  //   } catch (e) {
+  //     return "Failed to search skills: ${e.toString()}";
+  //   }
+  // }
+
+  // Future<String> _handleResumeQuery(String text) async {
+  //   return "Resume Analysis\n\n"
+  //       "I can help you analyze your resume and match it with job descriptions!\n\n"
+  //       "To get started:\n"
+  //       "1. Share your resume text or key skills\n"
+  //       "2. I'll match it with available job descriptions\n"
+  //       "3. Get personalized recommendations and upskilling plans\n\n"
+  //       "Example: 'Analyze my resume for software engineering roles'";
+  // }
+
+  // Future<String> _handleGDQuery(String text) async {
+  //   return "Group Discussion Simulation\n\n"
+  //       "I can simulate and evaluate your GD performance!\n\n"
+  //       "How it works:\n"
+  //       "1. Share your GD transcript or key points\n"
+  //       "2. I'll analyze your communication, logic, and leadership\n"
+  //       "3. Get detailed feedback and improvement suggestions\n\n"
+  //       "Example: 'Simulate my GD on AI ethics'";
+  // }
+
+  Future<String> _handleGeneralQuery(String text) async {
+    try {
+      final response = await BackendService.query(question: text);
+      final answer = response['answer'] as String?;
+      final snippets = (response['snippets'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+
+      // Build grounded citations table from snippets metadata only (no guessing)
+      final rows = <String>[];
+      final seen = <String>{};
+      for (final sn in snippets) {
+        final meta = (sn['metadata'] as Map?)?.cast<String, dynamic>() ?? const {};
+        final company = (meta['company'] ?? '').toString().trim();
+        final role = (meta['role'] ?? '').toString().trim();
+        final year = (meta['year'] ?? '').toString().trim();
+        final skillsList = (meta['extracted_skills'] as List?)?.cast<String>() ?? const [];
+        if (company.isEmpty && role.isEmpty && year.isEmpty && skillsList.isEmpty) continue;
+        final key = [company, role, year, skillsList.take(3).join(',')].join('|');
+        if (seen.contains(key)) continue;
+        seen.add(key);
+        final skills = skillsList.isNotEmpty ? skillsList.take(6).join(', ') : 'Not mentioned';
+        rows.add('| ${company.isEmpty ? 'Not mentioned' : company} | ${role.isEmpty ? 'Not mentioned' : role} | ${year.isEmpty ? 'Not mentioned' : year} | $skills |');
       }
-      await batch.commit();
+
+      String citations = '';
+      final hasMeaningful = rows.any((r) => !r.contains('Not mentioned | Not mentioned | Not mentioned |'));
+      if (rows.isNotEmpty && hasMeaningful) {
+        citations = '\n\nCitations from job descriptions (grounded):\n\n'
+            '| Company | Role | Year | Skills cited |\n'
+            '|---|---|---|---|\n'
+            '${rows.join('\n')}';
+      }
+
+      final safeAnswer = answer ?? "I couldn't find a specific answer to your question.";
+      return safeAnswer + citations;
     } catch (e) {
-      throw 'Failed to clear chat history: $e';
+      return "Query failed: ${e.toString()}";
     }
   }
 
-  // Get chat statistics for a user
-  Future<Map<String, dynamic>> getChatStats(String userId) async {
-    try {
-      QuerySnapshot messages = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('chat')
-          .get();
+  void clearChat() {
+    _messages.clear();
+    _initializeChat();
+  }
 
-      int totalMessages = messages.docs.length;
-      int userMessages = messages.docs
-          .where((doc) => (doc.data() as Map<String, dynamic>?)?['isUserMessage'] == true)
-          .length;
-      int aiMessages = totalMessages - userMessages;
-
-      return {
-        'totalMessages': totalMessages,
-        'userMessages': userMessages,
-        'aiMessages': aiMessages,
-      };
-    } catch (e) {
-      throw 'Failed to get chat statistics: $e';
+  Future<void> reconnect() async {
+    _isConnected = await BackendService.checkHealth();
+    notifyListeners();
+    
+    if (_isConnected) {
+      _addBotMessage("Backend connection restored!");
     }
   }
 }

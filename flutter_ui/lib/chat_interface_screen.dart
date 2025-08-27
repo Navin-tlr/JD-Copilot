@@ -1,9 +1,13 @@
 // flutter_ui/lib/chat_interface_screen.dart
 
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:provider/provider.dart';
+import 'services/chat_service.dart';
+import 'services/theme_service.dart';
 
 class ChatInterfaceScreen extends StatefulWidget {
   const ChatInterfaceScreen({super.key});
@@ -13,58 +17,32 @@ class ChatInterfaceScreen extends StatefulWidget {
 }
 
 class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
-  final List<Map<String, String>> _messages = [];
   final TextEditingController _textController = TextEditingController();
-  final String _baseUrl = 'http://127.0.0.1:8000';
   double _yImageOpacity = 1.0;
 
-  void _sendMessage() async {
+  void _sendMessage() {
     if (_textController.text.isNotEmpty) {
       final userMessage = _textController.text;
-      setState(() {
-        _messages.insert(0, {'sender': 'user', 'text': userMessage});
-        if (_yImageOpacity == 1.0) {
-          _yImageOpacity = 0.15; // Fade out the background
-        }
-        _textController.clear();
-        FocusScope.of(context).unfocus();
-      });
-
-      try {
-        final response = await http.post(
-          Uri.parse('$_baseUrl/query'),
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({
-            'question': userMessage,
-            'top_k': 3,
-            'filters': {},
-          }),
-        );
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          setState(() {
-            _messages.insert(0, {'sender': 'bot', 'text': data['answer']});
-          });
-        } else {
-          setState(() {
-            _messages.insert(0,
-                {'sender': 'bot', 'text': 'Error: ${response.statusCode}'});
-          });
-        }
-      } catch (e) {
+      if (_yImageOpacity == 1.0) {
         setState(() {
-          _messages.insert(
-              0, {'sender': 'bot', 'text': 'Error: Could not connect.'});
+          _yImageOpacity = 0.15; // Fade out the background
         });
       }
+      _textController.clear();
+      FocusScope.of(context).unfocus();
+      
+      // Send message through the service
+      context.read<ChatService>().sendMessage(userMessage);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF151515),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
@@ -83,12 +61,98 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
             ),
             Column(
               children: [
-                const Align(
-                  alignment: Alignment.topRight,
-                  child: Padding(
-                    padding: EdgeInsets.only(top: 38.0, right: 26.0),
-                    child: _ModelSelectionCard(),
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Connection status indicator
+                    Consumer<ChatService>(
+                      builder: (context, chatService, child) {
+                        return Container(
+                          margin: const EdgeInsets.only(top: 38.0, left: 26.0),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: chatService.isConnected 
+                                ? Colors.green.withOpacity(isDark ? 0.2 : 0.12)
+                                : Colors.red.withOpacity(isDark ? 0.2 : 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: chatService.isConnected 
+                                  ? Colors.green.withOpacity(isDark ? 0.5 : 0.35)
+                                  : Colors.red.withOpacity(isDark ? 0.5 : 0.35),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: chatService.isConnected 
+                                      ? Colors.green 
+                                      : Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                              chatService.isConnected ? 'Connected' : 'Disconnected',
+                              style: TextStyle(
+                                color: chatService.isConnected 
+                                    ? (isDark ? Colors.green : Colors.green.shade700)
+                                    : (isDark ? Colors.red : Colors.red.shade700),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (!chatService.isConnected) ...[
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () => chatService.reconnect(),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: (isDark ? Colors.blue.withOpacity(0.2) : Colors.blue.withOpacity(0.12)),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: (isDark ? Colors.blue.withOpacity(0.5) : Colors.blue.withOpacity(0.35)),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Reconnect',
+                                    style: TextStyle(
+                                      color: isDark ? Colors.blue : Colors.blue.shade700,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    Row(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 38.0, right: 8.0),
+                          child: IconButton(
+                            tooltip: isDark ? 'Switch to light theme' : 'Switch to dark theme',
+                            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: theme.colorScheme.primary),
+                            onPressed: () => context.read<ThemeService>().toggleThemeMode(),
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.only(top: 38.0, right: 26.0),
+                          child: _ModelSelectionCard(),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
                 Expanded(child: _buildChatMessages()),
                 _ChatInputBar(
@@ -104,35 +168,303 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
   }
 
   Widget _buildChatMessages() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      reverse: true,
-      itemCount: _messages.length,
-      itemBuilder: (context, index) {
-        final message = _messages[index];
-        final isUserMessage = message['sender'] == 'user';
-        return Align(
-          alignment:
-              isUserMessage ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.7,
-            ),
-            margin: const EdgeInsets.symmetric(vertical: 5.0),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12.47),
-              color: isUserMessage
-                  ? const Color(0xFF433F3F)
-                  : const Color(0xFF2A2A2A),
-            ),
-            child: Text(
-              message['text']!,
-              style:
-                  TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 16),
-            ),
+    return Consumer<ChatService>(
+      builder: (context, chatService, child) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        return ListView.builder(
+          padding: const EdgeInsets.all(16.0),
+          reverse: true,
+          itemCount: chatService.messages.length,
+          itemBuilder: (context, index) {
+            final message = chatService.messages[index];
+            final isUserMessage = message.sender == 'user';
+            final isError = message.type == MessageType.error;
+            final isLoading = message.type == MessageType.loading;
+            
+            return Align(
+              alignment:
+                  isUserMessage ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.7,
+                ),
+                margin: const EdgeInsets.symmetric(vertical: 5.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12.47),
+                  color: isLoading
+                      ? Colors.transparent
+                      : isUserMessage
+                      ? (isDark ? const Color(0xFF433F3F) : const Color(0xFFE6F0FF))
+                      : isError 
+                          ? (isDark ? Colors.red.withOpacity(0.2) : Colors.red.withOpacity(0.12))
+                          : (isDark ? const Color(0xFF2A2A2A) : Colors.white),
+                ),
+                child: isLoading
+                    ? EphemeralThinking(exiting: context.read<ChatService>().thinkingExiting)
+                    : _FadeInOnBuild(
+                        child: MarkdownBody(
+                          data: message.text,
+                          selectable: false,
+                          softLineBreak: true,
+                          styleSheet: MarkdownStyleSheet(
+                            p: TextStyle(
+                              color: isDark ? Colors.white.withOpacity(0.90) : Colors.black87,
+                              fontSize: 16,
+                              height: 1.35,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            h1: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? const Color(0xFFEFEFEF) : Colors.black,
+                            ),
+                            h2: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFFEFEFEF) : Colors.black87,
+                            ),
+                            h3: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFFEFEFEF) : Colors.black87,
+                            ),
+                            strong: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFFF5F5F5) : Colors.black,
+                            ),
+                            em: TextStyle(
+                              fontStyle: FontStyle.italic,
+                              color: isDark ? Colors.white.withOpacity(0.9) : Colors.black.withOpacity(0.75),
+                            ),
+                            blockquoteDecoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF333333) : const Color(0xFFF0F0F0),
+                              border: Border(left: BorderSide(color: isDark ? Colors.white24 : Colors.black12, width: 3)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            codeblockDecoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+                            ),
+                            code: TextStyle(
+                              fontSize: 14,
+                              color: isDark ? const Color(0xFFE0E0E0) : Colors.black87,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            listBullet: TextStyle(
+                              color: isDark ? Colors.white.withOpacity(0.85) : Colors.black54,
+                              fontSize: 16,
+                            ),
+                            listBulletPadding: const EdgeInsets.only(right: 8),
+                            tableHead: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFFF0F0F0) : Colors.black,
+                            ),
+                            tableBody: TextStyle(
+                              color: isDark ? Colors.white.withOpacity(0.85) : Colors.black87,
+                              fontSize: 15,
+                            ),
+                            tableBorder: TableBorder.all(color: isDark ? Colors.white12 : Colors.black12, width: 1),
+                            tableCellsPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                            horizontalRuleDecoration: BoxDecoration(
+                              border: Border(bottom: BorderSide(color: isDark ? Colors.white24 : Colors.black12, width: 1)),
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _FadeInOnBuild extends StatelessWidget {
+  final Widget child;
+  const _FadeInOnBuild({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      builder: (context, value, _) => Opacity(opacity: value, child: child),
+    );
+  }
+}
+
+/// Ephemeral Text Feedback (Apple Tier)
+class EphemeralThinking extends StatefulWidget {
+  final bool exiting;
+  const EphemeralThinking({super.key, this.exiting = false});
+
+  @override
+  State<EphemeralThinking> createState() => _EphemeralThinkingState();
+}
+
+class _EphemeralThinkingState extends State<EphemeralThinking>
+    with TickerProviderStateMixin {
+  late final AnimationController _driftController;
+  late final AnimationController _shimmerController;
+  late final Animation<double> _drift;
+  Timer? _swapTimer;
+  int _index = 0;
+
+  final List<String> _phrases = const [
+    'Analyzing your query',
+    'Reviewing job descriptions',
+    'Extracting cited skills',
+    'Composing the answer',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Gentle Drift Animation - 3000ms sine wave for breathing effect
+    _driftController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3000),
+    )..repeat(reverse: true);
+    
+    _drift = Tween<double>(begin: -2.0, end: 2.0).animate(
+      CurvedAnimation(parent: _driftController, curve: Curves.easeInOutSine),
+    );
+
+    // Subtle Shimmer Animation - 2000ms diagonal glint
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    
+    // Start shimmer after entry delay (250ms)
+    Future.delayed(const Duration(milliseconds: 250), () {
+      if (mounted) _shimmerController.repeat();
+    });
+
+    _scheduleSwap();
+  }
+
+  void _scheduleSwap() {
+    _swapTimer?.cancel();
+    final delay = Duration(milliseconds: 900 + math.Random().nextInt(600));
+    _swapTimer = Timer(delay, () {
+      if (!mounted) return;
+      setState(() => _index = (_index + 1) % _phrases.length);
+      _scheduleSwap();
+    });
+  }
+
+  @override
+  void dispose() {
+    _driftController.dispose();
+    _shimmerController.dispose();
+    _swapTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 1.0, end: 0.0),
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      builder: (context, bgOpacity, child) {
+        final contentOpacity = widget.exiting ? 0.0 : 1.0;
+        return AnimatedOpacity(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+          opacity: contentOpacity,
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              // Entry: subtle bubble background that fades out to 0
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2A2A2A).withOpacity(bgOpacity * 0.9),
+                      borderRadius: BorderRadius.circular(12.47),
+                    ),
+                  ),
+                ),
+              ),
+              // Floating thinking text with gentle drift and shimmer
+              AnimatedBuilder(
+                animation: _drift,
+                builder: (context, child) => Transform.translate(
+                  offset: Offset(0, _drift.value),
+                  child: child,
+                ),
+                child: _ShimmerText(
+                  controller: _shimmerController,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    switchInCurve: Curves.easeInOut,
+                    switchOutCurve: Curves.easeInOut,
+                    layoutBuilder: (current, previous) => Stack(
+                      alignment: Alignment.centerLeft,
+                      children: [
+                        ...previous,
+                        if (current != null) current,
+                      ],
+                    ),
+                    transitionBuilder: (w, a) => FadeTransition(opacity: a, child: w),
+                    child: Text(
+                      _phrases[_index],
+                      key: ValueKey(_index),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.86),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
+        );
+      },
+    );
+  }
+}
+
+class _ShimmerText extends StatelessWidget {
+  final AnimationController controller;
+  final Widget child;
+  const _ShimmerText({required this.controller, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        // Very faint, light gradient for subtle glint effect - exact blueprint specs
+        final gradient = LinearGradient(
+          colors: [
+            Colors.transparent,
+            const Color(0xFFC8C8C8).withOpacity(0.1), // Exact blueprint: rgba(200, 200, 200, 0.1)
+            Colors.transparent,
+          ],
+          stops: const [0.35, 0.50, 0.65], // Exact blueprint: 35%, 50%, 65%
+          begin: const Alignment(-1.0, -1.0), // Diagonal from top-left
+          end: const Alignment(1.0, 1.0),     // to bottom-right
+          transform: _DiagonalSlide(controller.value),
+        );
+
+        return ShaderMask(
+          blendMode: BlendMode.srcATop,
+          shaderCallback: (bounds) => gradient.createShader(
+            Rect.fromLTWH(0, 0, bounds.width, bounds.height),
+          ),
+          child: child,
         );
       },
     );
@@ -416,8 +748,7 @@ class __ChatInputBarState extends State<_ChatInputBar>
                             controller: widget.textController,
                             style: const TextStyle(
                               color: Colors.white70,
-                              fontFamily: 'PP NeueBit',
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w500,
                               fontSize: 18,
                             ),
                             decoration: const InputDecoration(
@@ -426,8 +757,7 @@ class __ChatInputBarState extends State<_ChatInputBar>
                               hintStyle: TextStyle(
                                 color: Color.fromRGBO(255, 255, 255, 0.70),
                                 fontSize: 18,
-                                fontFamily: 'PP NeueBit',
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w500,
                               ),
                               border: InputBorder.none,
                             ),
@@ -556,5 +886,161 @@ class _AnimatedCardRow extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class GenerativeTextFeedback extends StatefulWidget {
+  const GenerativeTextFeedback({super.key});
+
+  @override
+  _GenerativeTextFeedbackState createState() => _GenerativeTextFeedbackState();
+}
+
+class _GenerativeTextFeedbackState extends State<GenerativeTextFeedback>
+    with TickerProviderStateMixin {
+  late final AnimationController _driftController;
+  late final AnimationController _shimmerController;
+  late final Animation<double> _driftAnimation;
+
+  int _textIndex = 0;
+  Timer? _textSwapTimer;
+  final List<String> _feedbackTexts = [
+    'Analyzing your query...',
+    'Consulting knowledge base...',
+    'Synthesizing a response...',
+    'Almost there...',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _driftController = AnimationController(
+      duration: const Duration(milliseconds: 2500),
+      vsync: this,
+    )..repeat(reverse: true);
+    _driftAnimation = Tween<double>(begin: -2.0, end: 2.0).animate(
+      CurvedAnimation(
+        parent: _driftController,
+        curve: Curves.easeInOutSine,
+      ),
+    );
+
+    _shimmerController = AnimationController(
+      duration: const Duration(milliseconds: 1800),
+      vsync: this,
+    )..repeat();
+
+    _scheduleNextSwap();
+  }
+
+  void _scheduleNextSwap() {
+    // 500ms to 1500ms randomized delay for text swap
+    final nextDelayMs = 500 + math.Random().nextInt(1000);
+    _textSwapTimer?.cancel();
+    _textSwapTimer = Timer(Duration(milliseconds: nextDelayMs), () {
+      if (!mounted) return;
+      setState(() {
+        _textIndex = (_textIndex + 1) % _feedbackTexts.length;
+      });
+      _scheduleNextSwap();
+    });
+  }
+
+  @override
+  void dispose() {
+    _driftController.dispose();
+    _shimmerController.dispose();
+    _textSwapTimer?.cancel();
+    super.dispose();
+  }
+
+  Widget _buildCrossfadeText(Color color) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      switchInCurve: Curves.easeInOut,
+      switchOutCurve: Curves.easeInOut,
+      layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+        return Stack(
+          alignment: Alignment.centerLeft,
+          children: <Widget>[
+            ...previousChildren,
+            if (currentChild != null) currentChild,
+          ],
+        );
+      },
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+      child: Text(
+        _feedbackTexts[_textIndex],
+        key: ValueKey<int>(_textIndex),
+        style: TextStyle(
+          color: color,
+          fontSize: 16,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _driftAnimation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _driftAnimation.value),
+          child: child,
+        );
+      },
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          // Base text (always visible)
+          _buildCrossfadeText(Colors.white.withOpacity(0.7)),
+
+          // Light diagonal shimmer overlay, clipped to text using ShaderMask
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _shimmerController,
+              builder: (context, _) {
+                final gradient = LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    Colors.white.withOpacity(0.40),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.30, 0.50, 0.70],
+                  begin: const Alignment(-1.0, -1.0),
+                  end: const Alignment(1.0, 1.0),
+                  transform: _DiagonalSlide(_shimmerController.value),
+                );
+
+                return ShaderMask(
+                  blendMode: BlendMode.srcATop,
+                  shaderCallback: (bounds) => gradient.createShader(
+                    Rect.fromLTWH(0, 0, bounds.width, bounds.height),
+                  ),
+                  child: _buildCrossfadeText(Colors.white.withOpacity(0.9)),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiagonalSlide extends GradientTransform {
+  final double progress;
+
+  const _DiagonalSlide(this.progress);
+
+  @override
+  Matrix4? transform(Rect bounds, {TextDirection? textDirection}) {
+    final dx = bounds.width * 1.4 * (progress - 0.5);
+    final dy = bounds.height * 1.4 * (progress - 0.5);
+    return Matrix4.translationValues(dx, dy, 0.0);
   }
 }

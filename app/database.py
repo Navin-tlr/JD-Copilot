@@ -421,11 +421,37 @@ class PlacementDatabase:
             logging.error(f"Failed to search skills: {e}")
             return []
 
-    def get_companies_by_specialization(self, specialization: str, batch_year: str = "2024-2025") -> List[Dict[str, Any]]:
+    def get_companies_by_specialization(self, specialization: str, batch_year: str = None) -> List[Dict[str, Any]]:
         """Get companies offering roles in a specific specialization"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
+                
+                # If no specific year is requested, show all companies with roles
+                # This ensures users see all available roles regardless of year or offers data
+                if batch_year is None:
+                    # Get all companies with roles in this specialization (regardless of year or offers)
+                    cursor.execute("""
+                        SELECT DISTINCT c.company_name, c.company_type, c.industry, c.location,
+                               COUNT(r.id) as role_count
+                        FROM companies c
+                        JOIN roles r ON c.id = r.company_id
+                        WHERE LOWER(r.specialization) = LOWER(?)
+                        GROUP BY c.id, c.company_name, c.company_type, c.industry, c.location
+                        ORDER BY role_count DESC
+                    """, (specialization,))
+                    
+                    columns = [desc[0] for desc in cursor.description]
+                    results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                    
+                    # Add null values for salary fields to maintain consistency
+                    for result in results:
+                        result['avg_min_salary'] = None
+                        result['avg_max_salary'] = None
+                    
+                    return results
+                
+                # For specific years, first try to get companies with offers data
                 cursor.execute("""
                     SELECT DISTINCT c.company_name, c.company_type, c.industry, c.location,
                            COUNT(r.id) as role_count,
@@ -434,13 +460,39 @@ class PlacementDatabase:
                     FROM companies c
                     JOIN roles r ON c.id = r.company_id
                     JOIN offers o ON r.id = o.role_id
-                    WHERE r.specialization = ? AND o.batch_year = ?
+                    WHERE LOWER(r.specialization) = LOWER(?) AND o.batch_year = ?
                     GROUP BY c.id, c.company_name, c.company_type, c.industry, c.location
                     ORDER BY role_count DESC, avg_max_salary DESC
                 """, (specialization, batch_year))
                 
                 columns = [desc[0] for desc in cursor.description]
-                return [dict(zip(columns, row)) for row in cursor.fetchall()]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                
+                # If we found results with offers, return them
+                if results:
+                    return results
+                
+                # Fallback: get companies with roles but no offers data (regardless of year)
+                # This ensures we return companies even when they don't have salary/offer information
+                cursor.execute("""
+                    SELECT DISTINCT c.company_name, c.company_type, c.industry, c.location,
+                           COUNT(r.id) as role_count
+                    FROM companies c
+                    JOIN roles r ON c.id = r.company_id
+                    WHERE LOWER(r.specialization) = LOWER(?)
+                    GROUP BY c.id, c.company_name, c.company_type, c.industry, c.location
+                    ORDER BY role_count DESC
+                """, (specialization,))
+                
+                columns = [desc[0] for desc in cursor.description]
+                fallback_results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                
+                # Add null values for salary fields to maintain consistency
+                for result in fallback_results:
+                    result['avg_min_salary'] = None
+                    result['avg_max_salary'] = None
+                
+                return fallback_results
                 
         except Exception as e:
             logging.error(f"Failed to get companies by specialization: {e}")

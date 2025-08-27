@@ -1,0 +1,54 @@
+{
+  "session_id": "default",
+  "messages": [
+    {
+      "role": "user",
+      "content": "what are the relevant skills a marketing student should hone?",
+      "timestamp": "2025-08-27T10:37:08.446531",
+      "metadata": {},
+      "query_type": "structured",
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "Based on the structured placement database:\n\n**No Marketing roles found for None**\n\n**Note:** No data available for Marketing positions during None. Please check other specializations or contact the placement office.",
+      "timestamp": "2025-08-27T10:37:08.447737",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "what are the relevant skills a marketing student should hone?",
+      "timestamp": "2025-08-27T10:40:25.387084",
+      "metadata": {},
+      "query_type": "unstructured",
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "what are the relevant skills a marketing student should hone?",
+      "timestamp": "2025-08-27T10:41:53.354405",
+      "metadata": {},
+      "query_type": "unstructured",
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "what are the relevant skills a marketing student should hone?\u201d",
+      "timestamp": "2025-08-27T10:43:06.365248",
+      "metadata": {},
+      "query_type": "unstructured",
+      "specialization": null,
+      "entities_mentioned": []
+    }
+  ],
+  "current_context": {
+    "last_query_type": "unstructured"
+  },
+  "last_updated": "2025-08-27T10:43:06.365458"
+}

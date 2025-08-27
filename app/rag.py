@@ -82,6 +82,7 @@ def get_pinecone_index():
     settings = get_settings()
     if not settings.PINECONE_API_KEY or not settings.PINECONE_INDEX_NAME:
         raise RuntimeError("Pinecone not configured. Set PINECONE_API_KEY and PINECONE_INDEX_NAME.")
+    
     # Harden SSL for Pinecone HTTP client
     try:
         ca = certifi.where()
@@ -89,8 +90,19 @@ def get_pinecone_index():
         os.environ.setdefault("REQUESTS_CA_BUNDLE", ca)
     except Exception:
         pass
-    pc = Pinecone(api_key=settings.PINECONE_API_KEY)
-    return pc.Index(settings.PINECONE_INDEX_NAME)
+    
+    try:
+        pc = Pinecone(api_key=settings.PINECONE_API_KEY)
+        # Check if index exists before trying to access it
+        index_list = pc.list_indexes()
+        index_names = [idx.name for idx in index_list] if hasattr(index_list, '__iter__') else []
+        
+        if settings.PINECONE_INDEX_NAME not in index_names:
+            raise RuntimeError(f"Pinecone index '{settings.PINECONE_INDEX_NAME}' does not exist. Available indexes: {index_names}")
+        
+        return pc.Index(settings.PINECONE_INDEX_NAME)
+    except Exception as e:
+        raise RuntimeError(f"Failed to connect to Pinecone: {e}")
 
 
 MAX_SNIPPET_CHARS = 400
@@ -99,9 +111,35 @@ MAX_FULL_JD_CHARS = 10000  # Much larger limit for full JD requests
 
 def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
     settings = get_settings()
-    index = get_pinecone_index()
-    embedder = EmbeddingBackend(settings.EMBED_MODEL)
-    q_emb = embedder.embed([question])[0]
+    
+    # Try Pinecone first, fall back to local database if not configured
+    try:
+        index = get_pinecone_index()
+        embedder = EmbeddingBackend(settings.EMBED_MODEL)
+        q_emb = embedder.embed([question])[0]
+    except RuntimeError as e:
+        print(f"⚠️ Pinecone not configured, using local database: {e}")
+        # Fall back to local database - return sample snippets for now
+        from .database import PlacementDatabase
+        db = PlacementDatabase()
+        companies = db.get_companies()
+        
+        # Create simple snippets from available data
+        snippets = []
+        for i, company in enumerate(companies[:top_k]):
+            snippet = {
+                "text": f"Company: {company.get('company_name', 'Unknown')} - Industry: {company.get('industry', 'Not specified')} - Location: {company.get('location', 'Not specified')}",
+                "metadata": {
+                    "company": company.get('company_name', ''),
+                    "industry": company.get('industry', ''),
+                    "location": company.get('location', ''),
+                    "source": "database"
+                }
+            }
+            snippets.append(snippet)
+        
+        print(f"📊 Returning {len(snippets)} snippets from local database")
+        return snippets
 
     # Check if this is a "full jd" request
     is_full_jd_request = any(phrase in question.lower() for phrase in [

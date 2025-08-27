@@ -4,6 +4,7 @@ Routes queries to SQL (structured), RAG (unstructured), or hybrid approaches
 """
 
 import re
+import json
 import requests
 from typing import Dict, List, Optional, Tuple, Any
 from enum import Enum
@@ -17,36 +18,38 @@ class QueryType(Enum):
     MULTI_HOP = "multi_hop"        # Complex multi-step queries
 
 class QueryRouter:
-    """Intelligent query router for placement queries"""
+    """Intelligent query router for placement queries with LLM-powered classification"""
     
     def __init__(self):
         # Patterns for query classification
+        # STRICT: Route to STRUCTURED only when user asks for counts/numbers/salaries
         self.structured_patterns = [
-            r"how many companies",
-            r"count.*companies",
-            r"total.*companies",
-            r"median salary",
-            r"average salary",
-            r"salary range",
-            r"highest salary",
-            r"lowest salary",
-            r"number of roles",
-            r"total roles",
-            r"placement statistics",
-            r"placement data",
-            r"salary statistics",
-            r"company count",
-            r"role count",
-            r"which companies.*(?:marketing|finance|hr|operations|strategy|it|analytics)",
-            r"companies.*(?:marketing|finance|hr|operations|strategy|it|analytics)",
-            r"(?:marketing|finance|hr|operations|strategy|it|analytics).*companies"
+            r"\bhow many\b.*\b(companies|roles|offers)\b",
+            r"\bcount\b.*\b(companies|roles|offers)\b",
+            r"\btotal\b.*\b(companies|roles|offers)\b",
+            r"\bnumber of\b.*\b(companies|roles|offers)\b",
+            r"\bmedian salary\b",
+            r"\baverage\b.*\bsalary\b|\bavg\b.*\bsalary\b",
+            r"\bsalary range\b|\bmin(?:imum)? salary\b|\bmax(?:imum)? salary\b",
+            r"\bplacement statistics\b|\bsalary statistics\b|\bplacement data\b",
         ]
         
         self.unstructured_patterns = [
-            r"what skills",
-            r"key skills",
+            # Broad skills coverage
+            r"\bwhat\s+.*skills\b",
+            r"\bwhich\s+.*skills\b",
+            r"\brelevant\s+.*skills\b",
+            r"\bskills\s+to\s+(learn|hone|focus|prepare)\b",
+            r"\bskills?\b",  # catch-all; safe because structured is stricter
+            r"key skills", 
             r"required skills",
             r"skills needed",
+            r"most.*skills",
+            r"sought.*skills",
+            r"popular.*skills",
+            r"in.*demand.*skills", 
+            r"top.*skills",
+            r"important.*skills",
             r"company culture",
             r"work environment",
             r"job description",
@@ -89,55 +92,64 @@ class QueryRouter:
         ]
     
     def classify_query(self, question: str) -> Tuple[QueryType, Dict[str, Any]]:
-        """Classify the query type and extract relevant parameters"""
-        question_lower = question.lower()
+        """Classify the query type using LLM intelligence with fallback to pattern matching"""
+        try:
+            # Try LLM classification first
+            llm_result = self._llm_classify_query(question)
+            if llm_result:
+                return llm_result
+        except Exception as e:
+            logging.warning(f"LLM classification failed, falling back to patterns: {e}")
         
-        # Check for multi-hop queries first (most complex)
-        if self._matches_patterns(question_lower, self.multi_hop_patterns):
-            return QueryType.MULTI_HOP, self._extract_multi_hop_params(question_lower)
-        
-        # Check for hybrid queries
-        if self._matches_patterns(question_lower, self.hybrid_patterns):
-            return QueryType.HYBRID, self._extract_hybrid_params(question_lower)
-        
-        # Check for structured queries
-        if self._matches_patterns(question_lower, self.structured_patterns):
-            return QueryType.STRUCTURED, self._extract_structured_params(question_lower)
-        
-        # Check for unstructured queries
-        if self._matches_patterns(question_lower, self.unstructured_patterns):
-            return QueryType.UNSTRUCTURED, self._extract_unstructured_params(question_lower)
-        
-        # Default to unstructured for unknown queries
-        return QueryType.UNSTRUCTURED, {"query": question}
+        # Fallback to pattern-based classification with strict guards
+        return self._pattern_based_classification(question)
     
-    def _llm_classify_query(self, question: str) -> Tuple[QueryType, Dict[str, Any]]:
-        """LLM-based query classification for edge cases"""
+    def _llm_classify_query(self, question: str) -> Optional[Tuple[QueryType, Dict[str, Any]]]:
+        """LLM-based query classification with strict guardrails"""
         try:
             from .config import get_settings
             settings = get_settings()
             
             if not settings.OPENROUTER_API_KEY:
-                print("⚠️ No OpenRouter API key, defaulting to HYBRID")
-                return QueryType.HYBRID, {"query": question, "fallback": "no_api_key"}
+                return None
             
-            # LLM classification prompt
-            classification_prompt = f"""You are a query router for a placement database. 
-Classify the user's query into one of:
-- SQL (counts, statistics, totals, averages, medians, comparisons across companies or years)
-- RAG (open-ended, descriptive, unstructured answers requiring JD details)
-- HYBRID (needs both SQL stats + JD text details).
+            # Structured prompt with strict constraints
+            classification_prompt = f"""You are a query router for a placement database. Your task is to classify queries into one of these categories:
 
-Respond ONLY with one label: SQL, RAG, or HYBRID.
+STRUCTURED: Queries that need numerical data, counts, statistics, comparisons, or filtered lists. Examples:
+- "How many companies came for marketing roles?"
+- "What's the average salary for finance positions?"
+- "Which companies recruited in 2023?"
+- "Count of roles by specialization"
+
+UNSTRUCTURED: Queries that need detailed descriptions, skills analysis, or contextual information. Examples:
+- "What skills are required for this role?"
+- "Tell me about the company culture"
+- "Show me the complete job description"
+- "What are the responsibilities?"
+
+HYBRID: Queries that need both structured data AND detailed analysis. Examples:
+- "Compare salaries and skills across companies"
+- "Which companies pay well and what skills do they need?"
+
+MULTI_HOP: Complex queries requiring multiple steps. Examples:
+- "Among high-paying companies, what skills are most valued?"
+
+IMPORTANT RULES:
+1. If the query asks for counts, numbers, or filtered lists → STRUCTURED
+2. If the query asks for descriptions, skills, or detailed info → UNSTRUCTURED  
+3. If the query needs both → HYBRID
+4. If the query is complex with multiple conditions → MULTI_HOP
+5. When in doubt, choose UNSTRUCTURED for safety
 
 User Query: "{question}"
 
-Classification:"""
+Respond with ONLY one word: STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
             
             payload = {
                 "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free",
                 "messages": [
-                    {"role": "system", "content": "You are a precise query classifier. Respond with ONLY one word: SQL, RAG, or HYBRID."},
+                    {"role": "system", "content": "You are a precise query classifier. Respond with ONLY one word: STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP."},
                     {"role": "user", "content": classification_prompt}
                 ],
                 "temperature": 0.0,
@@ -160,30 +172,92 @@ Classification:"""
                 result = response.json()
                 content = result["choices"][0]["message"]["content"].strip().upper()
                 
-                print(f"🤖 LLM Classification: {content}")
+                logging.info(f"🤖 LLM Classification: {content}")
                 
-                # Map LLM response to QueryType
-                if "SQL" in content:
-                    return QueryType.STRUCTURED, self._extract_structured_params(question)
-                elif "RAG" in content:
-                    return QueryType.UNSTRUCTURED, self._extract_unstructured_params(question)
+                # Map LLM response to QueryType with strict validation
+                if "STRUCTURED" in content:
+                    qtype = QueryType.STRUCTURED
+                    override = self._enforce_post_llm_guards(question, qtype)
+                    qtype = override or qtype
+                    extractor = {
+                        QueryType.STRUCTURED: self._extract_structured_params,
+                        QueryType.UNSTRUCTURED: self._extract_unstructured_params,
+                    }[qtype]
+                    return qtype, extractor(question)
+                elif "UNSTRUCTURED" in content:
+                    qtype = QueryType.UNSTRUCTURED
+                    override = self._enforce_post_llm_guards(question, qtype)
+                    qtype = override or qtype
+                    extractor = {
+                        QueryType.STRUCTURED: self._extract_structured_params,
+                        QueryType.UNSTRUCTURED: self._extract_unstructured_params,
+                    }[qtype]
+                    return qtype, extractor(question)
                 elif "HYBRID" in content:
                     return QueryType.HYBRID, self._extract_hybrid_params(question)
+                elif "MULTI_HOP" in content:
+                    return QueryType.MULTI_HOP, self._extract_multi_hop_params(question)
                 else:
-                    print(f"⚠️ Unexpected LLM response: {content}, defaulting to HYBRID")
-                    return QueryType.HYBRID, {"query": question, "fallback": "unexpected_llm_response"}
+                    logging.warning(f"Unexpected LLM response: {content}, defaulting to UNSTRUCTURED")
+                    return QueryType.UNSTRUCTURED, {"query": question, "fallback": "unexpected_llm_response"}
             
             else:
-                print(f"❌ LLM API error: {response.status_code}, defaulting to HYBRID")
-                return QueryType.HYBRID, {"query": question, "fallback": "llm_api_error"}
+                logging.warning(f"LLM API error: {response.status_code}, falling back to patterns")
+                return None
                 
         except Exception as e:
-            print(f"❌ LLM classification failed: {e}, defaulting to HYBRID")
-            return QueryType.HYBRID, {"query": question, "fallback": "llm_exception"}
+            logging.error(f"LLM classification failed: {e}")
+            return None
+    
+    def _pattern_based_classification(self, question: str) -> Tuple[QueryType, Dict[str, Any]]:
+        """Fallback pattern-based classification when LLM fails"""
+        question_lower = question.lower()
+
+        # Quick guard: explicit numeric/count queries should always be STRUCTURED
+        if re.search(r"\b(how many|count|total|number of)\b", question_lower) and \
+           re.search(r"\b(companies|roles|offers|salary|salaries)\b", question_lower):
+            return QueryType.STRUCTURED, self._extract_structured_params(question_lower)
+
+        # Check for multi-hop queries first (most complex)
+        if self._matches_patterns(question_lower, self.multi_hop_patterns):
+            return QueryType.MULTI_HOP, self._extract_multi_hop_params(question_lower)
+
+        # Check for hybrid queries
+        if self._matches_patterns(question_lower, self.hybrid_patterns):
+            return QueryType.HYBRID, self._extract_hybrid_params(question_lower)
+
+        # Prefer UNSTRUCTURED first to avoid false positives
+        if self._matches_patterns(question_lower, self.unstructured_patterns):
+            return QueryType.UNSTRUCTURED, self._extract_unstructured_params(question_lower)
+
+        # Structured only if strict patterns match
+        if self._matches_patterns(question_lower, self.structured_patterns):
+            return QueryType.STRUCTURED, self._extract_structured_params(question_lower)
+
+        # Check for unstructured queries
+        if self._matches_patterns(question_lower, self.unstructured_patterns):
+            return QueryType.UNSTRUCTURED, self._extract_unstructured_params(question_lower)
+
+        # Default to unstructured (safety)
+        return QueryType.UNSTRUCTURED, {"query": question, "fallback": "pattern_default"}
     
     def _matches_patterns(self, text: str, patterns: List[str]) -> bool:
         """Check if text matches any of the patterns"""
         return any(re.search(pattern, text) for pattern in patterns)
+
+    def _enforce_post_llm_guards(self, question: str, llm_type: QueryType) -> Optional[QueryType]:
+        """If LLM says STRUCTURED but the question clearly asks for skills/descriptions,
+        override to UNSTRUCTURED. If LLM says UNSTRUCTURED but query clearly demands counts, override to STRUCTURED."""
+        q = question.lower()
+        if llm_type == QueryType.STRUCTURED:
+            # If query mentions skills/description/culture without numeric intent → UNSTRUCTURED
+            if self._matches_patterns(q, self.unstructured_patterns) and not self._matches_patterns(q, self.structured_patterns):
+                return QueryType.UNSTRUCTURED
+        if llm_type == QueryType.UNSTRUCTURED:
+            # If query clearly asks for counts/salaries → STRUCTURED
+            if self._matches_patterns(q, self.structured_patterns):
+                return QueryType.STRUCTURED
+        return None
     
     def _extract_structured_params(self, question: str) -> Dict[str, Any]:
         """Extract parameters for structured queries"""
@@ -193,6 +267,10 @@ Classification:"""
         year_match = re.search(r"(\d{4})", question)
         if year_match:
             params["year"] = int(year_match.group(1))
+        elif "last year" in question.lower():
+            params["year"] = "2023-2024"
+        elif "this year" in question.lower():
+            params["year"] = "2024-2025"
         
         # Extract MBA specialization
         mba_specializations = [
@@ -228,6 +306,92 @@ Classification:"""
                 params["entity"] = "offers"
         
         return params
+
+    def llm_extract_structured_intent(self, question: str) -> Dict[str, Any]:
+        """Use the LLM to extract normalized structured intent safely (JSON-only).
+        Returns a dict with possible keys: entity, specialization, year, metric.
+        Falls back to pattern extraction if LLM unavailable or invalid.
+        """
+        try:
+            from .config import get_settings
+            settings = get_settings()
+            if not settings.OPENROUTER_API_KEY:
+                return self._extract_structured_params(question)
+
+            prompt = (
+                "Extract intent for a SQL lookup over a placement database. "
+                "Return STRICT JSON only, no prose, matching this schema: {\n"
+                "  \"entity\": one of [\"companies\", \"roles\", \"offers\", \"salaries\", \"stats\"] or null,\n"
+                "  \"specialization\": one of [\"Marketing\", \"Finance\", \"HR\", \"Operations\", \"Strategy\", \"IT\", \"Analytics\"] or null,\n"
+                "  \"year\": string like \"2024-2025\" or null,\n"
+                "  \"metric\": one of [\"count\", \"average\", \"median\", \"min\", \"max\"] or null\n"
+                "}\n"
+                "Normalize casing and synonyms (e.g., hr -> HR, biz analytics -> Analytics).\n"
+                f"User query: {question}\n"
+                "JSON:"
+            )
+
+            payload = {
+                "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free",
+                "messages": [
+                    {"role": "system", "content": "You output STRICT JSON only. No explanations."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.0,
+                "max_tokens": 120,
+            }
+            headers = {
+                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+            }
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=12,
+            )
+            if resp.status_code != 200:
+                logging.warning(f"LLM intent extraction failed: {resp.status_code}")
+                return self._extract_structured_params(question)
+
+            content = resp.json()["choices"][0]["message"]["content"].strip()
+            try:
+                data = json.loads(content)
+            except Exception:
+                # Try to extract JSON substring if model wrapped it
+                start = content.find('{')
+                end = content.rfind('}')
+                if start != -1 and end != -1:
+                    data = json.loads(content[start:end+1])
+                else:
+                    return self._extract_structured_params(question)
+
+            # Validate and normalize
+            valid_entities = {"companies", "roles", "offers", "salaries", "stats"}
+            valid_specs = {"Marketing", "Finance", "HR", "Operations", "Strategy", "IT", "Analytics"}
+            valid_metrics = {"count", "average", "median", "min", "max"}
+
+            out: Dict[str, Any] = {"query": question}
+            ent = (data.get("entity") or "").lower()
+            if ent in valid_entities:
+                out["entity"] = ent
+            spec = data.get("specialization")
+            if spec in valid_specs:
+                out["specialization"] = spec
+            yr = data.get("year")
+            if isinstance(yr, str) and re.match(r"^\d{4}-\d{4}$", yr):
+                out["year"] = yr
+            met = (data.get("metric") or "").lower()
+            if met in valid_metrics:
+                out["metric"] = met
+
+            # If nothing validated, fallback
+            if len(out.keys()) == 1:
+                return self._extract_structured_params(question)
+            return out
+        except Exception as e:
+            logging.warning(f"LLM structured intent exception: {e}")
+            return self._extract_structured_params(question)
     
     def _extract_unstructured_params(self, question: str) -> Dict[str, Any]:
         """Extract parameters for unstructured queries"""
@@ -294,14 +458,14 @@ Classification:"""
             return {
                 "primary": "sql",
                 "fallback": "rag",
-                "description": "Use SQL database for fast, accurate statistics"
+                "description": "Use SQL database for fast, accurate statistics and filtered data"
             }
         
         elif query_type == QueryType.UNSTRUCTURED:
             return {
                 "primary": "rag",
                 "fallback": "sql",
-                "description": "Use RAG for detailed, contextual answers"
+                "description": "Use RAG for detailed, contextual answers from job descriptions"
             }
         
         elif query_type == QueryType.HYBRID:
@@ -318,7 +482,7 @@ Classification:"""
                 "description": "Multi-step approach: filter then analyze"
             }
         
-        return {"primary": "rag", "description": "Default to RAG"}
+        return {"primary": "rag", "description": "Default to RAG for safety"}
     
     def format_query_for_llm(self, query_type: QueryType, params: Dict[str, Any]) -> str:
         """Format the query with context for LLM processing"""

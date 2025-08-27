@@ -1,0 +1,123 @@
+{
+  "session_id": "test123",
+  "messages": [
+    {
+      "role": "user",
+      "content": "HOW MANY COMPANIES CAME FOR MARKETING ROLES?",
+      "timestamp": "2025-08-27T10:30:05.252682",
+      "metadata": {},
+      "query_type": "structured",
+      "specialization": "Marketing",
+      "entities_mentioned": [
+        "Madison PR",
+        "Tap Academy",
+        "Target"
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": "Based on the structured placement database for Marketing roles:\n\n**Total Companies:** 3 companies recruited for Marketing positions\n**Companies:** Madison PR, Tap Academy, Target\n\n**Note:** This shows all available Marketing roles across all time periods. Salary/offer details may not be complete. For comprehensive historical data including salary information, please contact the placement office.",
+      "timestamp": "2025-08-27T10:30:05.253273",
+      "metadata": {
+        "companies": [
+          "Madison PR",
+          "Tap Academy",
+          "Target"
+        ],
+        "count": 3
+      },
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "GIVE DETAILS ON THAT",
+      "timestamp": "2025-08-27T10:30:22.148861",
+      "metadata": {},
+      "query_type": "structured",
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "Based on the structured placement database:\n\n**No Marketing roles found for None**\n\n**Note:** No data available for Marketing positions during None. Please check other specializations or contact the placement office.",
+      "timestamp": "2025-08-27T10:30:22.149717",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "GIVE DETAILS ON THAT",
+      "timestamp": "2025-08-27T10:30:58.226847",
+      "metadata": {},
+      "query_type": "structured",
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "Based on the structured placement database:\n\n**No Marketing roles found for None**\n\n**Note:** No data available for Marketing positions during None. Please check other specializations or contact the placement office.",
+      "timestamp": "2025-08-27T10:30:58.228139",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "which companies are those?",
+      "timestamp": "2025-08-27T10:31:13.044949",
+      "metadata": {},
+      "query_type": "structured",
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "Based on the structured placement database:\n\n**No Marketing roles found for None**\n\n**Note:** No data available for Marketing positions during None. Please check other specializations or contact the placement office.",
+      "timestamp": "2025-08-27T10:31:13.046177",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "what about finance roles?",
+      "timestamp": "2025-08-27T10:31:26.865432",
+      "metadata": {},
+      "query_type": "structured",
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "Based on the structured placement database:\n\n**No Finance roles found for None**\n\n**Note:** No data available for Finance positions during None. Please check other specializations or contact the placement office.",
+      "timestamp": "2025-08-27T10:31:26.865855",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    }
+  ],
+  "current_context": {
+    "last_specialization": "Marketing",
+    "specialization_timestamp": "2025-08-27 10:30:05.252682",
+    "last_query_type": "structured",
+    "last_entities": [
+      "Madison PR",
+      "Tap Academy",
+      "Target"
+    ],
+    "entities_timestamp": "2025-08-27 10:30:05.252682",
+    "last_company_query": "HOW MANY COMPANIES CAME FOR MARKETING ROLES?",
+    "company_query_timestamp": "2025-08-27 10:30:05.252682",
+    "last_numbers_mentioned": {
+      "total_companies": "3"
+    }
+  },
+  "last_updated": "2025-08-27T10:31:26.865949"
+}
