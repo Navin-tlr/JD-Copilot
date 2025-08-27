@@ -316,7 +316,7 @@ def query_job_database(query: str) -> str:
         
         # Create a dedicated SQL Agent with validation
         # This is more reliable than a simple Text-to-SQL chain
-        sql_agent_executor = create_sql_agent(sql_generator_llm, db=sql_db, agent_type="openai-tools", verbose=True)
+        sql_agent_executor = create_sql_agent(sql_generator_llm, db=sql_db, agent_type="openai-tools", verbose=False)
         
         # Step 3: Execute the query with validation
         response = sql_agent_executor.invoke({"input": query})
@@ -465,7 +465,7 @@ def create_jd_agent():
     """)
 
     agent = create_openai_tools_agent(agent_llm, tools, custom_prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
     return agent_executor
 
 
@@ -604,7 +604,7 @@ You are a world-class Text-to-SQL agent. Your purpose is to answer user question
     # Step D: Initialize the LLM and create the agent
     if settings.OPENROUTER_API_KEY:
         agent_llm = ChatOpenAI(
-            model="anthropic/claude-3-haiku",  # Haiku is excellent and fast for tool use
+            model="moonshotai/kimi-k2",  # Using the specified model
             temperature=0,
             openai_api_key=settings.OPENROUTER_API_KEY,
             openai_api_base="https://openrouter.ai/api/v1",
@@ -617,4 +617,4 @@ You are a world-class Text-to-SQL agent. Your purpose is to answer user question
     partial_prompt = prompt.partial(schema=schema_json)
     
     agent = create_openai_tools_agent(agent_llm, tools, partial_prompt)
-    return AgentExecutor(agent=agent, tools=tools, verbose=True)
+    return AgentExecutor(agent=agent, tools=tools, verbose=False)

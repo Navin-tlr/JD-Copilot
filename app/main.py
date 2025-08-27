@@ -62,6 +62,7 @@ class ChatResponse(BaseModel):
     answer: str
     snippets: List[Dict[str, Any]] = []
     citations: List[Dict[str, Any]] = []
+    error: Optional[bool] = False  # Add error flag for frontend error handling
 
 class QueryResponse(BaseModel):
     answer: str
@@ -131,10 +132,20 @@ async def chat_endpoint(request: QueryRequest, agent = Depends(get_jd_agent)):
         # Use the AI agent to process the query
         if agent:
             print("🚀 Using AI agent for intelligent query processing")
-            response = agent.invoke({
-                "input": question,
-            })
-            answer = response.get("output", "I couldn't process your query. Please try again.")
+            try:
+                response = agent.invoke({
+                    "input": question,
+                })
+                answer = response.get("output", "I couldn't process your query. Please try again.")
+            except Exception as agent_error:
+                print(f"❌ Agent execution error: {agent_error}")
+                # Return a graceful error response instead of crashing
+                return ChatResponse(
+                    answer=f"Sorry, I encountered an error while processing your query: {str(agent_error)}",
+                    snippets=[],
+                    citations=[],
+                    error=True
+                )
             
             # Extract snippets from the answer if available
             snippets = []
@@ -183,7 +194,15 @@ async def chat_endpoint(request: QueryRequest, agent = Depends(get_jd_agent)):
         print(f"❌ Error in chat endpoint: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        
+        # Return a structured error response instead of raising an exception
+        # This ensures the Flutter app always gets valid JSON
+        return ChatResponse(
+            answer=f"An error occurred while processing your query: {str(e)}",
+            snippets=[],
+            citations=[],
+            error=True  # Add error flag for frontend handling
+        )
 
 @app.post("/structured", response_model=StructuredResponse)
 async def structured_endpoint(request: StructuredRequest = Body(...)):

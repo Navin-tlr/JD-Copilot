@@ -87,6 +87,19 @@ class ChatService extends ChangeNotifier {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        
+        // Check if the response contains an error flag
+        if (data['error'] == true) {
+          // It's a structured error from our backend
+          final errorMessage = data['answer'] ?? 'An error occurred';
+          _thinkingExiting = true;
+          notifyListeners();
+          await Future.delayed(const Duration(milliseconds: 250));
+          _removeLastLoadingMessageIfAny();
+          addMessage(errorMessage, false, type: MessageType.error);
+          return;
+        }
+        
         final answer = data['answer'] ?? 'No response received';
         
         // Strip emojis from the answer
