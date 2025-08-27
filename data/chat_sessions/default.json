@@ -45,10 +45,309 @@
       "query_type": "unstructured",
       "specialization": null,
       "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "how many companies came for finance roles",
+      "timestamp": "2025-08-27T15:04:08.642330",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "After checking both the structured database and the unstructured job descriptions, the data confirms that **1 company** came for finance roles. This appears to be the accurate count based on the available information.",
+      "timestamp": "2025-08-27T15:05:00.741442",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "what are the most sought after skills",
+      "timestamp": "2025-08-27T15:05:44.299556",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "Based on my analysis of the job descriptions, here are the **most sought-after skills** that companies are actively seeking:\n\n## \ud83d\udd25 **Top Skills in Highest Demand**\n\n### **Technical Skills**\n1. **CRM Systems** - Salesforce, HubSpot, or similar tools\n2. **MS Office Suite** - Advanced Excel, PowerPoint, Teams\n3. **HR Technologies & HRMS** - Human Resource Management Systems\n4. **LinkedIn & Social Media** - Professional networking and digital outreach\n\n### **Soft Skills** \n1. **Communication Excellence** - Written and verbal (mentioned by 100% of companies)\n2. **Presentation & Negotiation** - Client-facing and sales capabilities\n3. **Time Management & Multitasking** - Prioritization under pressure\n4. **Analytical & Problem-Solving** - Data-driven decision making\n\n### **Experience Requirements**\n- **B2C Sales Experience** - Direct consumer sales background\n- **Target Achievement** - Proven track record of meeting/exceeding goals\n- **Cold Outreach** - Cold calling and email campaign experience\n\n## \ud83c\udfaf **Key Insight for MBA Students**\nThe market is demanding **\"tech-enabled business professionals\"** - individuals who combine traditional business skills with modern digital tools. The most valuable combination appears to be:\n\n**Communication + CRM Expertise + Social Media Proficiency + Analytical Skills**\n\nThis skill set provides maximum flexibility to transition between sales, HR, and business development roles across different companies.",
+      "timestamp": "2025-08-27T15:07:42.365152",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "How many companies came for finance ?",
+      "timestamp": "2025-08-27T15:12:24.091186",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "I couldn't find any relevant information to answer your question.",
+      "timestamp": "2025-08-27T15:12:36.779887",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "How many companies came for Finance roles",
+      "timestamp": "2025-08-27T15:18:11.598193",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "**Answer:** 1 company came for Finance roles.",
+      "timestamp": "2025-08-27T15:18:28.930733",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "how many companies came for finance",
+      "timestamp": "2025-08-27T15:29:26.744345",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "**Answer:** 1 company came for finance roles.",
+      "timestamp": "2025-08-27T15:29:44.875522",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "How many companies came for finance?",
+      "timestamp": "2025-08-27T15:36:11.126183",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "timestamp": "2025-08-27T15:36:15.199789",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "How many companies came for finance?",
+      "timestamp": "2025-08-27T15:42:24.883387",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "**Answer:** 1 company came for finance roles.",
+      "timestamp": "2025-08-27T15:42:32.530760",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "List all companies",
+      "timestamp": "2025-08-27T15:42:46.896421",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "Here are all the companies in the database:\n\n- Accorian  \n- Madison PR  \n- Masters' Union  \n- Mill Story  \n- Tap Academy  \n- Target",
+      "timestamp": "2025-08-27T15:42:59.501397",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "What is the work culture like at Masters Union?",
+      "timestamp": "2025-08-27T15:42:59.514695",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "timestamp": "2025-08-27T15:43:18.611437",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "How many companies came for HR roles?",
+      "timestamp": "2025-08-27T19:11:37.553749",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "timestamp": "2025-08-27T19:12:33.803481",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "How many companies came for HR ROLES?",
+      "timestamp": "2025-08-27T19:43:55.947433",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "hOW MANY COMPANIES CAME FOR FINANCE ROLES",
+      "timestamp": "2025-08-27T19:55:34.856238",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "\n\nThe SQL query first joins the `companies` and `roles` tables on the `company_id` foreign key, and then counts the distinct company names where the role specialization is 'Finance'. This gives us the number of unique companies that have come for finance roles.",
+      "timestamp": "2025-08-27T19:55:50.090620",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "How many companies came for finance role",
+      "timestamp": "2025-08-27T20:00:51.805842",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "\n\nThe SQL query first joins the `companies` and `roles` tables on the `company_id` column. It then counts the distinct company names where the `specialization` column in the `roles` table is 'Finance'. This gives us the number of unique companies that have a finance role.",
+      "timestamp": "2025-08-27T20:01:01.444444",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "How many companies came for FINANCE roles",
+      "timestamp": "2025-08-27T20:02:48.232327",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "\n\nThe SQL query first joins the `companies` and `roles` tables on the `company_id` column. It then counts the distinct `company_name` values where the `specialization` column in the `roles` table is 'Finance'. This gives us the number of unique companies that have come for finance roles.",
+      "timestamp": "2025-08-27T20:02:57.685964",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "How many companies came for FINANCE roles?",
+      "timestamp": "2025-08-27T20:06:38.854426",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "\n\nThere is 1 company that came for FINANCE roles.",
+      "timestamp": "2025-08-27T20:06:53.531455",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "HOW MANY COMPANIES CAME FOR FINANCE ROLES?",
+      "timestamp": "2025-08-27T20:09:58.017737",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "\n\nThere is 1 company that came for Finance roles.",
+      "timestamp": "2025-08-27T20:10:06.677637",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "\"How many companies came for Finance roles?",
+      "timestamp": "2025-08-27T20:18:12.369465",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "\n\nThe SQL query first joins the companies and roles tables to connect the company information with the role specializations. It then counts the distinct company names where the role specialization contains 'FINANCE' (using the UPPER() function to make the search case-insensitive).\n\nThe result [[1]] indicates that there is 1 company that came for Finance roles.",
+      "timestamp": "2025-08-27T20:18:28.022071",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
     }
   ],
   "current_context": {
-    "last_query_type": "unstructured"
+    "last_query_type": "unstructured",
+    "last_company_query": "\"How many companies came for Finance roles?",
+    "company_query_timestamp": "2025-08-27 20:18:12.369465"
   },
-  "last_updated": "2025-08-27T10:43:06.365458"
+  "last_updated": "2025-08-27T20:18:28.023360"
 }
