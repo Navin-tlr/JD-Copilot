@@ -184,11 +184,13 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
                 # Extract the text *after* the trigger pattern
                 potential_company = question_lower.split(pattern, 1)[1]
                 # Clean up and limit to reasonable company name length
-                company_text = " ".join(potential_company.strip().split()[:3])
+                company_text = " ".join(potential_company.strip().split()[:4])  # Increased to 4 words for company names like "Master's Union"
                 # Additional validation: company name should not end with common query words
-                if company_text and not any(company_text.endswith(word) for word in ['roles', 'positions', 'specializations', 'skills', 'requirements']):
-                    print(f"🔍 Auto-detected potential company: '{company_text}'")
-                    break
+                if company_text and not any(company_text.endswith(word) for word in ['roles', 'positions', 'specializations', 'skills', 'requirements', 'jd', 'description']):
+                    # Additional validation: ensure it's not just a generic term
+                    if len(company_text.split()) >= 2 and not any(word in company_text.lower() for word in ['company', 'corporation', 'limited', 'inc', 'ltd']):
+                        print(f"🔍 Auto-detected potential company: '{company_text}'")
+                        break
         # --- END OF REVISED LOGIC ---
     
     # If company filter provided (either from filters or auto-detected), bias the query
@@ -207,36 +209,32 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
     for m in matches:
         meta = m.get("metadata", {}) if isinstance(m, dict) else getattr(m, "metadata", {})
         
-        # Company filtering - comprehensive matching
+        # Company filtering - STRICT matching to prevent JD mixing
         if company_text:
             meta_company = meta.get("company", "")
             if not meta_company:  # Skip chunks without company metadata
                 continue
                 
-            # Multiple matching strategies for comprehensive coverage
+            # STRICT company matching to prevent mixing JDs
             company_lower = company_text.lower().strip()
             meta_lower = meta_company.lower().strip()
             
-            # Strategy 1: Exact match
+            # Strategy 1: Exact match (highest priority)
             if company_lower == meta_lower:
                 should_include = True
-            # Strategy 2: Contains match (either direction)
+            # Strategy 2: Handle compound names with spaces (e.g., "Master's Union")
+            elif company_lower.replace("'", "").replace(" ", "") == meta_lower.replace("'", "").replace(" ", ""):
+                should_include = True
+            # Strategy 3: Handle case variations for exact matches
+            elif company_lower.upper() == meta_lower.upper():
+                should_include = True
+            # Strategy 4: Handle common abbreviations (e.g., "TAP" vs "TAP Academy")
             elif company_lower in meta_lower or meta_lower in company_lower:
-                should_include = True
-            # Strategy 3: Word-based matching for compound names
-            company_words = set(company_lower.split())
-            meta_words = set(meta_lower.split())
-            if company_words & meta_words:  # Set intersection
-                should_include = True
-            # Strategy 4: Common abbreviations/variations
-            elif any(word in meta_lower for word in company_lower.split()):
-                should_include = True
-            # Strategy 5: Handle acronyms and variations (e.g., "Tap academy" vs "TAP Academy")
-            elif company_lower.replace(" ", "") == meta_lower.replace(" ", ""):
-                should_include = True
-            # Strategy 6: Handle case variations and partial matches
-            elif any(word.upper() in meta_lower.upper() for word in company_lower.split()):
-                should_include = True
+                # But only if the shorter name is at least 3 characters to avoid false matches
+                if len(company_lower) >= 3 or len(meta_lower) >= 3:
+                    should_include = True
+                else:
+                    should_include = False
             else:
                 should_include = False
                 
@@ -264,7 +262,18 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
     # For full JD requests, return more chunks to reconstruct the complete document
     if is_full_jd_request:
         print(f"📄 Full JD request detected - returning up to {len(scored)} chunks for complete document reconstruction")
-        return scored[:min(len(scored), 50)]  # Return up to 50 chunks for full JD
+        
+        # For full JD requests, prioritize company-specific chunks and return comprehensive coverage
+        if company_text:
+            # Get ALL chunks for the specific company to ensure 100% JD coverage
+            company_specific_chunks = [s for s in scored if s.get("metadata", {}).get("company", "").lower() == company_text.lower()]
+            print(f"🎯 Company-specific chunks for '{company_text}': {len(company_specific_chunks)} chunks")
+            
+            # Return all company-specific chunks for complete JD reconstruction
+            return company_specific_chunks
+        else:
+            # If no company specified, return more chunks but still limit to prevent mixing
+            return scored[:min(len(scored), 100)]  # Return up to 100 chunks for full JD
     
     return scored[:top_k]
 

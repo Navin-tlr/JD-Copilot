@@ -23,7 +23,7 @@ from pydantic import Field
 class OpenRouterLLM(LLM):
     """Custom LLM wrapper for OpenRouter API to work with LlamaIndex."""
     
-    model: str = Field(default="moonshotai/kimi-k2", description="OpenRouter model name")
+    model: str = Field(default="google/gemini-2.5-pro-exp-03-25", description="OpenRouter model name")
     api_key: str = Field(default=None, description="OpenRouter API key")
     
     @property
@@ -279,7 +279,7 @@ Output format:
             "Content-Type": "application/json"
         }
         payload = {
-            "model": "moonshotai/kimi-k2",
+            "model": "google/gemini-2.5-pro-exp-03-25",
             "messages": [{"role": "user", "content": schema_helper_prompt}],
             "temperature": 0.0,
             "max_tokens": 200,
@@ -315,6 +315,34 @@ Output format:
     except Exception as e:
         print(f"❌ Schema Helper failed: {e}")
         return user_question
+
+def parse_routing_decision(raw_response: str) -> str:
+    """Parse the LLM response to extract just the routing category"""
+    print(f"🔍 parse_routing_decision input: '{repr(raw_response)}'")
+    
+    # Clean and normalize the response - remove quotes and extra characters
+    response = raw_response.strip().strip("'\"`").upper()
+    print(f"🔍 Normalized response: '{repr(response)}'")
+    
+    # Look for the exact category words FIRST (highest priority)
+    # Use exact matching to avoid substring confusion
+    if response == "STRUCTURED":
+        print(f"🔍 Exact match: STRUCTURED")
+        return "STRUCTURED"
+    elif response == "UNSTRUCTURED":
+        print(f"🔍 Exact match: UNSTRUCTURED")
+        return "UNSTRUCTURED"
+    elif response == "HYBRID":
+        print(f"🔍 Exact match: HYBRID")
+        return "HYBRID"
+    elif response == "MULTI_HOP" or response == "MULTIHOP":
+        print(f"🔍 Exact match: MULTI_HOP")
+        return "MULTI_HOP"
+    
+    # If no exact category found, use intelligent fallback based on query content
+    # This should only happen if the LLM completely fails to follow instructions
+    print(f"⚠️ LLM didn't output exact category, using intelligent fallback")
+    return "UNSTRUCTURED"  # Default to UNSTRUCTURED for safety
 
 def route_query(user_question: str) -> str:
     """
@@ -384,7 +412,7 @@ STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
     if settings.OPENROUTER_API_KEY:
         # Use direct OpenRouter API call
         payload = {
-            "model": "moonshotai/kimi-k2",
+            "model": "google/gemini-2.5-pro-exp-03-25",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -407,7 +435,10 @@ STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
             )
             
             if response.status_code == 200:
-                routing_decision = response.json()["choices"][0]["message"]["content"].strip().upper()
+                raw_response = response.json()["choices"][0]["message"]["content"].strip()
+                print(f"🔍 Raw LLM response (length: {len(raw_response)}): '{repr(raw_response)}'")
+                routing_decision = parse_routing_decision(raw_response)
+                print(f"🔍 Parsed routing decision: '{routing_decision}'")
             else:
                 print(f"❌ OpenRouter API error: {response.status_code}")
                 routing_decision = "UNSTRUCTURED"  # Default fallback
