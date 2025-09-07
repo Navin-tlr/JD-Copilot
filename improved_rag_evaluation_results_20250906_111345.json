@@ -1,0 +1,117 @@
+{
+  "summary": {
+    "total_tests": 10,
+    "passed_tests": 7,
+    "failed_tests": 3,
+    "success_rate": 70.0,
+    "average_context_correctness": 0.4897382855415344,
+    "average_keyword_match": 0.5366666666666667,
+    "average_overall_score": 0.5085096326271693
+  },
+  "detailed_results": [
+    {
+      "test_number": 1,
+      "query": "How many companies are offering finance roles?",
+      "expected_answer": "1 company (Mill Story) is offering finance roles",
+      "expected_context": "finance roles, companies, count, Mill Story",
+      "expected_keywords": [
+        "Mill Story",
+        "Finance",
+        "1",
+        "company"
+      ],
+      "actual_response": "1 company (Mill Story) is offering finance roles.",
+      "metrics": {
+        "context_correctness": 0.8286153078079224,
+        "keyword_match": 1.0,
+        "overall_score": 0.8971691846847534,
+        "found_keywords": [
+          "Mill Story",
+          "Finance",
+          "1",
+          "company"
+        ],
+        "missing_keywords": []
+      },
+      "passed": true,
+      "description": "Should find 1 company with finance roles"
+    },
+    {
+      "test_number": 2,
+      "query": "Which companies are hiring for HR roles?",
+      "expected_answer": "Accorian is hiring for HR roles",
+      "expected_context": "HR roles, companies, hiring, Accorian, People Operations",
+      "expected_keywords": [
+        "Accorian",
+        "HR",
+        "People Operations"
+      ],
+      "actual_response": "Companies with HR opportunities: Accorian",
+      "metrics": {
+        "context_correctness": 0.7457954287528992,
+        "keyword_match": 0.6666666666666666,
+        "overall_score": 0.7141439239184062,
+        "found_keywords": [
+          "Accorian",
+          "HR"
+        ],
+        "missing_keywords": [
+          "People Operations"
+        ]
+      },
+      "passed": true,
+      "description": "Should find Accorian with HR/People Operations role"
+    },
+    {
+      "test_number": 3,
+      "query": "Which companies are hiring for PR or communications roles?",
+      "expected_answer": "Madison PR is hiring for PR/communications roles",
+      "expected_context": "PR, communications, companies, hiring, Madison PR, Account Executive",
+      "expected_keywords": [
+        "Madison PR",
+        "PR",
+        "communications",
+        "Account Executive"
+      ],
+      "actual_response": "Companies hiring for PR/communications roles: Madison PR",
+      "metrics": {
+        "context_correctness": 0.7937867641448975,
+        "keyword_match": 0.75,
+        "overall_score": 0.7762720584869385,
+        "found_keywords": [
+          "Madison PR",
+          "PR",
+          "communications"
+        ],
+        "missing_keywords": [
+          "Account Executive"
+        ]
+      },
+      "passed": true,
+      "description": "Should find Madison PR with PR/communications role"
+    },
+    {
+      "test_number": 4,
+      "query": "Are there any admission-related jobs?",
+      "expected_answer": "Yes, Masters' Union has admission-related jobs",
+      "expected_context": "admission, jobs, Masters' Union, Admission Counselor, Yes",
+      "expected_keywords": [
+        "Masters' Union",
+        "Admission",
+        "Counselor",
+        "Yes"
+      ],
+      "actual_response": "Query result: [(2,)]",
+      "metrics": {
+        "context_correctness": 0.07798664271831512,
+        "keyword_match": 0.0,
+        "overall_score": 0.046791985630989075,
+        "found_keywords": [],
+        "missing_keywords": [
+          "Masters' Union",
+          "Admission",
+          "Counselor",
+          "Yes"
+        ]
+      },
+      "passed": 

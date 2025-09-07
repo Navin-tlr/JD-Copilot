@@ -1,0 +1,209 @@
+{
+  "test_plan": {
+    "name": "JD-Copilot Backend Test Plan",
+    "version": "1.0.0",
+    "description": "Comprehensive backend testing for JD-Copilot API endpoints and functionality",
+    "tests": [
+      {
+        "id": "test_health_check",
+        "name": "Health Check Endpoint",
+        "description": "Test the health check endpoint returns proper status",
+        "endpoint": "/health",
+        "method": "GET",
+        "expected_status": 200,
+        "expected_response": {
+          "status": "healthy",
+          "timestamp": "string"
+        }
+      },
+      {
+        "id": "test_chat_query",
+        "name": "Main Chat Query Endpoint",
+        "description": "Test the main chat query endpoint with AI response",
+        "endpoint": "/query",
+        "method": "POST",
+        "payload": {
+          "query": "What are the top companies for software engineering roles?",
+          "session_id": "test_session_1"
+        },
+        "expected_status": 200,
+        "expected_response": {
+          "answer": "string",
+          "snippets": "array",
+          "citations": "array",
+          "error": "boolean"
+        }
+      },
+      {
+        "id": "test_legacy_chat",
+        "name": "Legacy Chat Endpoint",
+        "description": "Test the legacy chat endpoint for backward compatibility",
+        "endpoint": "/chat",
+        "method": "POST",
+        "payload": {
+          "question": "Tell me about placement statistics",
+          "session_id": "test_session_2"
+        },
+        "expected_status": 200,
+        "expected_response": {
+          "answer": "string",
+          "snippets": "array",
+          "citations": "array"
+        }
+      },
+      {
+        "id": "test_enhanced_chat",
+        "name": "Enhanced Chat Endpoint",
+        "description": "Test the enhanced chat endpoint with workflow features",
+        "endpoint": "/chat/enhanced",
+        "method": "POST",
+        "payload": {
+          "question": "What skills are required for data science roles?",
+          "session_id": "test_session_3"
+        },
+        "expected_status": 200,
+        "expected_response": {
+          "answer": "string",
+          "snippets": "array",
+          "citations": "array"
+        }
+      },
+      {
+        "id": "test_structured_query",
+        "name": "Structured SQL Query",
+        "description": "Test structured query endpoint for database operations",
+        "endpoint": "/structured",
+        "method": "POST",
+        "payload": {
+          "question": "Show me all companies in the technology sector"
+        },
+        "expected_status": 200,
+        "expected_response": {
+          "answer": "string"
+        }
+      },
+      {
+        "id": "test_get_companies",
+        "name": "Get All Companies",
+        "description": "Test retrieving all companies from database",
+        "endpoint": "/companies",
+        "method": "GET",
+        "expected_status": 200,
+        "expected_response": {
+          "companies": "array"
+        }
+      },
+      {
+        "id": "test_get_companies_by_specialization",
+        "name": "Get Companies by Specialization",
+        "description": "Test retrieving companies by specialization",
+        "endpoint": "/companies/technology",
+        "method": "GET",
+        "expected_status": 200,
+        "expected_response": {
+          "specialization": "technology",
+          "companies": "array"
+        }
+      },
+      {
+        "id": "test_get_stats",
+        "name": "Get Placement Statistics",
+        "description": "Test retrieving placement statistics",
+        "endpoint": "/stats",
+        "method": "GET",
+        "expected_status": 200,
+        "expected_response": {
+          "stats": "object"
+        }
+      },
+      {
+        "id": "test_create_workflow",
+        "name": "Create Workflow Session",
+        "description": "Test creating a new workflow session",
+        "endpoint": "/workflow/sessions/test_workflow/create",
+        "method": "POST",
+        "payload": {
+          "metadata": {
+            "test": true
+          }
+        },
+        "expected_status": 200,
+        "expected_response": {
+          "success": true,
+          "workflow_instance": "object",
+          "message": "string"
+        }
+      },
+      {
+        "id": "test_get_workflow_status",
+        "name": "Get Workflow Status",
+        "description": "Test retrieving workflow status",
+        "endpoint": "/workflow/sessions/test_workflow/status",
+        "method": "GET",
+        "expected_status": 200,
+        "expected_response": {
+          "session_id": "test_workflow",
+          "status": "string"
+        }
+      },
+      {
+        "id": "test_clear_chat_history",
+        "name": "Clear Chat History",
+        "description": "Test clearing chat history for a session",
+        "endpoint": "/chat/clear",
+        "method": "POST",
+        "payload": {
+          "session_id": "test_session_1"
+        },
+        "expected_status": 200,
+        "expected_response": {
+          "message": "string"
+        }
+      },
+      {
+        "id": "test_get_chat_history",
+        "name": "Get Chat History",
+        "description": "Test retrieving chat history for a session",
+        "endpoint": "/chat/history",
+        "method": "GET",
+        "payload": {
+          "session_id": "test_session_1"
+        },
+        "expected_status": 200,
+        "expected_response": {
+          "session_id": "string",
+          "messages": "array"
+        }
+      },
+      {
+        "id": "test_invalid_query",
+        "name": "Invalid Query Handling",
+        "description": "Test error handling for invalid queries",
+        "endpoint": "/query",
+        "method": "POST",
+        "payload": {
+          "query": "",
+          "session_id": "test_error"
+        },
+        "expected_status": 200,
+        "expected_response": {
+          "answer": "string",
+          "error": true
+        }
+      },
+      {
+        "id": "test_cors_headers",
+        "name": "CORS Headers",
+        "description": "Test CORS headers are properly set",
+        "endpoint": "/health",
+        "method": "OPTIONS",
+        "expected_status": 200,
+        "expected_headers": {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "*",
+          "Access-Control-Allow-Headers": "*"
+        }
+      }
+    ]
+  }
+}

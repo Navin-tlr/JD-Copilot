@@ -1,0 +1,180 @@
+{
+  "project_name": "JD-Copilot",
+  "version": "1.0.0",
+  "description": "AI-powered career guidance system for job description analysis and placement data insights",
+  "tech_stack": {
+    "backend": ["Python", "FastAPI", "SQLite", "Pinecone", "OpenAI", "Gemini", "OpenRouter", "LlamaIndex"],
+    "frontend": ["React", "TypeScript", "Tailwind CSS", "Vite", "Framer Motion"],
+    "database": ["SQLite", "Pinecone Vector Database"],
+    "deployment": ["Docker", "Uvicorn"]
+  },
+  "features": [
+    {
+      "name": "AI Chat Interface",
+      "description": "Interactive chat interface with AI-powered responses for career guidance",
+      "priority": "high",
+      "acceptance_criteria": [
+        "Users can send messages and receive AI responses",
+        "Chat history is maintained across sessions",
+        "Real-time messaging with typing indicators",
+        "Error handling for failed requests"
+      ]
+    },
+    {
+      "name": "Document Search & RAG",
+      "description": "Retrieval-Augmented Generation system for searching job descriptions and career documents",
+      "priority": "high",
+      "acceptance_criteria": [
+        "Users can search through job descriptions",
+        "AI responses include relevant document citations",
+        "Vector search returns relevant snippets",
+        "Multiple LLM providers supported"
+      ]
+    },
+    {
+      "name": "Placement Data Analytics",
+      "description": "Database operations for placement statistics and company information",
+      "priority": "medium",
+      "acceptance_criteria": [
+        "Users can query placement statistics",
+        "Company data is searchable by specialization",
+        "SQL queries are executed safely",
+        "Data is returned in structured format"
+      ]
+    },
+    {
+      "name": "Session Management",
+      "description": "Advanced session management with durable workflows",
+      "priority": "medium",
+      "acceptance_criteria": [
+        "Multiple chat sessions can be created",
+        "Session state is persisted",
+        "Workflow instances are managed",
+        "Session history is retrievable"
+      ]
+    },
+    {
+      "name": "React Frontend",
+      "description": "Modern web interface with animations and responsive design",
+      "priority": "high",
+      "acceptance_criteria": [
+        "Interface loads and displays correctly",
+        "Dark/light theme switching works",
+        "Animations and mascot character function",
+        "Responsive design works on all devices"
+      ]
+    },
+    {
+      "name": "Health Monitoring",
+      "description": "System health checks and monitoring endpoints",
+      "priority": "low",
+      "acceptance_criteria": [
+        "Health endpoint returns system status",
+        "Error responses are properly formatted",
+        "System metrics are accessible"
+      ]
+    }
+  ],
+  "api_endpoints": [
+    {
+      "path": "/query",
+      "method": "POST",
+      "description": "Main chat query endpoint",
+      "priority": "high"
+    },
+    {
+      "path": "/chat",
+      "method": "POST",
+      "description": "Legacy chat endpoint",
+      "priority": "medium"
+    },
+    {
+      "path": "/chat/enhanced",
+      "method": "POST",
+      "description": "Enhanced chat with workflows",
+      "priority": "medium"
+    },
+    {
+      "path": "/structured",
+      "method": "POST",
+      "description": "Structured SQL queries",
+      "priority": "medium"
+    },
+    {
+      "path": "/companies",
+      "method": "GET",
+      "description": "Get all companies",
+      "priority": "low"
+    },
+    {
+      "path": "/companies/{specialization}",
+      "method": "GET",
+      "description": "Get companies by specialization",
+      "priority": "low"
+    },
+    {
+      "path": "/stats",
+      "method": "GET",
+      "description": "Get placement statistics",
+      "priority": "low"
+    },
+    {
+      "path": "/health",
+      "method": "GET",
+      "description": "Health check endpoint",
+      "priority": "low"
+    },
+    {
+      "path": "/workflow/sessions/{session_id}/create",
+      "method": "POST",
+      "description": "Create workflow session",
+      "priority": "medium"
+    },
+    {
+      "path": "/workflow/sessions/{session_id}/status",
+      "method": "GET",
+      "description": "Get workflow status",
+      "priority": "medium"
+    }
+  ],
+  "test_requirements": {
+    "backend_tests": [
+      "API endpoint functionality",
+      "Database operations",
+      "RAG system performance",
+      "Error handling",
+      "Authentication and authorization",
+      "Data validation",
+      "Performance testing"
+    ],
+    "frontend_tests": [
+      "Component rendering",
+      "User interactions",
+      "API integration",
+      "Responsive design",
+      "Theme switching",
+      "Animation performance",
+      "Error handling"
+    ],
+    "integration_tests": [
+      "End-to-end chat flow",
+      "Database integration",
+      "External API integration",
+      "Session management",
+      "Workflow persistence"
+    ]
+  },
+  "performance_requirements": {
+    "response_time": "< 2 seconds for chat responses",
+    "concurrent_users": "Support 100+ concurrent users",
+    "database_queries": "< 500ms for simple queries",
+    "vector_search": "< 1 second for document retrieval"
+  },
+  "security_requirements": [
+    "Input validation and sanitization",
+    "SQL injection prevention",
+    "CORS configuration",
+    "Error message sanitization",
+    "Rate limiting"
+  ]
+}

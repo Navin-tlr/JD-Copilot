@@ -1,13 +1,13 @@
 # JD Copilot Chat Interface
 
-This document describes the complete chat interface implementation that translates the React design to work with your existing Python backend and Flutter UI.
+This document describes the complete chat interface implementation that works with your existing Python backend and React UI.
 
 ## Architecture Overview
 
 The chat interface consists of two main parts:
 
 1. **Python Backend** - FastAPI endpoints and chat services
-2. **Flutter UI** - Complete chat interface components
+2. **React UI** - Complete chat interface components (Web + PWA)
 
 ## Python Backend Components
 
@@ -49,59 +49,59 @@ from .chat_api import include_chat_router
 include_chat_router(app)
 ```
 
-## Flutter UI Components
+## React UI Components
 
-### 1. Chat Screen (`flutter_ui/lib/screens/chat_screen.dart`)
+### 1. Chat Interface (`React Style/components/ChatInterface.tsx`)
 
 Main chat interface that orchestrates all components:
 - Message display
 - Input handling
-- Mascot character
-- Animations and state management
+- Real-time communication
+- Responsive design
 
-### 2. Chat Provider (`flutter_ui/lib/providers/chat_provider.dart`)
+### 2. Chat State Management
 
 State management for chat functionality:
 - Message state
 - Typing indicators
-- Mascot state management
+- Session management
 - Backend communication
 
-### 3. Chat Widgets
+### 3. Chat Components
 
-#### MessageBubble (`flutter_ui/lib/widgets/chat/message_bubble.dart`)
+#### MessageBubble (`React Style/components/MessageBubble.tsx`)
 - Individual message display
 - User/AI avatar distinction
 - Responsive design
 - Timestamp display
 
-#### ChatInput (`flutter_ui/lib/widgets/chat/chat_input.dart`)
+#### ChatInput (`React Style/components/ChatInput.tsx`)
 - Expandable input field
 - Quick action buttons
 - Send functionality
 - Auto-expand for long messages
 
-#### ChatHeader (`flutter_ui/lib/widgets/chat/chat_header.dart`)
+#### ChatHeader (`React Style/components/ChatHeader.tsx`)
 - App branding
 - Theme toggle
 - Navigation options
 
-#### MascotCharacter (`flutter_ui/lib/widgets/chat/mascot_character.dart`)
+#### MascotCharacter (`React Style/components/MascotCharacter.tsx`)
 - Interactive mascot with different states
 - Welcome, idle, listening, thinking animations
 - Click interactions
 
-#### AiThinkingFeedback (`flutter_ui/lib/widgets/chat/ai_thinking_feedback.dart`)
+#### AiThinkingFeedback (`React Style/components/AiThinkingFeedback.tsx`)
 - Animated typing indicator
 - Smooth dot animations
 - Visual feedback during AI processing
 
-#### ScrollToBottom (`flutter_ui/lib/widgets/chat/scroll_to_bottom.dart`)
+#### ScrollToBottom (`React Style/components/ScrollToBottom.tsx`)
 - Quick scroll to bottom button
 - Smooth animations
 - Hover effects
 
-#### ParticleVortex (`flutter_ui/lib/widgets/chat/particle_vortex.dart`)
+#### ParticleVortex (`React Style/components/ParticleVortex.tsx`)
 - Animated particle system
 - Welcome screen background
 - Smooth performance
@@ -109,27 +109,27 @@ State management for chat functionality:
 ## Data Models
 
 ### ChatMessage
-```dart
-class ChatMessage {
-  final String id;
-  final String content;
-  final MessageSender sender;
-  final DateTime timestamp;
-  final String sessionId;
-  final Map<String, dynamic>? metadata;
+```typescript
+interface ChatMessage {
+  id: string;
+  content: string;
+  sender: 'user' | 'ai';
+  timestamp: Date;
+  sessionId: string;
+  metadata?: Record<string, any>;
 }
 ```
 
 ### ChatSession
-```dart
-class ChatSession {
-  final String id;
-  final String userId;
-  final String title;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final String model;
-  final bool isActive;
+```typescript
+interface ChatSession {
+  id: string;
+  userId: string;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
+  model: string;
+  isActive: boolean;
 }
 ```
 
@@ -146,11 +146,12 @@ The chat endpoints will be available at:
 - REST API: `http://localhost:8000/chat/*`
 - WebSocket: `ws://localhost:8000/chat/ws/{session_id}`
 
-### 2. Run the Flutter Chat App
+### 2. Run the React Chat App
 
 ```bash
-cd flutter_ui
-flutter run -t lib/main_chat.dart
+cd "React Style"
+npm install
+npm run dev
 ```
 
 ### 3. Test the Chat Interface

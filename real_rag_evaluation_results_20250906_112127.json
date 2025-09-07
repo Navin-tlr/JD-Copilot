@@ -1,0 +1,113 @@
+{
+  "summary": {
+    "total_tests": 10,
+    "passed_tests": 8,
+    "failed_tests": 2,
+    "error_tests": 2,
+    "success_rate": 80.0,
+    "average_match_score": 0.5638888888888889
+  },
+  "detailed_results": [
+    {
+      "test_number": 1,
+      "query": "How many companies are offering finance roles?",
+      "expected_answer": "1 company (Mill Story) is offering finance roles",
+      "actual_response": "1 company (Mill Story) is offering finance roles.",
+      "match_score": 1.0,
+      "is_error": false,
+      "passed": true,
+      "description": "Should find 1 company with finance roles"
+    },
+    {
+      "test_number": 2,
+      "query": "Which companies are hiring for HR roles?",
+      "expected_answer": "Accorian is hiring for HR roles",
+      "actual_response": "Companies with HR opportunities: Accorian",
+      "match_score": 0.3333333333333333,
+      "is_error": false,
+      "passed": true,
+      "description": "Should find Accorian with HR/People Operations role"
+    },
+    {
+      "test_number": 3,
+      "query": "Which companies are hiring for PR or communications roles?",
+      "expected_answer": "Madison PR is hiring for PR/communications roles",
+      "actual_response": "Companies hiring for PR/communications roles: Madison PR",
+      "match_score": 1.0,
+      "is_error": false,
+      "passed": true,
+      "description": "Should find Madison PR with PR/communications role"
+    },
+    {
+      "test_number": 4,
+      "query": "Are there any admission-related jobs?",
+      "expected_answer": "Yes, Masters' Union has admission-related jobs",
+      "actual_response": "Yes, there are 2 admission-related jobs: Masters' Union (Admission Counselor)",
+      "match_score": 0.8333333333333334,
+      "is_error": false,
+      "passed": true,
+      "description": "Should find Masters' Union with Admission Counselor role"
+    },
+    {
+      "test_number": 5,
+      "query": "What finance-related tasks are mentioned?",
+      "expected_answer": "Finance tasks include accounting, P&L, budgeting, expense tracking",
+      "actual_response": "Finance-Related Tasks Identified in the Available Documents\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n1. Book-keeping & Accuracy  \n   \u2022 Task: \u201cHelp us keep our books clean and accurate.\u201d  \n   \u2022 MBA Lens: Core to Finance specialization; demonstrates the need for meticulous record-keeping and internal-control awareness.\n\n2. Preparation of Financial Statements  \n   \u2022 Task: \u201cWork on Performa accounting and financial statements (P&L, balance sheet, cash flow).\u201d  \n   \u2022 MBA Lens: Directly maps to Financial Reporting & Analysis courses; essential for roles in Corporate Finance, FP&A, and Investment Banking.\n\n3. Budgeting & Expense Tracking  \n   \u2022 Task: \u201cAssist with budgeting, expense tracking, and invoice checks.\u201d  \n   \u2022 MBA Lens: Bridges Finance and Operations; highlights cost-management skills valued in Strategic Finance and Operations Consulting.\n\n4. Fund-Raising Support  \n   \u2022 Task: \u201cSupport in fundraising preparations \u2014 real exposure to how start-ups raise capital.\u201d  \n   \u2022 MBA Lens: High-impact exposure for students targeting VC/PE, Corporate Development, or Entrepreneurial Finance; involves valuation, pitch-deck creation, and investor due-diligence.\n\n5. Tool Proficiency (Enabling Tasks)  \n   \u2022 Required: Excel / Google Sheets proficiency.  \n   \u2022 Bonus: Tally, Zoho Books, or any accounting tool.  \n   \u2022 MBA Lens: Demonstrates the expectation of tech-enabled finance; upskilling in these tools is a quick win for Finance-track students.\n\nStrategic Take-away for MBA Students\n\u2022 These tasks collectively form a mini \u201cend-to-end\u201d finance cycle\u2014transaction recording \u2192 statement preparation \u2192 budgeting \u2192 capital raising.  \n\u2022 Interns who master these five areas will exit with a holistic view of start-up finance, positioning them strongly for full-time roles in Corporate Finance, FP&A, or early-stage VC/PE.",
+      "match_score": 0.75,
+      "is_error": false,
+      "passed": true,
+      "description": "Should list finance tasks from job descriptions"
+    },
+    {
+      "test_number": 6,
+      "query": "What do HR operations jobs involve?",
+      "expected_answer": "HR operations involve employee lifecycle management, compliance, engagement",
+      "actual_response": "## Strategic Analysis: HR Operations Roles Across Companies\n\n### Core Responsibilities Identified\n\nBased on the available data from **Accorian** and **TAP Academy**, HR Operations roles encompass:\n\n**1. Employee Lifecycle Management**\n- **Accorian**: \"Responsible for all operational activities pertaining to an employee life cycle\"\n- **TAP Academy**: Focus on \"HR processes from hire to retire\"\n- **Strategic Implication**: This represents the backbone of HR operations, requiring MBA-HR students to master end-to-end process design and optimization\n\n**2. Strategic Partnership & Stakeholder Management**\n- **Accorian**: \"Partner with leaders and managers on organization design & development\"\n- **Accorian**: \"Collaborate with different stakeholders... implementing People programs\"\n- **Strategic Implication**: Modern HR operations has evolved from administrative to strategic, making this ideal for MBA students seeking business partner roles\n\n**3. Process Optimization & Technology Integration**\n- **Accorian**: \"Proven expertise in streamlining HR processes whereby enhancing efficiency\"\n- **Accorian**: \"Good understanding of HR Technologies\" + \"HRMS\"\n- **Strategic Implication**: Digital transformation in HR creates opportunities for MBA students with tech-operations hybrid skills\n\n### Cross-Company Skills Matrix\n\n| **Skill Category** | **Accorian** | **TAP Academy** | **MBA Relevance** |\n|-------------------|--------------|-----------------|-------------------|\n| **Analytical Skills** | Strong analytical & problem-solving | Reporting & pipeline management | **Business Analytics** - Data-driven HR decisions |\n| **Technology** | MS Office, HRMS, HR Technologies | - | **Operations** - HR tech implementation |\n| **Legal Compliance** | Labor laws & compliance | - | **HR Specialization** - Risk mitigation expertise |\n| **Strategic Design** | Organization design & development | - | **All Specializations** - Cross-functional impact |\n\n### Market Insights for MBA Students\n\n**1. Evolution of HR Operations**\n- **Traditional View**: Administrative, transactional\n- **Current Reality**: Strategic business partner role with measurable impact on organizational performance\n- **Opportunity**: MBA students can position themselves as \"HR Business Partners\" rather than \"HR Administrators\"\n\n**2. Technology as Differentiator**\n- **Gap Identified**: While both companies mention technology, depth varies significantly\n- **Strategic Advice**: MBA students should pursue **HR Analytics certifications** (e.g., People Analytics by Wharton, SAP SuccessFactors) to bridge the technology-strategy gap\n\n**3. Cross-Functional Value Creation**\n- **Key Insight**: HR Operations now directly impacts:\n  - **Finance**: Through cost optimization in hiring processes\n  - **Marketing**: Through employer branding initiatives\n  - **Operations**: Through workforce planning and productivity metrics\n\n### Recommended Career Pathways\n\n**For MBA-HR Students:**\n1. **Immediate Focus**: Master employee lifecycle processes + HR technology platforms\n2. **Differentiation Strategy**: Develop expertise in **HR Analytics** and **Change Management**\n3. **Certification Path**: \n   - SHRM-CP/SCP (HR credibility)\n   - People Analytics (Cornell/Wharton programs)\n   - Six Sigma Green Belt (process optimization)\n\n**For Cross-Specialization Students:**\n- **Finance**: Focus on **HR cost optimization** and **workforce ROI metrics**\n- **Marketing**: Specialize in **employer branding** and **candidate experience design**\n- **Business Analytics**: Target **HR data science** roles with predictive analytics for retention\n\n### Strategic Positioning Advice\n\n**Elevator Pitch Framework** for MBA students:\n*\"I specialize in transforming HR operations from cost centers to strategic value drivers through data-driven process optimization and stakeholder partnership, directly impacting organizational performance metrics.\"*\n\n**Portfolio Projects to Undertake:**\n1. **Process Redesign Case Study**: Map and optimize a company's hire-to-retire process\n2. **HR Technology Implementation**: Design rollout strategy for HRMS/HRIS\n3. **ROI Analysis**: Quantify impact of HR initiatives on business outcomes\n\nThis analysis reveals that HR Operations has evolved into a strategic function requiring MBA-level business acumen, making it an excellent entry point for students seeking high-impact roles with clear progression to HR leadership positions.",
+      "match_score": 0.5,
+      "is_error": false,
+      "passed": true,
+      "description": "Should describe HR operations responsibilities"
+    },
+    {
+      "test_number": 7,
+      "query": "What opportunities does TAP Academy offer?",
+      "expected_answer": "TAP Academy offers lead generation, partnership development, LinkedIn outreach",
+      "actual_response": "## TAP Academy Opportunities Analysis\n\n### **Primary Opportunity: Business Development Associate**\n**Job Title:** Business Development Associate  \n**Company:** TAP Academy  \n**Location:** BTM Layout, Bangalore  \n**Experience:** 0-3 years (EdTech experience is a plus)  \n\n### **Core Responsibilities & MBA Relevance**\n\n**1. Lead Generation for Placements**\n- **What You'll Do:** Identify and target companies with hiring needs through cold calling, cold emailing, and LinkedIn outreach\n- **MBA Connection:** This is pure B2B sales and market development - directly applicable to Marketing and Business Analytics specializations\n- **Strategic Value:** You'll build a live database of hiring companies, giving you insider knowledge of recruitment patterns across industries\n\n**2. Partnership Development**\n- **What You'll Do:** Establish relationships with HR managers, recruiters, and decision-makers\n- **MBA Connection:** Perfect for HR specialization students - you'll understand recruitment from the employer's perspective\n- **Strategic Value:** Builds your professional network across Bangalore's tech ecosystem\n\n**3. LinkedIn & Social Media Outreach**\n- **What You'll Do:** Master digital prospecting and personal branding\n- **MBA Connection:** Essential for all specializations in today's digital-first business environment\n- **Strategic Value:** You'll become proficient in the same tools used for executive job searches\n\n**4. Reporting & Pipeline Management**\n- **What You'll Do:** Track outreach activities, lead generation, and placement successes\n- **MBA Connection:** Directly relevant to Business Analytics - you'll work with CRM data and conversion metrics\n- **Strategic Value:** Experience with sales analytics and performance dashboards\n\n### **Compensation & Growth**\nWhile specific salary details aren't available in the documents, this role offers:\n- **Immediate Value:** 0-3 years experience requirement makes it accessible for fresh MBA graduates\n- **Location Advantage:** BTM Layout is Bangalore's EdTech hub, surrounded by 50+ training companies\n- **Career Progression:** Clear path to Senior BD roles or transition into corporate L&D/HR functions\n\n### **Strategic Recommendations for MBA Students**\n\n**For Marketing Specialization:**\n- This role offers live B2B sales experience with measurable KPIs\n- You'll master account-based marketing and lead nurturing\n- Perfect stepping stone to corporate sales/marketing roles\n\n**For HR Specialization:**\n- Direct exposure to recruitment processes and employer decision-making\n- Understanding of skills gap analysis and training ROI\n- Builds relationships with 100+ HR managers\n\n**For Business Analytics:**\n- Work with CRM data, conversion rates, and sales forecasting\n- Opportunity to implement data-driven outreach strategies\n- Experience with sales performance dashboards\n\n**Cross-Functional Skills You'll Develop:**\n- CRM tools (likely Salesforce or HubSpot)\n- Advanced LinkedIn Sales Navigator usage\n- Sales presentation and negotiation skills\n- Data analysis for sales optimization\n\n### **Immediate Action Items**\n1. **Prepare Your Pitch:** Research TAP Academy's training programs to speak their language\n2. **LinkedIn Optimization:** Build a strong profile focused on business development/HR interests\n3. **Skill Certification:** Consider Google Analytics or HubSpot Sales certification before applying\n4. **Network Warm-up:** Connect with current TAP Academy employees on LinkedIn\n\n### **Long-term Career Trajectory**\nThis role serves as an excellent launchpad for:\n- **Corporate Sales/Business Development roles** (Marketing)\n- **Campus Recruitment/Talent Acquisition positions** (HR)\n- **Sales Operations/Analytics roles** (Business Analytics)\n- **EdTech Product Management** (Operations/Marketing)\n\nThe EdTech sector is growing at 20% annually, and this experience positions you perfectly for the booming education technology market.",
+      "match_score": 0.8888888888888888,
+      "is_error": false,
+      "passed": true,
+      "description": "Should list TAP Academy opportunities"
+    },
+    {
+      "test_number": 8,
+      "query": "List all the tools/software mentioned in the JDs",
+      "expected_answer": "Tools mentioned include Excel, Google Sheets, HRMS, CRM, LinkedIn",
+      "actual_response": "## Strategic Tool Landscape Analysis\n\n### **Identified Tools/Software Across Companies**\n\n**1. MS Office Suite**\n- **Cited By**: Accorian\n- **Relevance for MBA Students**: Foundational productivity suite essential across all specializations\n- **Strategic Implications**: While basic, mastery of advanced Excel (pivot tables, VLOOKUP, macros) and PowerPoint (data visualization, executive presentations) differentiates candidates\n\n**2. HRMS (Human Resource Management System)**\n- **Cited By**: Accorian\n- **Relevance for MBA Students**: Critical for HR specialization; increasingly relevant for Operations and Business Analytics\n- **Strategic Implications**: Understanding HRMS demonstrates operational efficiency mindset. Popular platforms include Workday, SAP SuccessFactors, BambooHR\n\n### **Cross-Company Insights**\n\n**Tool Sophistication Gap**: The current dataset reveals a **significant gap in advanced analytical tools** typically expected in MBA placements. Notable absences include:\n- Business Intelligence tools (Tableau, Power BI)\n- Statistical software (R, Python, SPSS)\n- Project management platforms (Jira, Asana)\n- CRM systems (Salesforce, HubSpot)\n\n**Strategic Recommendations for MBA Students**:\n\n1. **Immediate Action Items**:\n   - **HR Specialization**: Pursue Workday or SAP SuccessFactors certifications\n   - **Business Analytics**: Supplement with SQL, Tableau, and Python\n   - **Marketing**: Add Google Analytics, HubSpot certifications\n   - **Finance**: Ensure Bloomberg Terminal, Capital IQ proficiency\n\n2. **Cross-Functional Advantage**:\n   - Combine HRMS knowledge with advanced Excel for HR Analytics roles\n   - Layer MS Office expertise with data visualization tools for consulting readiness\n\n3. **Market Positioning**:\n   - The limited tool requirements suggest these roles may be **early-career focused**\n   - Students should proactively demonstrate tool proficiency beyond listed requirements to command premium packages\n\n**Note**: The dataset appears incomplete (Masters' Union JD missing). I recommend accessing full JD repositories to provide comprehensive tool landscape analysis across all recruiting companies.",
+      "match_score": 0.3333333333333333,
+      "is_error": false,
+      "passed": true,
+      "description": "Should list tools mentioned in job descriptions"
+    },
+    {
+      "test_number": 9,
+      "query": "Which jobs are specifically internships?",
+      "expected_answer": "Mill Story offers a Finance Internship",
+      "actual_response": "Query result: [(1,)]",
+      "match_score": 0.0,
+      "is_error": true,
+      "passed": false,
+      "description": "Should find Mill Story Finance Internship"
+    },
+    {
+      "test_number": 10,
+      "query": "Which jobs are based in Bangalore?",
+      "expected_answer": "Jobs in Bangalore include Mill Story, TAP Academy, Madison PR",
+      "actual_response": "Query result: [(4,)]",
+      "match_score": 0.0,
+      "is_error": true,
+      "passed": false,
+      "description": "Should find companies with Bangalore locations"
+    }
+  ],
+  "timestamp": "2025-09-06T11:21:27.113372"
+}

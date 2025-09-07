@@ -1,0 +1,1372 @@
+{
+  "individual_results": [
+    {
+      "query": "How many companies are offering finance roles?",
+      "expected_answer": "1 (Mill Story \u2013 Finance & Accounting Internship)",
+      "generated_answer": "Result: SQL Query: SELECT COUNT(DISTINCT c.id) AS company_count\nFROM companies c\nJOIN roles r ON c.id = r.company_id\nWHERE r.specialization = 'finance';\nResult: ('[(0,)]', {'result': [(0,)], 'col_keys': ['company_count']})",
+      "category": "company_count",
+      "difficulty": "easy",
+      "expected_entities": [
+        "Mill Story",
+        "Finance",
+        "Accounting",
+        "Internship"
+      ],
+      "response_time": 4.9899,
+      "standard_metrics": {
+        "rouge1": 0.048780487804878044,
+        "rouge2": 0.0,
+        "rougeL": 0.048780487804878044,
+        "bleu": 0.00610232513021697,
+        "semantic_similarity": "0.13096604",
+        "bert_precision": 0.7431148290634155,
+        "bert_recall": 0.8369321823120117,
+        "bert_f1": 0.7872382998466492,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.25,
+        "keyword_overlap": 0.0,
+        "length_ratio": 4.625,
+        "faithfulness": 0.25,
+        "overall_retrieval_score": 0.03252032520325203,
+        "overall_generation_score": 0.3081022208295639,
+        "overall_accuracy_score": 0.08333333333333333,
+        "comprehensive_score": 0.18169537687120682
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 2,
+        "generation_quality": 3,
+        "faithfulness": 8,
+        "relevance": 4,
+        "completeness": 2,
+        "clarity": 3,
+        "precision": 2,
+        "consistency": 4,
+        "overall_score": 3.5,
+        "information_retrieval_issues": [
+          "The SQL query returned 0 companies, contradicting the ground-truth of 1 company (Mill Story).",
+          "The retrieval layer appears to have used an incorrect filter (specialization='finance') instead of the actual field value that tags the Mill Story role as finance-related.",
+          "No fallback or validation step detected the mismatch between query result and expected data."
+        ],
+        "generation_issues": [
+          "The answer presents raw SQL and a raw tuple ('[(0,)]') instead of a concise, user-friendly statement.",
+          "No explanation is given for why the count is zero, leaving the user confused.",
+          "The response format mixes debug output (SQL, tuple) with a pseudo-JSON structure, harming readability."
+        ],
+        "hallucination_detection": [
+          "No hallucinated companies or roles were introduced; the SQL result is faithfully reported."
+        ],
+        "rag_system_performance": "The system successfully executed a SQL query and returned its literal result, but failed at the retrieval layer by applying an incorrect filter, leading to a false zero count. Generation quality is poor because raw technical artifacts are surfaced to the end user. Overall, the pipeline lacks validation against ground-truth data and does not translate technical results into natural language.",
+        "improvement_recommendations": [
+          "Add a synonym/keyword mapping layer so that 'finance' matches the exact specialization value stored in the database.",
+          "Implement a post-retrieval validation step that cross-checks the SQL result against a small ground-truth set for known queries; flag discrepancies for human review.",
+          "Replace raw SQL/tuple output with a concise sentence: '1 company is offering finance roles: Mill Story \u2013 Finance & Accounting Internship.'",
+          "Introduce a natural-language formatter module that hides debug information unless explicitly requested."
+        ]
+      },
+      "timestamp": "2025-09-05T12:06:54.614121"
+    },
+    {
+      "query": "Who are the companies with HR opportunities?",
+      "expected_answer": "Accorian (Associate \u2013 People Operations)",
+      "generated_answer": "Result: SQL Query: SELECT DISTINCT c.company_name\nFROM companies c\nJOIN roles r ON c.id = r.company_id\nWHERE r.specialization = 'HR';\nResult: (\"[('Accorian',)]\", {'result': [('Accorian',)], 'col_keys': ['company_name']})",
+      "category": "company_identification",
+      "difficulty": "easy",
+      "expected_entities": [
+        "Accorian",
+        "Associate",
+        "People Operations",
+        "HR"
+      ],
+      "response_time": 5.343135,
+      "standard_metrics": {
+        "rouge1": 0.05555555555555555,
+        "rouge2": 0.0,
+        "rougeL": 0.05555555555555555,
+        "bleu": 0.0063672466751171115,
+        "semantic_similarity": "0.23281448",
+        "bert_precision": 0.7477927207946777,
+        "bert_recall": 0.8081722259521484,
+        "bert_f1": 0.7768109440803528,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.5,
+        "keyword_overlap": 0.0,
+        "length_ratio": 5.5,
+        "faithfulness": 0.5,
+        "overall_retrieval_score": 0.037037037037037035,
+        "overall_generation_score": 0.33866422221648146,
+        "overall_accuracy_score": 0.16666666666666666,
+        "comprehensive_score": 0.23244339682293647
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 7,
+        "generation_quality": 4,
+        "faithfulness": 9,
+        "relevance": 8,
+        "completeness": 5,
+        "clarity": 3,
+        "precision": 6,
+        "consistency": 2,
+        "overall_score": 5.5,
+        "information_retrieval_issues": [
+          "Retrieved only the company name 'Accorian' but omitted the role title 'Associate \u2013 People Operations' that was present in the expected answer.",
+          "Returned raw SQL query and tuple structure instead of human-readable content."
+        ],
+        "generation_issues": [
+          "Answer is presented as a raw SQL result set rather than a concise, natural-language response.",
+          "Includes extraneous technical details (SQL statement, column keys) that are irrelevant to the end-user."
+        ],
+        "hallucination_detection": [],
+        "rag_system_performance": "The system successfully identified the correct company with HR opportunities, demonstrating good retrieval accuracy and faithfulness. However, it failed to transform the retrieved data into a user-friendly format, resulting in poor generation quality, low clarity, and inconsistency with the expected concise answer style. The omission of the specific role title further reduces completeness.",
+        "improvement_recommendations": [
+          "Implement a post-processing layer that converts SQL/tuple output into natural language.",
+          "Include role titles when the query implies interest in opportunities, not just company names.",
+          "Suppress internal query artifacts from the final user-facing response."
+        ]
+      },
+      "timestamp": "2025-09-05T12:07:14.732499"
+    },
+    {
+      "query": "Which companies are hiring for PR or communications roles?",
+      "expected_answer": "Madison PR (Account Executive)",
+      "generated_answer": "Strategic Market Insight \u2013 PR / Communications Hiring Landscape  \n(Placement-cell lens: MBA Marketing & HR specialisations)\n\n1. Confirmed Active Recruiter  \n   \u2022 Company: Madison Public Relations (Madison World)  \n   \u2022 Role: Account Executive \u2013 Public Relations  \n   \u2022 Locations: Mumbai | Gurgaon | Bangalore  \n   \u2022 2025 PG-eligible; fixed CTC \u2264 \u20b9 5.5 LPA  \n   \u2022 Cited By: Vector JDs (5 separate chunks)  \n\n2. Cross-Company Scan  \n   Structured SQL sweep across \u201crole\u201d & \u201cjob_title\u201d fields for like terms (\u201cPublic Relations\u201d, \u201cCommunications\u201d, \u201cCorporate Communications\u201d, \u201cPR\u201d, \u201cMedia Relations\u201d) returned zero additional records for 2024-25.  \n   \u21d2 Madison PR is the only documented recruiter in this vertical within our current placement repository.\n\nStrategic Interpretation for MBA Students  \nRelevant Specialisations: Marketing (brand storytelling, media planning) and HR (corporate communications, employer-branding).  \nWhy It Matters: PR is converging with performance-driven marketing; firms want data-literate storytellers who can convert earned media into measurable reach/engagement.  \nSkill Overlap Noted: storytelling, influencer-networking, event-led launch execution\u2014skills also requested by FMCG & luxury-marketing roles (HUL, L\u2019Or\u00e9al, Titan) in other JDs.  \nNiche Opportunity: Only one dedicated PR agency on radar; limited seats \u2192 differentiate early through:  \n   \u2013 Google Analytics + Meltwater/Talkwalker certifications (show you can quantify PR impact)  \n   \u2013 Short course on \u201cCrisis Communications\u201d (IIM-B exec-ed) \u2013 valued by corporate-comm teams.  \n   \u2013 Build a media-contact deck & by-lined article portfolio before interviews.\n\nRecommended Certification/Training  \n   \u2022 Certificate in Strategic Public Relations (UCLA Extension / SPJIMR 6-week exec)  \n   \u2022 HubSpot \u201cPR & Earned Media\u201d module (free)  \n   \u2022 Advanced Excel + Power BI dashboarding \u2013 to report PR KPIs (share-of-voice, sentiment score).\n\nPlacement-Cell Action  \n   \u2022 Fast-track Marketing & HR students with prior PR internships (Madison mandates it).  \n   \u2022 Host a 2-day \u201cMedia Pitch Simulation\u201d workshop; invite Madison HR team to judge \u2013 creates a direct talent pipeline.\n\nBottom line: PR/Communications hiring is presently a single-company game this season; position yourself as a metrics-savvy communicator to secure the scarce seats.",
+      "category": "company_identification",
+      "difficulty": "easy",
+      "expected_entities": [
+        "Madison PR",
+        "Account Executive",
+        "PR",
+        "communications"
+      ],
+      "response_time": 15.109618,
+      "standard_metrics": {
+        "rouge1": 0.025974025974025976,
+        "rouge2": 0.013071895424836602,
+        "rougeL": 0.01948051948051948,
+        "bleu": 0.003097074212538787,
+        "semantic_similarity": "0.35092148",
+        "bert_precision": 0.7412962913513184,
+        "bert_recall": 0.8824748396873474,
+        "bert_f1": 0.8057481646537781,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 1.0,
+        "keyword_overlap": 1.0,
+        "length_ratio": 77.56666666666666,
+        "faithfulness": 1.0,
+        "overall_retrieval_score": 0.019508813626460685,
+        "overall_generation_score": 0.3865889069046933,
+        "overall_accuracy_score": 0.3333333333333333,
+        "comprehensive_score": 0.3168990230847803
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: API Error: 429",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:07:35.621859"
+    },
+    {
+      "query": "Are there any admission-related jobs?",
+      "expected_answer": "Yes, Masters' Union (Admission Counselor)",
+      "generated_answer": "Strategic Placement Cell Advisory \u2013 Admission-Related Opportunities\n\nSkill Name: Inside-Sales-Driven Admission Counseling  \nCited By Companies: Masters\u2019 Union (multiple postings)  \nRelevant Specializations: Marketing (highest), Business Analytics (moderate), HR (low)  \nWhy It Matters:  \n\u2022 Masters\u2019 Union is explicitly scaling its MasterCamp portfolio and a new UG program. Admission Counselors are the revenue engine\u2014owning the full B2C funnel from lead generation to enrolment.  \n\u2022 The role sits at the intersection of sales strategy, customer insight, and brand positioning\u2014core competencies for any MBA specializing in Marketing or Sales & Distribution.  \n\u2022 Data from the JD shows heavy reliance on CRM analytics and KPI dashboards, making Business Analytics students valuable for funnel optimization.\n\nStrategic Advice for MBA Students:  \n1. Position yourself as a \u201cRevenue-Impact Marketer.\u201d Emphasize how your MBA training in consumer behavior, pricing, and digital campaigns translates directly to higher conversion rates.  \n2. Highlight CRM proficiency (Salesforce, HubSpot) and comfort with SQL / Power BI to showcase data-driven decision-making\u2014skills explicitly requested by Masters\u2019 Union.  \n3. If you come from HR or Operations, pivot the narrative: frame your stakeholder-management or process-improvement experience as \u201creducing enrolment cycle time\u201d or \u201cimproving candidate experience.\u201d\n\nRecommended Certifications / Training:  \n\u2022 Salesforce Certified Sales Representative (Trailhead)  \n\u2022 HubSpot Sales Software Certification  \n\u2022 Google Analytics 4 (for funnel attribution)  \n\u2022 SPIN or Challenger Sales methodology workshops  \n\nAdditional Notes:  \n\u2022 Compensation benchmarks are not disclosed in the retrieved data; negotiate by benchmarking against EdTech inside-sales packages (\u20b98\u201315 LPA fixed + variable).  \n\u2022 Career progression: Admission Counselor \u2192 Team Lead \u2192 Head of Enrolments \u2192 Director of Growth. The role is a fast-track to P&L ownership within 3\u20134 years.",
+      "category": "yes_no_question",
+      "difficulty": "easy",
+      "expected_entities": [
+        "Masters' Union",
+        "Admission Counselor",
+        "Yes"
+      ],
+      "response_time": 18.810925,
+      "standard_metrics": {
+        "rouge1": 0.02962962962962963,
+        "rouge2": 0.01492537313432836,
+        "rougeL": 0.02962962962962963,
+        "bleu": 0.003867661357462518,
+        "semantic_similarity": "0.3443333",
+        "bert_precision": 0.0,
+        "bert_recall": 0.0,
+        "bert_f1": 0.0,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.3333333333333333,
+        "keyword_overlap": 0.8,
+        "length_ratio": 48.34146341463415,
+        "faithfulness": 0.3333333333333333,
+        "overall_retrieval_score": 0.02472821079786254,
+        "overall_generation_score": 0.11606698413707817,
+        "overall_accuracy_score": 0.1111111111111111,
+        "comprehensive_score": 0.10795984544830792
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: API Error: 429",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:07:55.915521"
+    },
+    {
+      "query": "Which roles are open for freshers?",
+      "expected_answer": "Accorian (Associate HR Ops \u2013 Fresher), TAP Academy (BDA \u2013 freshers encouraged)",
+      "generated_answer": "Based on the available data, here are the **freshers-friendly roles** currently open:\n\n---\n\n### **1. TAP Academy \u2013 Sales/Business Development Trainee**\n- **Role Type**: Entry-level sales & outreach  \n- **Key Requirements**:\n  - **Freshers welcome** with excellent communication skills  \n  - Interest in **cold calling & cold emailing**  \n  - **LinkedIn & social media networking** for lead generation  \n- **Relevance for MBA Students**:\n  - **Marketing specialization**: Ideal for students targeting **B2B/B2C sales roles**  \n  - **Business Analytics**: Opportunity to learn **CRM pipeline tracking**  \n- **Strategic Advice**:  \n  - **Certifications**: HubSpot Sales Software, LinkedIn Sales Navigator  \n  - **Tools to Learn**: Salesforce, Zoho CRM, Apollo.io  \n\n---\n\n### **2. Accorian \u2013 Associate-People Operations (HR)**\n- **Role Type**: Entry-level HR operations  \n- **Key Requirements**:\n  - **Freshers encouraged** with strong communication  \n  - Exposure to **employee lifecycle management** (onboarding, engagement, performance)  \n- **Relevance for MBA Students**:\n  - **HR specialization**: Direct alignment with **HR operations, employee engagement**  \n  - **Operations**: Cross-functional exposure to **process optimization**  \n- **Strategic Advice**:  \n  - **Certifications**: SHRM-CP (entry-level), Google HR Analytics  \n  - **Skills to Highlight**: Excel (HR dashboards), employee engagement frameworks  \n\n---\n\n### **3. Masters\u2019 Union \u2013 Admission Counselor (Inside Sales)**\n- **Role Type**: B2C sales in **education sector**  \n- **Key Requirements**:\n  - **Freshers with sales aptitude** (B2C experience preferred but not mandatory)  \n  - **CRM usage** (lead tracking & pipeline management)  \n- **Relevance for MBA Students**:\n  - **Marketing**: High-demand skill in **ed-tech & higher education sales**  \n  - **Business Analytics**: CRM data analysis for conversion optimization  \n- **Strategic Advice**:  \n  - **Certifications**: Salesforce CRM, Coursera\u2019s \"Successful Negotiation\"  \n  - **Key Pitch**: Emphasize **understanding of MBA student career needs** (since role involves counseling professionals)  \n\n---\n\n### **Cross-Company Trend for Freshers**:\n- **Communication & CRM skills** are **universal must-haves** across all roles.  \n- **LinkedIn & cold outreach** are **high-value skills** for **Marketing & Sales roles**.  \n- **HR operations** is a **niche but growing** area for **HR specialization students**.  \n\n**Final Recommendation**:  \n- **Marketing students**: Prioritize **TAP Academy & Masters\u2019 Union** for **sales pipeline exposure**.  \n- **HR students**: Target **Accorian** for **employee lifecycle management**.  \n- **Cross-functional skill**: **CRM proficiency (Salesforce/HubSpot)** is a **career accelerator** across all specializations.",
+      "category": "role_listing",
+      "difficulty": "medium",
+      "expected_entities": [
+        "Accorian",
+        "TAP Academy",
+        "fresher",
+        "BDA"
+      ],
+      "response_time": 23.678665,
+      "standard_metrics": {
+        "rouge1": 0.05128205128205128,
+        "rouge2": 0.019354838709677417,
+        "rougeL": 0.038461538461538464,
+        "bleu": 0.002546308806299552,
+        "semantic_similarity": "0.5995047",
+        "bert_precision": 0.7233080863952637,
+        "bert_recall": 0.8415231704711914,
+        "bert_f1": 0.7779503464698792,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.75,
+        "keyword_overlap": 0.6,
+        "length_ratio": 35.57692307692308,
+        "faithfulness": 0.75,
+        "overall_retrieval_score": 0.03636614281775572,
+        "overall_generation_score": 0.46000045483998436,
+        "overall_accuracy_score": 0.25,
+        "comprehensive_score": 0.31987139899617434
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: API Error: 429",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:08:19.708974"
+    },
+    {
+      "query": "Which jobs mention placements explicitly?",
+      "expected_answer": "TAP Academy (student placements)",
+      "generated_answer": "Based on the available data, I found **one role** that explicitly mentions placements:\n\n---\n\n**Job Title:** Admission Counselor (Inside Sales)  \n**Company:** Masters\u2019 Union  \n**Location:** Not specified  \n**Key Requirements:**  \n- Proven experience in inside sales, particularly in a B2C environment  \n- Strong track record of meeting/exceeding sales targets  \n- Experience working with professionals, understanding their learning needs and career aspirations  \n- Knowledge of CRM systems for lead tracking and pipeline management  \n- Excellent verbal and written communication skills  \n\n**Relevance for MBA Students:**  \nThis role directly aligns with **Marketing** and **Business Analytics** specializations. The placement aspect is embedded in the **B2C sales** function, where you\u2019ll guide professionals toward educational programs (likely MBA or executive education), making it a **placement-adjacent** role.  \n\n**Strategic Insight:**  \nWhile not a traditional campus placement role, this position offers **high-value exposure** to:  \n1. **Pipeline management** (critical for placement officers)  \n2. **Understanding career aspirations** (key for HR/Marketing roles in talent acquisition)  \n3. **CRM tools** (Tableau, Salesforce) \u2013 a cross-functional skill for Analytics students  \n\n**Recommendation:**  \nMBA students targeting **Marketing** or **HR** roles in **ed-tech or higher education** should leverage this. The role\u2019s focus on **converting leads into enrollments** mirrors placement processes, making it a **strategic stepping stone** for careers in **corporate L&D or talent consulting**.  \n\n---\n\n**Note:** No other companies in the provided data explicitly mention \"placements\" in their job descriptions.",
+      "category": "feature_identification",
+      "difficulty": "easy",
+      "expected_entities": [
+        "TAP Academy",
+        "placements",
+        "student"
+      ],
+      "response_time": 29.587083,
+      "standard_metrics": {
+        "rouge1": 0.01777777777777778,
+        "rouge2": 0.0,
+        "rougeL": 0.01777777777777778,
+        "bleu": 0.0014704520931969093,
+        "semantic_similarity": "0.37914923",
+        "bert_precision": 0.7419325113296509,
+        "bert_recall": 0.8433816432952881,
+        "bert_f1": 0.7894110083580017,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.6666666666666666,
+        "keyword_overlap": 0.25,
+        "length_ratio": 53.71875,
+        "faithfulness": 0.6666666666666666,
+        "overall_retrieval_score": 0.011851851851851855,
+        "overall_generation_score": 0.39001022959520854,
+        "overall_accuracy_score": 0.2222222222222222,
+        "comprehensive_score": 0.2674647015725497
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: API Error: 429",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:15:40.500201"
+    },
+    {
+      "query": "Are there any ed-tech companies hiring?",
+      "expected_answer": "TAP Academy (BDA role)",
+      "generated_answer": "OpenRouter generation failed after retries.",
+      "category": "industry_identification",
+      "difficulty": "medium",
+      "expected_entities": [
+        "TAP Academy",
+        "ed-tech",
+        "BDA"
+      ],
+      "response_time": 935.007654,
+      "standard_metrics": {
+        "rouge1": 0.0,
+        "rouge2": 0.0,
+        "rougeL": 0.0,
+        "bleu": 0,
+        "semantic_similarity": "-0.020385772",
+        "bert_precision": 0.8519963026046753,
+        "bert_recall": 0.8208369016647339,
+        "bert_f1": 0.8361263871192932,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.0,
+        "keyword_overlap": 0.0,
+        "length_ratio": 1.9545454545454546,
+        "faithfulness": 0.0,
+        "overall_retrieval_score": 0.0,
+        "overall_generation_score": 0.2719135383764903,
+        "overall_accuracy_score": 0.0,
+        "comprehensive_score": 0.1165343735899244
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: API Error: 429",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:16:14.894768"
+    },
+    {
+      "query": "Which companies are in consulting or cybersecurity?",
+      "expected_answer": "Accorian (cybersecurity advisory firm)",
+      "generated_answer": "Based on the available data, here are the companies in consulting or cybersecurity:\n\n## **Accorian** - **Cybersecurity Consulting Firm**\n\n**Company Profile:**\n- **Sector**: Pure-play cybersecurity advisory and consulting\n- **Headquarters**: New Jersey, USA\n- **Global Presence**: Regional offices in India, Canada, and UAE\n- **Specialization**: Cybersecurity strategy, risk identification, penetration testing, incident response, compliance (HITRUST, SOC, PCI)\n- **Unique Positioning**: One of only 10 companies globally offering both audit AND testing services in-house\n- **Accreditations**: HITRUST & SOC assessor, PCI QSA & ASV, CREST accredited\n\n**Strategic Implications for MBA Students:**\n- **HR Specialization**: The \"Associate - People Operations\" role indicates growing HR needs in cybersecurity firms\n- **Operations Specialization**: Opportunity to work with global clients and understand cross-border operations\n- **Business Analytics**: Cybersecurity consulting heavily relies on data analytics for risk assessment\n\n**Market Insight**: The cybersecurity consulting market is experiencing 15-20% annual growth, with increasing demand for professionals who understand both technical and business aspects of security.\n\n---\n\n## **TAP Academy** - **Skill Development & Training Consulting**\n\n**Company Profile:**\n- **Sector**: Education consulting and skill development\n- **Focus**: Industry hiring trends, skill requirements analysis\n- **Services**: Market research, networking facilitation, skill gap analysis\n\n**Strategic Implications for MBA Students:**\n- **Marketing Specialization**: Understanding skill market trends for positioning\n- **HR Specialization**: Bridging academia-industry skill gaps\n- **Business Analytics**: Data-driven insights on hiring patterns\n\n---\n\n## **Cross-Company Strategic Recommendations:**\n\n### **For MBA Students:**\n\n1. **Cybersecurity + Business Combination** (High Demand):\n   - Companies like Accorian need MBA graduates who understand cybersecurity business models\n   - **Recommended Path**: MBA with cybersecurity certification (CISSP, CISM, or CompTIA Security+)\n\n2. **Consulting Skills** (Universal Requirement):\n   - Both companies emphasize client interaction and strategic advisory\n   - **Key Skills**: Stakeholder management, presentation skills, business case development\n\n3. **Global Mindset** (Critical Differentiator):\n   - Accorian's multi-country operations require cross-cultural competency\n   - **Recommended Training**: Cross-cultural communication, international business practices\n\n### **Certification Recommendations by Specialization:**\n\n- **Finance**: CISA (Certified Information Systems Auditor) for cybersecurity audit roles\n- **HR**: SHRM-CP with cybersecurity HR specialization\n- **Marketing**: Digital marketing certifications with cybersecurity focus\n- **Operations**: Lean Six Sigma with security process optimization\n- **Business Analytics**: Data analytics certifications (Tableau, SQL) with security data interpretation\n\n### **Market Trend Alert**:\nThe intersection of business consulting and cybersecurity is creating new roles like \"Cybersecurity Business Analyst\" and \"Risk Advisory Consultant\" with salaries ranging 12-25 LPA for fresh MBA graduates.",
+      "category": "industry_identification",
+      "difficulty": "medium",
+      "expected_entities": [
+        "Accorian",
+        "cybersecurity",
+        "advisory"
+      ],
+      "response_time": 251.704767,
+      "standard_metrics": {
+        "rouge1": 0.02185792349726776,
+        "rouge2": 0.01098901098901099,
+        "rougeL": 0.02185792349726776,
+        "bleu": 0.0016520845786520948,
+        "semantic_similarity": "0.56734055",
+        "bert_precision": 0.7265060544013977,
+        "bert_recall": 0.8639363050460815,
+        "bert_f1": 0.7892835140228271,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 1.0,
+        "keyword_overlap": 1.0,
+        "length_ratio": 85.0,
+        "faithfulness": 1.0,
+        "overall_retrieval_score": 0.018234952661182167,
+        "overall_generation_score": 0.45275871713611116,
+        "overall_accuracy_score": 0.3333333333333333,
+        "comprehensive_score": 0.3447115727702686
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: API Error: 429",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:32:04.597199"
+    },
+    {
+      "query": "Which jobs are specifically internships?",
+      "expected_answer": "Mill Story (Finance Internship)",
+      "generated_answer": "Based on the available data, I have identified the following **internship opportunities**:\n\n## **Finance & Accounting Internship**\n- **Company:** Mill Story\n- **Location:** Sarjapur Road, Bengaluru\n- **Duration:** 2 Months\n- **Type:** Paid Internship\n- **Key Responsibilities:**\n  - Maintaining clean and accurate books\n  - Working on Proforma accounting and financial statements (P&L, balance sheet, cash flow)\n  - Budgeting, expense tracking, and invoice verification\n  - Supporting fundraising preparations with real exposure to startup funding processes\n\n## **Strategic Insights for MBA Students:**\n\n**For Finance Specialization Students:**\nThis internship offers direct exposure to startup finance operations and fundraising - a rare opportunity to understand the financial mechanics of early-stage D2C brands. The hands-on experience with P&L statements and cash flow management will be invaluable for roles in:\n- Startup finance\n- VC/PE analysis\n- Financial planning & analysis (FP&A)\n\n**Cross-Specialization Value:**\nEven Marketing and Operations students can benefit from understanding the financial backbone of D2C businesses, as modern business roles increasingly require financial literacy.\n\n**Note:** I could not find information about internships at TAP Academy, Madison Public Relations, or Masters' Union in the available documents.",
+      "category": "job_type",
+      "difficulty": "easy",
+      "expected_entities": [
+        "Mill Story",
+        "Finance",
+        "Internship"
+      ],
+      "response_time": 64.48167,
+      "standard_metrics": {
+        "rouge1": 0.04545454545454545,
+        "rouge2": 0.011494252873563218,
+        "rougeL": 0.04545454545454545,
+        "bleu": 0.003769985104168794,
+        "semantic_similarity": "0.51620734",
+        "bert_precision": 0.7728683352470398,
+        "bert_recall": 0.8900427222251892,
+        "bert_f1": 0.8273272514343262,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 1.0,
+        "keyword_overlap": 1.0,
+        "length_ratio": 43.483870967741936,
+        "faithfulness": 1.0,
+        "overall_retrieval_score": 0.034134447927551374,
+        "overall_generation_score": 0.44910152463931685,
+        "overall_accuracy_score": 0.3333333333333333,
+        "comprehensive_score": 0.3499582739572292
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: API Error: 429",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:36:22.077814"
+    },
+    {
+      "query": "Which job is in the food & consumer space?",
+      "expected_answer": "Mill Story (D2C food brand \u2013 chemical-free flour)",
+      "generated_answer": "Job Title: Finance & Accounting Intern  \nCompany: Mill Story  \nLocation: Sarjapur Road, Bengaluru  \n\nRelevance for MBA Students  \n- Sector: Food & Consumer (D2C healthy flours).  \n- Function: Finance & Accounting \u2013 ideal for Finance-specialization MBAs who want exposure to early-stage fundraising, D2C unit-economics, and working-capital cycles in perishables.  \n- Strategic Value: Mill Story is preparing its first external round; interns will gain first-hand experience in investor-ready financials, valuation drivers, and burn-rate management\u2014skills directly transferable to VC, PE, or startup-CFO career tracks.",
+      "category": "industry_identification",
+      "difficulty": "medium",
+      "expected_entities": [
+        "Mill Story",
+        "food",
+        "consumer",
+        "D2C"
+      ],
+      "response_time": 12.609365,
+      "standard_metrics": {
+        "rouge1": 0.10989010989010989,
+        "rouge2": 0.02247191011235955,
+        "rougeL": 0.0879120879120879,
+        "bleu": 0.011206993009735034,
+        "semantic_similarity": "0.51399994",
+        "bert_precision": 0.7783700823783875,
+        "bert_recall": 0.8555775880813599,
+        "bert_f1": 0.8151497840881348,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 1.0,
+        "keyword_overlap": 0.6,
+        "length_ratio": 12.571428571428571,
+        "faithfulness": 1.0,
+        "overall_retrieval_score": 0.07342470263818578,
+        "overall_generation_score": 0.44678557202090446,
+        "overall_accuracy_score": 0.3333333333333333,
+        "comprehensive_score": 0.36580440342532444
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: API Error: 429",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:37:32.498414"
+    },
+    {
+      "query": "What finance-related tasks are mentioned?",
+      "expected_answer": "Accounting, P&L, balance sheet, cash flow, budgeting, expense tracking, invoice checks, audits, compliance, fundraising support, pitch deck prep",
+      "generated_answer": "Finance-Related Tasks Identified in the Available Documents\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n1. Mill Story \u2013 Finance & Accounting Intern  \n   \u2022 Maintain clean and accurate books of accounts  \n   \u2022 Prepare Pro-forma accounting and financial statements (P&L, Balance Sheet, Cash-Flow)  \n   \u2022 Handle budgeting, expense tracking, and invoice verification  \n   \u2022 Support fundraising preparation activities (investor-ready financials, due-diligence packs)\n\nRelevance for MBA Students  \n\u2022 Directly aligns with the Finance specialization; offers hands-on exposure to startup finance cycles and investor relations\u2014valuable for those targeting roles in Corporate Finance, FP&A, or VC/PE.",
+      "category": "task_listing",
+      "difficulty": "hard",
+      "expected_entities": [
+        "Accounting",
+        "P&L",
+        "balance sheet",
+        "cash flow",
+        "budgeting",
+        "expense tracking",
+        "invoice checks",
+        "audits",
+        "compliance",
+        "fundraising",
+        "pitch deck"
+      ],
+      "response_time": 230.060879,
+      "standard_metrics": {
+        "rouge1": 0.25000000000000006,
+        "rouge2": 0.1372549019607843,
+        "rougeL": 0.23076923076923078,
+        "bleu": 0.09921799771616979,
+        "semantic_similarity": "0.5092957",
+        "bert_precision": 0.7836383581161499,
+        "bert_recall": 0.8548164367675781,
+        "bert_f1": 0.8176813125610352,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.5454545454545454,
+        "keyword_overlap": 0.5789473684210527,
+        "length_ratio": 4.902777777777778,
+        "faithfulness": 0.5454545454545454,
+        "overall_retrieval_score": 0.20600804424333838,
+        "overall_generation_score": 0.47539833741926524,
+        "overall_accuracy_score": 0.1818181818181818,
+        "comprehensive_score": 0.36995338434890807
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: API Error: 429",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:37:50.570870"
+    },
+    {
+      "query": "What do HR operations jobs involve?",
+      "expected_answer": "Employee lifecycle management, engagement, compliance audits, labor law adherence, HR processes, people initiatives",
+      "generated_answer": "OpenRouter generation failed after retries.",
+      "category": "role_description",
+      "difficulty": "hard",
+      "expected_entities": [
+        "Employee lifecycle",
+        "engagement",
+        "compliance",
+        "audits",
+        "labor law",
+        "HR processes",
+        "people initiatives"
+      ],
+      "response_time": 519.255388,
+      "standard_metrics": {
+        "rouge1": 0.0,
+        "rouge2": 0.0,
+        "rougeL": 0.0,
+        "bleu": 0,
+        "semantic_similarity": "-0.0013053287",
+        "bert_precision": 0.0,
+        "bert_recall": 0.0,
+        "bert_f1": 0.0,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.0,
+        "keyword_overlap": 0.0,
+        "length_ratio": 0.3739130434782609,
+        "faithfulness": 0.0,
+        "overall_retrieval_score": 0.0,
+        "overall_generation_score": -0.00043510956068833667,
+        "overall_accuracy_score": 0.0,
+        "comprehensive_score": -0.00018647552600928715
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x16a3879d0>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:41:45.966482"
+    },
+    {
+      "query": "What opportunities does TAP Academy offer?",
+      "expected_answer": "Lead generation, partnership development, LinkedIn outreach, placement strategy, market research, reporting, career advancement",
+      "generated_answer": "OpenRouter generation failed after retries.",
+      "category": "opportunity_listing",
+      "difficulty": "hard",
+      "expected_entities": [
+        "Lead generation",
+        "partnership development",
+        "LinkedIn outreach",
+        "placement strategy",
+        "market research",
+        "reporting",
+        "career advancement"
+      ],
+      "response_time": 0.018799,
+      "standard_metrics": {
+        "rouge1": 0.1111111111111111,
+        "rouge2": 0.0,
+        "rougeL": 0.1111111111111111,
+        "bleu": 0.0043066569774875925,
+        "semantic_similarity": "0.04067388",
+        "bert_precision": 0.0,
+        "bert_recall": 0.0,
+        "bert_f1": 0.0,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.0,
+        "keyword_overlap": 0.07692307692307693,
+        "length_ratio": 0.33858267716535434,
+        "faithfulness": 0.0,
+        "overall_retrieval_score": 0.07407407407407407,
+        "overall_generation_score": 0.014993512915555963,
+        "overall_accuracy_score": 0.0,
+        "comprehensive_score": 0.03817182299555572
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x16a3879d0>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:50:25.576396"
+    },
+    {
+      "query": "What are the most sought-after skills across these JDs?",
+      "expected_answer": "Communication, problem-solving, Excel/Google Sheets, HRMS, CRM, cold calling, negotiation, PR/media skills",
+      "generated_answer": "OpenRouter generation failed after retries.",
+      "category": "skill_analysis",
+      "difficulty": "hard",
+      "expected_entities": [
+        "Communication",
+        "problem-solving",
+        "Excel",
+        "Google Sheets",
+        "HRMS",
+        "CRM",
+        "cold calling",
+        "negotiation",
+        "PR",
+        "media skills"
+      ],
+      "response_time": 0.007292,
+      "standard_metrics": {
+        "rouge1": 0.0,
+        "rouge2": 0.0,
+        "rougeL": 0.0,
+        "bleu": 0,
+        "semantic_similarity": "-0.031203378",
+        "bert_precision": 0.0,
+        "bert_recall": 0.0,
+        "bert_f1": 0.0,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.0,
+        "keyword_overlap": 0.0,
+        "length_ratio": 0.4056603773584906,
+        "faithfulness": 0.0,
+        "overall_retrieval_score": 0.0,
+        "overall_generation_score": -0.010401125997304916,
+        "overall_accuracy_score": 0.0,
+        "comprehensive_score": -0.004457625427416393
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17e3ec050>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:50:25.627212"
+    },
+    {
+      "query": "Which jobs are based in Bangalore?",
+      "expected_answer": "Mill Story, TAP Academy, Madison PR (also Gurgaon/Mumbai)",
+      "generated_answer": "OpenRouter generation failed after retries.",
+      "category": "location_based",
+      "difficulty": "medium",
+      "expected_entities": [
+        "Mill Story",
+        "TAP Academy",
+        "Madison PR",
+        "Bangalore",
+        "Gurgaon",
+        "Mumbai"
+      ],
+      "response_time": 0.00833,
+      "standard_metrics": {
+        "rouge1": 0.0,
+        "rouge2": 0.0,
+        "rougeL": 0.0,
+        "bleu": 0,
+        "semantic_similarity": "0.08275081",
+        "bert_precision": 0.0,
+        "bert_recall": 0.0,
+        "bert_f1": 0.0,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.0,
+        "keyword_overlap": 0.0,
+        "length_ratio": 0.7543859649122807,
+        "faithfulness": 0.0,
+        "overall_retrieval_score": 0.0,
+        "overall_generation_score": 0.027583604057629902,
+        "overall_accuracy_score": 0.0,
+        "comprehensive_score": 0.0118215445961271
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x16a387750>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:50:25.696929"
+    },
+    {
+      "query": "Which role has the highest salary package?",
+      "expected_answer": "Madison PR (up to 5.5 LPA)",
+      "generated_answer": "OpenRouter generation failed after retries.",
+      "category": "salary_comparison",
+      "difficulty": "medium",
+      "expected_entities": [
+        "Madison PR",
+        "5.5 LPA",
+        "highest salary"
+      ],
+      "response_time": 0.008117,
+      "standard_metrics": {
+        "rouge1": 0.0,
+        "rouge2": 0.0,
+        "rougeL": 0.0,
+        "bleu": 0,
+        "semantic_similarity": "-0.008687321",
+        "bert_precision": 0.0,
+        "bert_recall": 0.0,
+        "bert_f1": 0.0,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.0,
+        "keyword_overlap": 0.0,
+        "length_ratio": 1.6538461538461537,
+        "faithfulness": 0.0,
+        "overall_retrieval_score": 0.0,
+        "overall_generation_score": -0.0028957736988862357,
+        "overall_accuracy_score": 0.0,
+        "comprehensive_score": -0.0012410458709512437
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17e3ef9d0>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:50:25.757266"
+    },
+    {
+      "query": "Which jobs are paid internships?",
+      "expected_answer": "Mill Story (Finance Internship)",
+      "generated_answer": "OpenRouter generation failed after retries.",
+      "category": "compensation_type",
+      "difficulty": "easy",
+      "expected_entities": [
+        "Mill Story",
+        "Finance Internship",
+        "paid"
+      ],
+      "response_time": 0.009022,
+      "standard_metrics": {
+        "rouge1": 0.0,
+        "rouge2": 0.0,
+        "rougeL": 0.0,
+        "bleu": 0,
+        "semantic_similarity": "0.026325606",
+        "bert_precision": 0.0,
+        "bert_recall": 0.0,
+        "bert_f1": 0.0,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.0,
+        "keyword_overlap": 0.0,
+        "length_ratio": 1.3870967741935485,
+        "faithfulness": 0.0,
+        "overall_retrieval_score": 0.0,
+        "overall_generation_score": 0.008775201936562857,
+        "overall_accuracy_score": 0.0,
+        "comprehensive_score": 0.0037608008299555096
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17e3ed950>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:50:25.795752"
+    },
+    {
+      "query": "List all the tools/software mentioned in the JDs",
+      "expected_answer": "Excel, Google Sheets, Tally, Zoho Books, HRMS, CRM, LinkedIn, PR tools, MS Office",
+      "generated_answer": "OpenRouter generation failed after retries.",
+      "category": "tool_listing",
+      "difficulty": "hard",
+      "expected_entities": [
+        "Excel",
+        "Google Sheets",
+        "Tally",
+        "Zoho Books",
+        "HRMS",
+        "CRM",
+        "LinkedIn",
+        "PR tools",
+        "MS Office"
+      ],
+      "response_time": 0.008087,
+      "standard_metrics": {
+        "rouge1": 0.0,
+        "rouge2": 0.0,
+        "rougeL": 0.0,
+        "bleu": 0,
+        "semantic_similarity": "-0.039924853",
+        "bert_precision": 0.0,
+        "bert_recall": 0.0,
+        "bert_f1": 0.0,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.0,
+        "keyword_overlap": 0.0,
+        "length_ratio": 0.5308641975308642,
+        "faithfulness": 0.0,
+        "overall_retrieval_score": 0.0,
+        "overall_generation_score": -0.013308284183343252,
+        "overall_accuracy_score": 0.0,
+        "comprehensive_score": -0.005703550364289965
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x16a3874d0>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:50:25.832361"
+    },
+    {
+      "query": "Which jobs are better for freshers?",
+      "expected_answer": "Accorian (fresher role), TAP Academy (freshers encouraged)",
+      "generated_answer": "OpenRouter generation failed after retries.",
+      "category": "comparative_analysis",
+      "difficulty": "medium",
+      "expected_entities": [
+        "Accorian",
+        "TAP Academy",
+        "fresher",
+        "better"
+      ],
+      "response_time": 0.007037,
+      "standard_metrics": {
+        "rouge1": 0.0,
+        "rouge2": 0.0,
+        "rougeL": 0.0,
+        "bleu": 0,
+        "semantic_similarity": "0.08378858",
+        "bert_precision": 0.0,
+        "bert_recall": 0.0,
+        "bert_f1": 0.0,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.0,
+        "keyword_overlap": 0.0,
+        "length_ratio": 0.7413793103448276,
+        "faithfulness": 0.0,
+        "overall_retrieval_score": 0.0,
+        "overall_generation_score": 0.02792952706416448,
+        "overall_accuracy_score": 0.0,
+        "comprehensive_score": 0.011969797313213348
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17e3ed310>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:50:25.868379"
+    },
+    {
+      "query": "Is there any role where I can learn fundraising?",
+      "expected_answer": "Yes, Mill Story (finance intern supports fundraising & pitch decks)",
+      "generated_answer": "OpenRouter generation failed after retries.",
+      "category": "learning_opportunity",
+      "difficulty": "medium",
+      "expected_entities": [
+        "Mill Story",
+        "finance intern",
+        "fundraising",
+        "pitch decks",
+        "Yes"
+      ],
+      "response_time": 0.014633,
+      "standard_metrics": {
+        "rouge1": 0.0,
+        "rouge2": 0.0,
+        "rougeL": 0.0,
+        "bleu": 0,
+        "semantic_similarity": "0.028887877",
+        "bert_precision": 0.0,
+        "bert_recall": 0.0,
+        "bert_f1": 0.0,
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "entity_accuracy": 0.0,
+        "keyword_overlap": 0.0,
+        "length_ratio": 0.6417910447761194,
+        "faithfulness": 0.0,
+        "overall_retrieval_score": 0.0,
+        "overall_generation_score": 0.009629292413592339,
+        "overall_accuracy_score": 0.0,
+        "comprehensive_score": 0.004126839605825288
+      },
+      "llm_evaluation": {
+        "retrieval_accuracy": 5,
+        "generation_quality": 5,
+        "faithfulness": 5,
+        "relevance": 5,
+        "completeness": 5,
+        "clarity": 5,
+        "precision": 5,
+        "consistency": 5,
+        "overall_score": 5.0,
+        "information_retrieval_issues": [],
+        "generation_issues": [],
+        "hallucination_detection": [],
+        "rag_system_performance": "Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x16a386fd0>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "improvement_recommendations": [
+          "Fix LLM evaluation system"
+        ]
+      },
+      "timestamp": "2025-09-05T12:50:25.902609"
+    }
+  ],
+  "aggregate_metrics": {
+    "overall": {
+      "total_queries": 20,
+      "standard_metrics": {
+        "rouge1": {
+          "mean": 0.038365660898847624,
+          "std": 0.05915713817843888,
+          "min": 0.0,
+          "max": 0.25000000000000006,
+          "median": 0.01981785063752277
+        },
+        "rouge2": {
+          "mean": 0.011478109160228022,
+          "std": 0.029774218935845077,
+          "min": 0.0,
+          "max": 0.1372549019607843,
+          "median": 0.0
+        },
+        "rougeL": {
+          "mean": 0.0353395203727071,
+          "std": 0.054503946306756375,
+          "min": 0.0,
+          "max": 0.23076923076923078,
+          "median": 0.01862914862914863
+        },
+        "bleu": {
+          "mean": 0.007180239283052258,
+          "std": 0.02131332599398423,
+          "min": 0.0,
+          "max": 0.09921799771616979,
+          "median": 0.001561268335924502
+        },
+        "semantic_similarity": {
+          "mean": "0.21527264",
+          "std": "0.22598824",
+          "min": "-0.039924853",
+          "max": "0.5995047",
+          "median": "0.107377306"
+        },
+        "bert_f1": {
+          "mean": 0.4011363506317139,
+          "std": 0.4013848910509669,
+          "min": 0.0,
+          "max": 0.8361263871192932,
+          "median": 0.3884054720401764
+        },
+        "exact_match": {
+          "mean": 0.0,
+          "std": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "median": 0.0
+        },
+        "entity_accuracy": {
+          "mean": 0.35227272727272724,
+          "std": 0.4028743432578746,
+          "min": 0.0,
+          "max": 1.0,
+          "median": 0.125
+        },
+        "comprehensive_score": {
+          "mean": 0.151577892951981,
+          "std": 0.14846584476772512,
+          "min": -0.005703550364289965,
+          "max": 0.36995338434890807,
+          "median": 0.11224710951911615
+        }
+      },
+      "llm_metrics": {
+        "overall_score": {
+          "mean": 4.95,
+          "std": 0.35,
+          "min": 3.5,
+          "max": 5.5,
+          "median": 5.0
+        },
+        "retrieval_accuracy": {
+          "mean": 4.95,
+          "std": 0.804673846971554,
+          "min": "2",
+          "max": "7",
+          "median": 5.0
+        },
+        "generation_quality": {
+          "mean": 4.85,
+          "std": 0.4769696007084728,
+          "min": "3",
+          "max": "5",
+          "median": 5.0
+        },
+        "faithfulness": {
+          "mean": 5.35,
+          "std": 1.0618380290797649,
+          "min": "5",
+          "max": "9",
+          "median": 5.0
+        },
+        "relevance": {
+          "mean": 5.1,
+          "std": 0.7,
+          "min": "4",
+          "max": "8",
+          "median": 5.0
+        },
+        "completeness": {
+          "mean": 4.85,
+          "std": 0.6538348415311012,
+          "min": "2",
+          "max": "5",
+          "median": 5.0
+        }
+      },
+      "response_time": {
+        "mean": 105.5360183,
+        "std": 228.4491521892504,
+        "min": 0.007037,
+        "max": 935.007654,
+        "median": 8.97625
+      }
+    },
+    "by_category": {
+      "skill_analysis": {
+        "count": 1,
+        "comprehensive_score": -0.004457625427416393,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.0,
+        "response_time": 0.007292
+      },
+      "industry_identification": {
+        "count": 3,
+        "comprehensive_score": 0.27568344992850585,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.04391601112912588,
+        "response_time": 399.7739286666667
+      },
+      "company_count": {
+        "count": 1,
+        "comprehensive_score": 0.18169537687120682,
+        "llm_overall_score": 3.5,
+        "rouge1": 0.048780487804878044,
+        "response_time": 4.9899
+      },
+      "location_based": {
+        "count": 1,
+        "comprehensive_score": 0.0118215445961271,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.0,
+        "response_time": 0.00833
+      },
+      "role_listing": {
+        "count": 1,
+        "comprehensive_score": 0.31987139899617434,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.05128205128205128,
+        "response_time": 23.678665
+      },
+      "salary_comparison": {
+        "count": 1,
+        "comprehensive_score": -0.0012410458709512437,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.0,
+        "response_time": 0.008117
+      },
+      "yes_no_question": {
+        "count": 1,
+        "comprehensive_score": 0.10795984544830792,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.02962962962962963,
+        "response_time": 18.810925
+      },
+      "comparative_analysis": {
+        "count": 1,
+        "comprehensive_score": 0.011969797313213348,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.0,
+        "response_time": 0.007037
+      },
+      "tool_listing": {
+        "count": 1,
+        "comprehensive_score": -0.005703550364289965,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.0,
+        "response_time": 0.008087
+      },
+      "feature_identification": {
+        "count": 1,
+        "comprehensive_score": 0.2674647015725497,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.01777777777777778,
+        "response_time": 29.587083
+      },
+      "company_identification": {
+        "count": 2,
+        "comprehensive_score": 0.2746712099538584,
+        "llm_overall_score": 5.25,
+        "rouge1": 0.04076479076479077,
+        "response_time": 10.2263765
+      },
+      "task_listing": {
+        "count": 1,
+        "comprehensive_score": 0.36995338434890807,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.25000000000000006,
+        "response_time": 230.060879
+      },
+      "role_description": {
+        "count": 1,
+        "comprehensive_score": -0.00018647552600928715,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.0,
+        "response_time": 519.255388
+      },
+      "opportunity_listing": {
+        "count": 1,
+        "comprehensive_score": 0.03817182299555572,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.1111111111111111,
+        "response_time": 0.018799
+      },
+      "compensation_type": {
+        "count": 1,
+        "comprehensive_score": 0.0037608008299555096,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.0,
+        "response_time": 0.009022
+      },
+      "learning_opportunity": {
+        "count": 1,
+        "comprehensive_score": 0.004126839605825288,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.0,
+        "response_time": 0.014633
+      },
+      "job_type": {
+        "count": 1,
+        "comprehensive_score": 0.3499582739572292,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.04545454545454545,
+        "response_time": 64.48167
+      }
+    },
+    "by_difficulty": {
+      "easy": {
+        "count": 7,
+        "comprehensive_score": 0.2085973455124237,
+        "llm_overall_score": 4.857142857142857,
+        "rouge1": 0.03188171745663035,
+        "response_time": 19.76162185714286
+      },
+      "medium": {
+        "count": 8,
+        "comprehensive_score": 0.1466998605532383,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.022878760583678617,
+        "response_time": 152.87982100000002
+      },
+      "hard": {
+        "count": 5,
+        "comprehensive_score": 0.07955551120534962,
+        "llm_overall_score": 5.0,
+        "rouge1": 0.07222222222222223,
+        "response_time": 149.870089
+      }
+    }
+  },
+  "professional_report": "\n# JD-Copilot RAG System - Professional Evaluation Report\nGenerated: 2025-09-05 12:50:25\n\n## Executive Summary\n- **Total Queries Evaluated:** 20\n- **Comprehensive Score:** 0.152 \u00b1 0.148\n- **LLM Overall Score:** 5.0/10 \u00b1 0.3\n- **Average Response Time:** 105.54s \u00b1 228.45s\n\n## Standard RAG Metrics\n### Retrieval Quality\n- **ROUGE-1:** 0.038 \u00b1 0.059\n- **ROUGE-2:** 0.011 \u00b1 0.030\n- **ROUGE-L:** 0.035 \u00b1 0.055\n\n### Generation Quality\n- **BLEU Score:** 0.007 \u00b1 0.021\n- **Semantic Similarity:** 0.215 \u00b1 0.226\n- **BERTScore F1:** 0.401 \u00b1 0.401\n\n### Accuracy Metrics\n- **Exact Match:** 0.000 \u00b1 0.000\n- **Entity Accuracy:** 0.352 \u00b1 0.403\n\n## LLM Professional Assessment\n- **Retrieval Accuracy:** 5.0/10 \u00b1 0.8\n- **Generation Quality:** 4.8/10 \u00b1 0.5\n- **Faithfulness:** 5.3/10 \u00b1 1.1\n- **Relevance:** 5.1/10 \u00b1 0.7\n- **Completeness:** 4.8/10 \u00b1 0.7\n\n## Performance by Category\n\n### Skill Analysis (1 queries)\n- Comprehensive Score: -0.004\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.000\n- Response Time: 0.01s\n\n### Industry Identification (3 queries)\n- Comprehensive Score: 0.276\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.044\n- Response Time: 399.77s\n\n### Company Count (1 queries)\n- Comprehensive Score: 0.182\n- LLM Overall Score: 3.5/10\n- ROUGE-1: 0.049\n- Response Time: 4.99s\n\n### Location Based (1 queries)\n- Comprehensive Score: 0.012\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.000\n- Response Time: 0.01s\n\n### Role Listing (1 queries)\n- Comprehensive Score: 0.320\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.051\n- Response Time: 23.68s\n\n### Salary Comparison (1 queries)\n- Comprehensive Score: -0.001\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.000\n- Response Time: 0.01s\n\n### Yes No Question (1 queries)\n- Comprehensive Score: 0.108\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.030\n- Response Time: 18.81s\n\n### Comparative Analysis (1 queries)\n- Comprehensive Score: 0.012\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.000\n- Response Time: 0.01s\n\n### Tool Listing (1 queries)\n- Comprehensive Score: -0.006\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.000\n- Response Time: 0.01s\n\n### Feature Identification (1 queries)\n- Comprehensive Score: 0.267\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.018\n- Response Time: 29.59s\n\n### Company Identification (2 queries)\n- Comprehensive Score: 0.275\n- LLM Overall Score: 5.2/10\n- ROUGE-1: 0.041\n- Response Time: 10.23s\n\n### Task Listing (1 queries)\n- Comprehensive Score: 0.370\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.250\n- Response Time: 230.06s\n\n### Role Description (1 queries)\n- Comprehensive Score: -0.000\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.000\n- Response Time: 519.26s\n\n### Opportunity Listing (1 queries)\n- Comprehensive Score: 0.038\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.111\n- Response Time: 0.02s\n\n### Compensation Type (1 queries)\n- Comprehensive Score: 0.004\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.000\n- Response Time: 0.01s\n\n### Learning Opportunity (1 queries)\n- Comprehensive Score: 0.004\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.000\n- Response Time: 0.01s\n\n### Job Type (1 queries)\n- Comprehensive Score: 0.350\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.045\n- Response Time: 64.48s\n\n## Performance by Difficulty\n\n### Easy Queries (7 queries)\n- Comprehensive Score: 0.209\n- LLM Overall Score: 4.9/10\n- ROUGE-1: 0.032\n- Response Time: 19.76s\n\n### Medium Queries (8 queries)\n- Comprehensive Score: 0.147\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.023\n- Response Time: 152.88s\n\n### Hard Queries (5 queries)\n- Comprehensive Score: 0.080\n- LLM Overall Score: 5.0/10\n- ROUGE-1: 0.072\n- Response Time: 149.87s\n\n## Industry Benchmarks\n\n### RAG System Performance Benchmarks\n- **Excellent ROUGE-1:** > 0.4\n- **Good ROUGE-1:** 0.3 - 0.4\n- **Fair ROUGE-1:** 0.2 - 0.3\n- **Poor ROUGE-1:** < 0.2\n\n- **Excellent BLEU:** > 0.3\n- **Good BLEU:** 0.2 - 0.3\n- **Fair BLEU:** 0.1 - 0.2\n- **Poor BLEU:** < 0.1\n\n- **Excellent Semantic Similarity:** > 0.8\n- **Good Semantic Similarity:** 0.6 - 0.8\n- **Fair Semantic Similarity:** 0.4 - 0.6\n- **Poor Semantic Similarity:** < 0.4\n\n### Current System Performance vs Benchmarks\n- **ROUGE-1 Performance:** 0.038 - Poor\n- **BLEU Performance:** 0.007 - Poor\n- **Semantic Similarity Performance:** 0.215 - Poor\n\n## Detailed Results\n\n### Query 1: How many companies are offering finance roles?\n- **Category:** company_count\n- **Difficulty:** easy\n- **Comprehensive Score:** 0.182\n- **LLM Overall Score:** 3.5/10\n- **Response Time:** 4.99s\n\n**Expected Answer:**\n1 (Mill Story \u2013 Finance & Accounting Internship)\n\n**Generated Answer:**\nResult: SQL Query: SELECT COUNT(DISTINCT c.id) AS company_count\nFROM companies c\nJOIN roles r ON c.id = r.company_id\nWHERE r.specialization = 'finance';\nResult: ('[(0,)]', {'result': [(0,)], 'col_keys': ['company_count']})\n\n**Standard Metrics:**\n- ROUGE-1: 0.049\n- ROUGE-2: 0.000\n- ROUGE-L: 0.049\n- BLEU: 0.006\n- Semantic Similarity: 0.131\n- BERTScore F1: 0.787\n- Exact Match: 0.000\n- Entity Accuracy: 0.250\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 2/10\n- Generation Quality: 3/10\n- Faithfulness: 8/10\n- Relevance: 4/10\n- Completeness: 2/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: The SQL query returned 0 companies, contradicting the ground-truth of 1 company (Mill Story)., The retrieval layer appears to have used an incorrect filter (specialization='finance') instead of the actual field value that tags the Mill Story role as finance-related., No fallback or validation step detected the mismatch between query result and expected data.\n- Generation Issues: The answer presents raw SQL and a raw tuple ('[(0,)]') instead of a concise, user-friendly statement., No explanation is given for why the count is zero, leaving the user confused., The response format mixes debug output (SQL, tuple) with a pseudo-JSON structure, harming readability.\n- Hallucination Detection: No hallucinated companies or roles were introduced; the SQL result is faithfully reported.\n- RAG System Performance: The system successfully executed a SQL query and returned its literal result, but failed at the retrieval layer by applying an incorrect filter, leading to a false zero count. Generation quality is poor because raw technical artifacts are surfaced to the end user. Overall, the pipeline lacks validation against ground-truth data and does not translate technical results into natural language.\n- Improvement Recommendations: Add a synonym/keyword mapping layer so that 'finance' matches the exact specialization value stored in the database., Implement a post-retrieval validation step that cross-checks the SQL result against a small ground-truth set for known queries; flag discrepancies for human review., Replace raw SQL/tuple output with a concise sentence: '1 company is offering finance roles: Mill Story \u2013 Finance & Accounting Internship.', Introduce a natural-language formatter module that hides debug information unless explicitly requested.\n\n---\n\n### Query 2: Who are the companies with HR opportunities?\n- **Category:** company_identification\n- **Difficulty:** easy\n- **Comprehensive Score:** 0.232\n- **LLM Overall Score:** 5.5/10\n- **Response Time:** 5.34s\n\n**Expected Answer:**\nAccorian (Associate \u2013 People Operations)\n\n**Generated Answer:**\nResult: SQL Query: SELECT DISTINCT c.company_name\nFROM companies c\nJOIN roles r ON c.id = r.company_id\nWHERE r.specialization = 'HR';\nResult: (\"[('Accorian',)]\", {'result': [('Accorian',)], 'col_keys': ['company_name']})\n\n**Standard Metrics:**\n- ROUGE-1: 0.056\n- ROUGE-2: 0.000\n- ROUGE-L: 0.056\n- BLEU: 0.006\n- Semantic Similarity: 0.233\n- BERTScore F1: 0.777\n- Exact Match: 0.000\n- Entity Accuracy: 0.500\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 7/10\n- Generation Quality: 4/10\n- Faithfulness: 9/10\n- Relevance: 8/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: Retrieved only the company name 'Accorian' but omitted the role title 'Associate \u2013 People Operations' that was present in the expected answer., Returned raw SQL query and tuple structure instead of human-readable content.\n- Generation Issues: Answer is presented as a raw SQL result set rather than a concise, natural-language response., Includes extraneous technical details (SQL statement, column keys) that are irrelevant to the end-user.\n- Hallucination Detection: None\n- RAG System Performance: The system successfully identified the correct company with HR opportunities, demonstrating good retrieval accuracy and faithfulness. However, it failed to transform the retrieved data into a user-friendly format, resulting in poor generation quality, low clarity, and inconsistency with the expected concise answer style. The omission of the specific role title further reduces completeness.\n- Improvement Recommendations: Implement a post-processing layer that converts SQL/tuple output into natural language., Include role titles when the query implies interest in opportunities, not just company names., Suppress internal query artifacts from the final user-facing response.\n\n---\n\n### Query 3: Which companies are hiring for PR or communications roles?\n- **Category:** company_identification\n- **Difficulty:** easy\n- **Comprehensive Score:** 0.317\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 15.11s\n\n**Expected Answer:**\nMadison PR (Account Executive)\n\n**Generated Answer:**\nStrategic Market Insight \u2013 PR / Communications Hiring Landscape  \n(Placement-cell lens: MBA Marketing & HR specialisations)\n\n1. Confirmed Active Recruiter  \n   \u2022 Company: Madison Public Relations (Madison World)  \n   \u2022 Role: Account Executive \u2013 Public Relations  \n   \u2022 Locations: Mumbai | Gurgaon | Bangalore  \n   \u2022 2025 PG-eligible; fixed CTC \u2264 \u20b9 5.5 LPA  \n   \u2022 Cited By: Vector JDs (5 separate chunks)  \n\n2. Cross-Company Scan  \n   Structured SQL sweep across \u201crole\u201d & \u201cjob_title\u201d fields for like terms (\u201cPublic Relations\u201d, \u201cCommunications\u201d, \u201cCorporate Communications\u201d, \u201cPR\u201d, \u201cMedia Relations\u201d) returned zero additional records for 2024-25.  \n   \u21d2 Madison PR is the only documented recruiter in this vertical within our current placement repository.\n\nStrategic Interpretation for MBA Students  \nRelevant Specialisations: Marketing (brand storytelling, media planning) and HR (corporate communications, employer-branding).  \nWhy It Matters: PR is converging with performance-driven marketing; firms want data-literate storytellers who can convert earned media into measurable reach/engagement.  \nSkill Overlap Noted: storytelling, influencer-networking, event-led launch execution\u2014skills also requested by FMCG & luxury-marketing roles (HUL, L\u2019Or\u00e9al, Titan) in other JDs.  \nNiche Opportunity: Only one dedicated PR agency on radar; limited seats \u2192 differentiate early through:  \n   \u2013 Google Analytics + Meltwater/Talkwalker certifications (show you can quantify PR impact)  \n   \u2013 Short course on \u201cCrisis Communications\u201d (IIM-B exec-ed) \u2013 valued by corporate-comm teams.  \n   \u2013 Build a media-contact deck & by-lined article portfolio before interviews.\n\nRecommended Certification/Training  \n   \u2022 Certificate in Strategic Public Relations (UCLA Extension / SPJIMR 6-week exec)  \n   \u2022 HubSpot \u201cPR & Earned Media\u201d module (free)  \n   \u2022 Advanced Excel + Power BI dashboarding \u2013 to report PR KPIs (share-of-voice, sentiment score).\n\nPlacement-Cell Action  \n   \u2022 Fast-track Marketing & HR students with prior PR internships (Madison mandates it).  \n   \u2022 Host a 2-day \u201cMedia Pitch Simulation\u201d workshop; invite Madison HR team to judge \u2013 creates a direct talent pipeline.\n\nBottom line: PR/Communications hiring is presently a single-company game this season; position yourself as a metrics-savvy communicator to secure the scarce seats.\n\n**Standard Metrics:**\n- ROUGE-1: 0.026\n- ROUGE-2: 0.013\n- ROUGE-L: 0.019\n- BLEU: 0.003\n- Semantic Similarity: 0.351\n- BERTScore F1: 0.806\n- Exact Match: 0.000\n- Entity Accuracy: 1.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: API Error: 429\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 4: Are there any admission-related jobs?\n- **Category:** yes_no_question\n- **Difficulty:** easy\n- **Comprehensive Score:** 0.108\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 18.81s\n\n**Expected Answer:**\nYes, Masters' Union (Admission Counselor)\n\n**Generated Answer:**\nStrategic Placement Cell Advisory \u2013 Admission-Related Opportunities\n\nSkill Name: Inside-Sales-Driven Admission Counseling  \nCited By Companies: Masters\u2019 Union (multiple postings)  \nRelevant Specializations: Marketing (highest), Business Analytics (moderate), HR (low)  \nWhy It Matters:  \n\u2022 Masters\u2019 Union is explicitly scaling its MasterCamp portfolio and a new UG program. Admission Counselors are the revenue engine\u2014owning the full B2C funnel from lead generation to enrolment.  \n\u2022 The role sits at the intersection of sales strategy, customer insight, and brand positioning\u2014core competencies for any MBA specializing in Marketing or Sales & Distribution.  \n\u2022 Data from the JD shows heavy reliance on CRM analytics and KPI dashboards, making Business Analytics students valuable for funnel optimization.\n\nStrategic Advice for MBA Students:  \n1. Position yourself as a \u201cRevenue-Impact Marketer.\u201d Emphasize how your MBA training in consumer behavior, pricing, and digital campaigns translates directly to higher conversion rates.  \n2. Highlight CRM proficiency (Salesforce, HubSpot) and comfort with SQL / Power BI to showcase data-driven decision-making\u2014skills explicitly requested by Masters\u2019 Union.  \n3. If you come from HR or Operations, pivot the narrative: frame your stakeholder-management or process-improvement experience as \u201creducing enrolment cycle time\u201d or \u201cimproving candidate experience.\u201d\n\nRecommended Certifications / Training:  \n\u2022 Salesforce Certified Sales Representative (Trailhead)  \n\u2022 HubSpot Sales Software Certification  \n\u2022 Google Analytics 4 (for funnel attribution)  \n\u2022 SPIN or Challenger Sales methodology workshops  \n\nAdditional Notes:  \n\u2022 Compensation benchmarks are not disclosed in the retrieved data; negotiate by benchmarking against EdTech inside-sales packages (\u20b98\u201315 LPA fixed + variable).  \n\u2022 Career progression: Admission Counselor \u2192 Team Lead \u2192 Head of Enrolments \u2192 Director of Growth. The role is a fast-track to P&L ownership within 3\u20134 years.\n\n**Standard Metrics:**\n- ROUGE-1: 0.030\n- ROUGE-2: 0.015\n- ROUGE-L: 0.030\n- BLEU: 0.004\n- Semantic Similarity: 0.344\n- BERTScore F1: 0.000\n- Exact Match: 0.000\n- Entity Accuracy: 0.333\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: API Error: 429\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 5: Which roles are open for freshers?\n- **Category:** role_listing\n- **Difficulty:** medium\n- **Comprehensive Score:** 0.320\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 23.68s\n\n**Expected Answer:**\nAccorian (Associate HR Ops \u2013 Fresher), TAP Academy (BDA \u2013 freshers encouraged)\n\n**Generated Answer:**\nBased on the available data, here are the **freshers-friendly roles** currently open:\n\n---\n\n### **1. TAP Academy \u2013 Sales/Business Development Trainee**\n- **Role Type**: Entry-level sales & outreach  \n- **Key Requirements**:\n  - **Freshers welcome** with excellent communication skills  \n  - Interest in **cold calling & cold emailing**  \n  - **LinkedIn & social media networking** for lead generation  \n- **Relevance for MBA Students**:\n  - **Marketing specialization**: Ideal for students targeting **B2B/B2C sales roles**  \n  - **Business Analytics**: Opportunity to learn **CRM pipeline tracking**  \n- **Strategic Advice**:  \n  - **Certifications**: HubSpot Sales Software, LinkedIn Sales Navigator  \n  - **Tools to Learn**: Salesforce, Zoho CRM, Apollo.io  \n\n---\n\n### **2. Accorian \u2013 Associate-People Operations (HR)**\n- **Role Type**: Entry-level HR operations  \n- **Key Requirements**:\n  - **Freshers encouraged** with strong communication  \n  - Exposure to **employee lifecycle management** (onboarding, engagement, performance)  \n- **Relevance for MBA Students**:\n  - **HR specialization**: Direct alignment with **HR operations, employee engagement**  \n  - **Operations**: Cross-functional exposure to **process optimization**  \n- **Strategic Advice**:  \n  - **Certifications**: SHRM-CP (entry-level), Google HR Analytics  \n  - **Skills to Highlight**: Excel (HR dashboards), employee engagement frameworks  \n\n---\n\n### **3. Masters\u2019 Union \u2013 Admission Counselor (Inside Sales)**\n- **Role Type**: B2C sales in **education sector**  \n- **Key Requirements**:\n  - **Freshers with sales aptitude** (B2C experience preferred but not mandatory)  \n  - **CRM usage** (lead tracking & pipeline management)  \n- **Relevance for MBA Students**:\n  - **Marketing**: High-demand skill in **ed-tech & higher education sales**  \n  - **Business Analytics**: CRM data analysis for conversion optimization  \n- **Strategic Advice**:  \n  - **Certifications**: Salesforce CRM, Coursera\u2019s \"Successful Negotiation\"  \n  - **Key Pitch**: Emphasize **understanding of MBA student career needs** (since role involves counseling professionals)  \n\n---\n\n### **Cross-Company Trend for Freshers**:\n- **Communication & CRM skills** are **universal must-haves** across all roles.  \n- **LinkedIn & cold outreach** are **high-value skills** for **Marketing & Sales roles**.  \n- **HR operations** is a **niche but growing** area for **HR specialization students**.  \n\n**Final Recommendation**:  \n- **Marketing students**: Prioritize **TAP Academy & Masters\u2019 Union** for **sales pipeline exposure**.  \n- **HR students**: Target **Accorian** for **employee lifecycle management**.  \n- **Cross-functional skill**: **CRM proficiency (Salesforce/HubSpot)** is a **career accelerator** across all specializations.\n\n**Standard Metrics:**\n- ROUGE-1: 0.051\n- ROUGE-2: 0.019\n- ROUGE-L: 0.038\n- BLEU: 0.003\n- Semantic Similarity: 0.600\n- BERTScore F1: 0.778\n- Exact Match: 0.000\n- Entity Accuracy: 0.750\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: API Error: 429\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 6: Which jobs mention placements explicitly?\n- **Category:** feature_identification\n- **Difficulty:** easy\n- **Comprehensive Score:** 0.267\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 29.59s\n\n**Expected Answer:**\nTAP Academy (student placements)\n\n**Generated Answer:**\nBased on the available data, I found **one role** that explicitly mentions placements:\n\n---\n\n**Job Title:** Admission Counselor (Inside Sales)  \n**Company:** Masters\u2019 Union  \n**Location:** Not specified  \n**Key Requirements:**  \n- Proven experience in inside sales, particularly in a B2C environment  \n- Strong track record of meeting/exceeding sales targets  \n- Experience working with professionals, understanding their learning needs and career aspirations  \n- Knowledge of CRM systems for lead tracking and pipeline management  \n- Excellent verbal and written communication skills  \n\n**Relevance for MBA Students:**  \nThis role directly aligns with **Marketing** and **Business Analytics** specializations. The placement aspect is embedded in the **B2C sales** function, where you\u2019ll guide professionals toward educational programs (likely MBA or executive education), making it a **placement-adjacent** role.  \n\n**Strategic Insight:**  \nWhile not a traditional campus placement role, this position offers **high-value exposure** to:  \n1. **Pipeline management** (critical for placement officers)  \n2. **Understanding career aspirations** (key for HR/Marketing roles in talent acquisition)  \n3. **CRM tools** (Tableau, Salesforce) \u2013 a cross-functional skill for Analytics students  \n\n**Recommendation:**  \nMBA students targeting **Marketing** or **HR** roles in **ed-tech or higher education** should leverage this. The role\u2019s focus on **converting leads into enrollments** mirrors placement processes, making it a **strategic stepping stone** for careers in **corporate L&D or talent consulting**.  \n\n---\n\n**Note:** No other companies in the provided data explicitly mention \"placements\" in their job descriptions.\n\n**Standard Metrics:**\n- ROUGE-1: 0.018\n- ROUGE-2: 0.000\n- ROUGE-L: 0.018\n- BLEU: 0.001\n- Semantic Similarity: 0.379\n- BERTScore F1: 0.789\n- Exact Match: 0.000\n- Entity Accuracy: 0.667\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: API Error: 429\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 7: Are there any ed-tech companies hiring?\n- **Category:** industry_identification\n- **Difficulty:** medium\n- **Comprehensive Score:** 0.117\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 935.01s\n\n**Expected Answer:**\nTAP Academy (BDA role)\n\n**Generated Answer:**\nOpenRouter generation failed after retries.\n\n**Standard Metrics:**\n- ROUGE-1: 0.000\n- ROUGE-2: 0.000\n- ROUGE-L: 0.000\n- BLEU: 0.000\n- Semantic Similarity: -0.020\n- BERTScore F1: 0.836\n- Exact Match: 0.000\n- Entity Accuracy: 0.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: API Error: 429\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 8: Which companies are in consulting or cybersecurity?\n- **Category:** industry_identification\n- **Difficulty:** medium\n- **Comprehensive Score:** 0.345\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 251.70s\n\n**Expected Answer:**\nAccorian (cybersecurity advisory firm)\n\n**Generated Answer:**\nBased on the available data, here are the companies in consulting or cybersecurity:\n\n## **Accorian** - **Cybersecurity Consulting Firm**\n\n**Company Profile:**\n- **Sector**: Pure-play cybersecurity advisory and consulting\n- **Headquarters**: New Jersey, USA\n- **Global Presence**: Regional offices in India, Canada, and UAE\n- **Specialization**: Cybersecurity strategy, risk identification, penetration testing, incident response, compliance (HITRUST, SOC, PCI)\n- **Unique Positioning**: One of only 10 companies globally offering both audit AND testing services in-house\n- **Accreditations**: HITRUST & SOC assessor, PCI QSA & ASV, CREST accredited\n\n**Strategic Implications for MBA Students:**\n- **HR Specialization**: The \"Associate - People Operations\" role indicates growing HR needs in cybersecurity firms\n- **Operations Specialization**: Opportunity to work with global clients and understand cross-border operations\n- **Business Analytics**: Cybersecurity consulting heavily relies on data analytics for risk assessment\n\n**Market Insight**: The cybersecurity consulting market is experiencing 15-20% annual growth, with increasing demand for professionals who understand both technical and business aspects of security.\n\n---\n\n## **TAP Academy** - **Skill Development & Training Consulting**\n\n**Company Profile:**\n- **Sector**: Education consulting and skill development\n- **Focus**: Industry hiring trends, skill requirements analysis\n- **Services**: Market research, networking facilitation, skill gap analysis\n\n**Strategic Implications for MBA Students:**\n- **Marketing Specialization**: Understanding skill market trends for positioning\n- **HR Specialization**: Bridging academia-industry skill gaps\n- **Business Analytics**: Data-driven insights on hiring patterns\n\n---\n\n## **Cross-Company Strategic Recommendations:**\n\n### **For MBA Students:**\n\n1. **Cybersecurity + Business Combination** (High Demand):\n   - Companies like Accorian need MBA graduates who understand cybersecurity business models\n   - **Recommended Path**: MBA with cybersecurity certification (CISSP, CISM, or CompTIA Security+)\n\n2. **Consulting Skills** (Universal Requirement):\n   - Both companies emphasize client interaction and strategic advisory\n   - **Key Skills**: Stakeholder management, presentation skills, business case development\n\n3. **Global Mindset** (Critical Differentiator):\n   - Accorian's multi-country operations require cross-cultural competency\n   - **Recommended Training**: Cross-cultural communication, international business practices\n\n### **Certification Recommendations by Specialization:**\n\n- **Finance**: CISA (Certified Information Systems Auditor) for cybersecurity audit roles\n- **HR**: SHRM-CP with cybersecurity HR specialization\n- **Marketing**: Digital marketing certifications with cybersecurity focus\n- **Operations**: Lean Six Sigma with security process optimization\n- **Business Analytics**: Data analytics certifications (Tableau, SQL) with security data interpretation\n\n### **Market Trend Alert**:\nThe intersection of business consulting and cybersecurity is creating new roles like \"Cybersecurity Business Analyst\" and \"Risk Advisory Consultant\" with salaries ranging 12-25 LPA for fresh MBA graduates.\n\n**Standard Metrics:**\n- ROUGE-1: 0.022\n- ROUGE-2: 0.011\n- ROUGE-L: 0.022\n- BLEU: 0.002\n- Semantic Similarity: 0.567\n- BERTScore F1: 0.789\n- Exact Match: 0.000\n- Entity Accuracy: 1.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: API Error: 429\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 9: Which jobs are specifically internships?\n- **Category:** job_type\n- **Difficulty:** easy\n- **Comprehensive Score:** 0.350\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 64.48s\n\n**Expected Answer:**\nMill Story (Finance Internship)\n\n**Generated Answer:**\nBased on the available data, I have identified the following **internship opportunities**:\n\n## **Finance & Accounting Internship**\n- **Company:** Mill Story\n- **Location:** Sarjapur Road, Bengaluru\n- **Duration:** 2 Months\n- **Type:** Paid Internship\n- **Key Responsibilities:**\n  - Maintaining clean and accurate books\n  - Working on Proforma accounting and financial statements (P&L, balance sheet, cash flow)\n  - Budgeting, expense tracking, and invoice verification\n  - Supporting fundraising preparations with real exposure to startup funding processes\n\n## **Strategic Insights for MBA Students:**\n\n**For Finance Specialization Students:**\nThis internship offers direct exposure to startup finance operations and fundraising - a rare opportunity to understand the financial mechanics of early-stage D2C brands. The hands-on experience with P&L statements and cash flow management will be invaluable for roles in:\n- Startup finance\n- VC/PE analysis\n- Financial planning & analysis (FP&A)\n\n**Cross-Specialization Value:**\nEven Marketing and Operations students can benefit from understanding the financial backbone of D2C businesses, as modern business roles increasingly require financial literacy.\n\n**Note:** I could not find information about internships at TAP Academy, Madison Public Relations, or Masters' Union in the available documents.\n\n**Standard Metrics:**\n- ROUGE-1: 0.045\n- ROUGE-2: 0.011\n- ROUGE-L: 0.045\n- BLEU: 0.004\n- Semantic Similarity: 0.516\n- BERTScore F1: 0.827\n- Exact Match: 0.000\n- Entity Accuracy: 1.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: API Error: 429\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 10: Which job is in the food & consumer space?\n- **Category:** industry_identification\n- **Difficulty:** medium\n- **Comprehensive Score:** 0.366\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 12.61s\n\n**Expected Answer:**\nMill Story (D2C food brand \u2013 chemical-free flour)\n\n**Generated Answer:**\nJob Title: Finance & Accounting Intern  \nCompany: Mill Story  \nLocation: Sarjapur Road, Bengaluru  \n\nRelevance for MBA Students  \n- Sector: Food & Consumer (D2C healthy flours).  \n- Function: Finance & Accounting \u2013 ideal for Finance-specialization MBAs who want exposure to early-stage fundraising, D2C unit-economics, and working-capital cycles in perishables.  \n- Strategic Value: Mill Story is preparing its first external round; interns will gain first-hand experience in investor-ready financials, valuation drivers, and burn-rate management\u2014skills directly transferable to VC, PE, or startup-CFO career tracks.\n\n**Standard Metrics:**\n- ROUGE-1: 0.110\n- ROUGE-2: 0.022\n- ROUGE-L: 0.088\n- BLEU: 0.011\n- Semantic Similarity: 0.514\n- BERTScore F1: 0.815\n- Exact Match: 0.000\n- Entity Accuracy: 1.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: API Error: 429\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 11: What finance-related tasks are mentioned?\n- **Category:** task_listing\n- **Difficulty:** hard\n- **Comprehensive Score:** 0.370\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 230.06s\n\n**Expected Answer:**\nAccounting, P&L, balance sheet, cash flow, budgeting, expense tracking, invoice checks, audits, compliance, fundraising support, pitch deck prep\n\n**Generated Answer:**\nFinance-Related Tasks Identified in the Available Documents\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n1. Mill Story \u2013 Finance & Accounting Intern  \n   \u2022 Maintain clean and accurate books of accounts  \n   \u2022 Prepare Pro-forma accounting and financial statements (P&L, Balance Sheet, Cash-Flow)  \n   \u2022 Handle budgeting, expense tracking, and invoice verification  \n   \u2022 Support fundraising preparation activities (investor-ready financials, due-diligence packs)\n\nRelevance for MBA Students  \n\u2022 Directly aligns with the Finance specialization; offers hands-on exposure to startup finance cycles and investor relations\u2014valuable for those targeting roles in Corporate Finance, FP&A, or VC/PE.\n\n**Standard Metrics:**\n- ROUGE-1: 0.250\n- ROUGE-2: 0.137\n- ROUGE-L: 0.231\n- BLEU: 0.099\n- Semantic Similarity: 0.509\n- BERTScore F1: 0.818\n- Exact Match: 0.000\n- Entity Accuracy: 0.545\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: API Error: 429\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 12: What do HR operations jobs involve?\n- **Category:** role_description\n- **Difficulty:** hard\n- **Comprehensive Score:** -0.000\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 519.26s\n\n**Expected Answer:**\nEmployee lifecycle management, engagement, compliance audits, labor law adherence, HR processes, people initiatives\n\n**Generated Answer:**\nOpenRouter generation failed after retries.\n\n**Standard Metrics:**\n- ROUGE-1: 0.000\n- ROUGE-2: 0.000\n- ROUGE-L: 0.000\n- BLEU: 0.000\n- Semantic Similarity: -0.001\n- BERTScore F1: 0.000\n- Exact Match: 0.000\n- Entity Accuracy: 0.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x16a3879d0>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 13: What opportunities does TAP Academy offer?\n- **Category:** opportunity_listing\n- **Difficulty:** hard\n- **Comprehensive Score:** 0.038\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 0.02s\n\n**Expected Answer:**\nLead generation, partnership development, LinkedIn outreach, placement strategy, market research, reporting, career advancement\n\n**Generated Answer:**\nOpenRouter generation failed after retries.\n\n**Standard Metrics:**\n- ROUGE-1: 0.111\n- ROUGE-2: 0.000\n- ROUGE-L: 0.111\n- BLEU: 0.004\n- Semantic Similarity: 0.041\n- BERTScore F1: 0.000\n- Exact Match: 0.000\n- Entity Accuracy: 0.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x16a3879d0>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 14: What are the most sought-after skills across these JDs?\n- **Category:** skill_analysis\n- **Difficulty:** hard\n- **Comprehensive Score:** -0.004\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 0.01s\n\n**Expected Answer:**\nCommunication, problem-solving, Excel/Google Sheets, HRMS, CRM, cold calling, negotiation, PR/media skills\n\n**Generated Answer:**\nOpenRouter generation failed after retries.\n\n**Standard Metrics:**\n- ROUGE-1: 0.000\n- ROUGE-2: 0.000\n- ROUGE-L: 0.000\n- BLEU: 0.000\n- Semantic Similarity: -0.031\n- BERTScore F1: 0.000\n- Exact Match: 0.000\n- Entity Accuracy: 0.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17e3ec050>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 15: Which jobs are based in Bangalore?\n- **Category:** location_based\n- **Difficulty:** medium\n- **Comprehensive Score:** 0.012\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 0.01s\n\n**Expected Answer:**\nMill Story, TAP Academy, Madison PR (also Gurgaon/Mumbai)\n\n**Generated Answer:**\nOpenRouter generation failed after retries.\n\n**Standard Metrics:**\n- ROUGE-1: 0.000\n- ROUGE-2: 0.000\n- ROUGE-L: 0.000\n- BLEU: 0.000\n- Semantic Similarity: 0.083\n- BERTScore F1: 0.000\n- Exact Match: 0.000\n- Entity Accuracy: 0.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x16a387750>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 16: Which role has the highest salary package?\n- **Category:** salary_comparison\n- **Difficulty:** medium\n- **Comprehensive Score:** -0.001\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 0.01s\n\n**Expected Answer:**\nMadison PR (up to 5.5 LPA)\n\n**Generated Answer:**\nOpenRouter generation failed after retries.\n\n**Standard Metrics:**\n- ROUGE-1: 0.000\n- ROUGE-2: 0.000\n- ROUGE-L: 0.000\n- BLEU: 0.000\n- Semantic Similarity: -0.009\n- BERTScore F1: 0.000\n- Exact Match: 0.000\n- Entity Accuracy: 0.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17e3ef9d0>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 17: Which jobs are paid internships?\n- **Category:** compensation_type\n- **Difficulty:** easy\n- **Comprehensive Score:** 0.004\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 0.01s\n\n**Expected Answer:**\nMill Story (Finance Internship)\n\n**Generated Answer:**\nOpenRouter generation failed after retries.\n\n**Standard Metrics:**\n- ROUGE-1: 0.000\n- ROUGE-2: 0.000\n- ROUGE-L: 0.000\n- BLEU: 0.000\n- Semantic Similarity: 0.026\n- BERTScore F1: 0.000\n- Exact Match: 0.000\n- Entity Accuracy: 0.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17e3ed950>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 18: List all the tools/software mentioned in the JDs\n- **Category:** tool_listing\n- **Difficulty:** hard\n- **Comprehensive Score:** -0.006\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 0.01s\n\n**Expected Answer:**\nExcel, Google Sheets, Tally, Zoho Books, HRMS, CRM, LinkedIn, PR tools, MS Office\n\n**Generated Answer:**\nOpenRouter generation failed after retries.\n\n**Standard Metrics:**\n- ROUGE-1: 0.000\n- ROUGE-2: 0.000\n- ROUGE-L: 0.000\n- BLEU: 0.000\n- Semantic Similarity: -0.040\n- BERTScore F1: 0.000\n- Exact Match: 0.000\n- Entity Accuracy: 0.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x16a3874d0>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 19: Which jobs are better for freshers?\n- **Category:** comparative_analysis\n- **Difficulty:** medium\n- **Comprehensive Score:** 0.012\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 0.01s\n\n**Expected Answer:**\nAccorian (fresher role), TAP Academy (freshers encouraged)\n\n**Generated Answer:**\nOpenRouter generation failed after retries.\n\n**Standard Metrics:**\n- ROUGE-1: 0.000\n- ROUGE-2: 0.000\n- ROUGE-L: 0.000\n- BLEU: 0.000\n- Semantic Similarity: 0.084\n- BERTScore F1: 0.000\n- Exact Match: 0.000\n- Entity Accuracy: 0.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17e3ed310>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n\n### Query 20: Is there any role where I can learn fundraising?\n- **Category:** learning_opportunity\n- **Difficulty:** medium\n- **Comprehensive Score:** 0.004\n- **LLM Overall Score:** 5.0/10\n- **Response Time:** 0.01s\n\n**Expected Answer:**\nYes, Mill Story (finance intern supports fundraising & pitch decks)\n\n**Generated Answer:**\nOpenRouter generation failed after retries.\n\n**Standard Metrics:**\n- ROUGE-1: 0.000\n- ROUGE-2: 0.000\n- ROUGE-L: 0.000\n- BLEU: 0.000\n- Semantic Similarity: 0.029\n- BERTScore F1: 0.000\n- Exact Match: 0.000\n- Entity Accuracy: 0.000\n\n**LLM Professional Assessment:**\n- Retrieval Accuracy: 5/10\n- Generation Quality: 5/10\n- Faithfulness: 5/10\n- Relevance: 5/10\n- Completeness: 5/10\n\n**Professional Analysis:**\n- Information Retrieval Issues: None\n- Generation Issues: None\n- Hallucination Detection: None\n- RAG System Performance: Evaluation failed: Error: HTTPSConnectionPool(host='openrouter.ai', port=443): Max retries exceeded with url: /api/v1/chat/completions (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x16a386fd0>: Failed to resolve 'openrouter.ai' ([Errno 8] nodename nor servname provided, or not known)\"))\n- Improvement Recommendations: Fix LLM evaluation system\n\n---\n",
+  "evaluation_timestamp": "2025-09-05T12:50:25.975496"
+}

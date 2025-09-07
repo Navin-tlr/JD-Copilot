@@ -1,0 +1,952 @@
+{
+  "summary": {
+    "total_tests": 30,
+    "successful_tests": 13,
+    "failed_tests": 17,
+    "success_rate": 43.333333333333336,
+    "average_response_time": 9.22538169225057,
+    "average_overall_score": 0.4731388888888889,
+    "average_relevance_score": 0.44333333333333336,
+    "average_completeness_score": 0.6,
+    "average_accuracy_score": 0.28055555555555556,
+    "average_professionalism_score": 0.6
+  },
+  "category_analysis": {
+    "Basic Structured Queries": {
+      "average_score": 0.9666666666666667,
+      "success_count": 5,
+      "total_count": 5
+    },
+    "Complex Structured Queries": {
+      "average_score": 0.6746666666666667,
+      "success_count": 3,
+      "total_count": 5
+    },
+    "Unstructured Queries": {
+      "average_score": 0.59,
+      "success_count": 3,
+      "total_count": 5
+    },
+    "Multi-hop Reasoning": {
+      "average_score": 0.4275,
+      "success_count": 2,
+      "total_count": 5
+    },
+    "Edge Cases": {
+      "average_score": 0.18,
+      "success_count": 0,
+      "total_count": 5
+    },
+    "Performance Tests": {
+      "average_score": 0,
+      "success_count": 0,
+      "total_count": 5
+    }
+  },
+  "complexity_analysis": {
+    "Low": {
+      "average_score": 0.7166666666666667,
+      "success_count": 5,
+      "total_count": 8
+    },
+    "Medium": {
+      "average_score": 0.5269444444444444,
+      "success_count": 6,
+      "total_count": 12
+    },
+    "High": {
+      "average_score": 0.21375,
+      "success_count": 2,
+      "total_count": 10
+    }
+  },
+  "detailed_results": [
+    {
+      "test_number": 1,
+      "category": "Basic Structured Queries",
+      "query": "How many companies are offering finance roles?",
+      "complexity": "Low",
+      "test_type": "Count Query",
+      "expected_keywords": [
+        "mill story",
+        "finance",
+        "1 company"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\n1 company (Mill Story) is offering finance roles.\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 1.919536828994751,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 1.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 1.0,
+        "professionalism_score": 1.0,
+        "overall_score": 1.0,
+        "issues": []
+      },
+      "timestamp": "2025-09-06T13:22:52.742216"
+    },
+    {
+      "test_number": 2,
+      "category": "Basic Structured Queries",
+      "query": "Which companies are hiring for HR roles?",
+      "complexity": "Low",
+      "test_type": "List Query",
+      "expected_keywords": [
+        "accorian",
+        "hr",
+        "people operations"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nCompanies with HR opportunities: Accorian\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 1.330925703048706,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 1.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 0.6666666666666666,
+        "professionalism_score": 1.0,
+        "overall_score": 0.9166666666666667,
+        "issues": []
+      },
+      "timestamp": "2025-09-06T13:22:54.073334"
+    },
+    {
+      "test_number": 3,
+      "category": "Basic Structured Queries",
+      "query": "Are there any admission-related jobs?",
+      "complexity": "Low",
+      "test_type": "Existence Query",
+      "expected_keywords": [
+        "masters union",
+        "admission",
+        "counselor"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nYes, there are 2 admission-related jobs: Masters' Union (Admission Counselor)\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 1.3736882209777832,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 1.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 0.6666666666666666,
+        "professionalism_score": 1.0,
+        "overall_score": 0.9166666666666667,
+        "issues": []
+      },
+      "timestamp": "2025-09-06T13:22:55.447146"
+    },
+    {
+      "test_number": 4,
+      "category": "Basic Structured Queries",
+      "query": "Which jobs are specifically internships?",
+      "complexity": "Low",
+      "test_type": "Filter Query",
+      "expected_keywords": [
+        "mill story",
+        "internship",
+        "finance"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nYes, there is 1 internship: Mill Story (Finance Internship)\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 1.3370251655578613,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 1.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 1.0,
+        "professionalism_score": 1.0,
+        "overall_score": 1.0,
+        "issues": []
+      },
+      "timestamp": "2025-09-06T13:22:56.784327"
+    },
+    {
+      "test_number": 5,
+      "category": "Basic Structured Queries",
+      "query": "Which jobs are based in Bangalore?",
+      "complexity": "Low",
+      "test_type": "Location Query",
+      "expected_keywords": [
+        "bangalore",
+        "mill story",
+        "tap academy",
+        "madison pr"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nYes, there are 4 jobs in Bangalore: Mill Story, TAP Academy, Madison PR, and others\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 1.2794170379638672,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 1.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 1.0,
+        "professionalism_score": 1.0,
+        "overall_score": 1.0,
+        "issues": []
+      },
+      "timestamp": "2025-09-06T13:22:58.063940"
+    },
+    {
+      "test_number": 6,
+      "category": "Complex Structured Queries",
+      "query": "How many companies are offering marketing roles and what are their names?",
+      "complexity": "Medium",
+      "test_type": "Multi-part Query",
+      "expected_keywords": [
+        "marketing",
+        "companies",
+        "madison pr",
+        "tap academy",
+        "target"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nFound 3 results\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 1.2128849029541016,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 1.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 0.0,
+        "professionalism_score": 1.0,
+        "overall_score": 0.75,
+        "issues": [
+          "Missing expected keywords"
+        ]
+      },
+      "timestamp": "2025-09-06T13:22:59.277161"
+    },
+    {
+      "test_number": 7,
+      "category": "Complex Structured Queries",
+      "query": "Which companies have both HR and marketing roles?",
+      "complexity": "Medium",
+      "test_type": "Intersection Query",
+      "expected_keywords": [
+        "companies",
+        "hr",
+        "marketing"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nFound 3 results\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 1.292781114578247,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 1.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 0.3333333333333333,
+        "professionalism_score": 1.0,
+        "overall_score": 0.8333333333333335,
+        "issues": [
+          "Missing expected keywords"
+        ]
+      },
+      "timestamp": "2025-09-06T13:23:00.570131"
+    },
+    {
+      "test_number": 8,
+      "category": "Complex Structured Queries",
+      "query": "What is the total number of distinct companies recruiting?",
+      "complexity": "Medium",
+      "test_type": "Aggregation Query",
+      "expected_keywords": [
+        "companies",
+        "total",
+        "distinct"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL RESPONSE\n\nQuery result: Structured query engine not available (fallback disabled).\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 1.3125457763671875,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 0.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 0.0,
+        "professionalism_score": 1.0,
+        "overall_score": 0.45,
+        "issues": [
+          "Error in response",
+          "Missing expected keywords"
+        ]
+      },
+      "timestamp": "2025-09-06T13:23:01.882918"
+    },
+    {
+      "test_number": 9,
+      "category": "Complex Structured Queries",
+      "query": "List all companies and their respective specializations",
+      "complexity": "Medium",
+      "test_type": "Join Query",
+      "expected_keywords": [
+        "companies",
+        "specializations",
+        "finance",
+        "hr",
+        "marketing"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - PLACEMENT OVERVIEW\n\nQuery result: [('Accorian',), ('Madison PR',), (\"Masters' Union\",), ('Mill Story',), ('Tap Academy',), ('Target',)]\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 1.3155813217163086,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 0.3,
+        "completeness_score": 1.0,
+        "accuracy_score": 0.2,
+        "professionalism_score": 1.0,
+        "overall_score": 0.59,
+        "issues": [
+          "Raw SQL result exposed",
+          "Missing expected keywords"
+        ]
+      },
+      "timestamp": "2025-09-06T13:23:03.198868"
+    },
+    {
+      "test_number": 10,
+      "category": "Complex Structured Queries",
+      "query": "Which companies are NOT offering finance roles?",
+      "complexity": "Medium",
+      "test_type": "Negation Query",
+      "expected_keywords": [
+        "companies",
+        "not",
+        "finance"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nFound 1 company\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 1.24481201171875,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 1.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 0.0,
+        "professionalism_score": 1.0,
+        "overall_score": 0.75,
+        "issues": [
+          "Missing expected keywords"
+        ]
+      },
+      "timestamp": "2025-09-06T13:23:04.443866"
+    },
+    {
+      "test_number": 11,
+      "category": "Unstructured Queries",
+      "query": "What finance-related tasks are mentioned in the job descriptions?",
+      "complexity": "Medium",
+      "test_type": "Content Analysis",
+      "expected_keywords": [
+        "finance",
+        "tasks",
+        "accounting",
+        "budgeting",
+        "p&l"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nFinance-Related Tasks Analysis: Cross-Company Insights\n\nIdentified Finance Tasks from Available Data\n\nBased on the retrieved job descriptions, here are the specific finance-related tasks mentioned:\n\n---\n\n1. Mill Story - Finance & Accounting Intern\n\nFinance Tasks Identified:\n\n- Bookkeeping & Accuracy Maintenance: Keeping books clean and accurate\n\n- Financial Statement Preparation: Working on Performa accounting and financial statements including:\n\n- Profit & Loss (P&L) statements\n\n- Balance sheets\n\n- Cash flow statements\n\n- Budgeting Support: Assisting with budgeting processes\n\n- Expense Management: Tracking expenses and monitoring invoice checks\n\n- Fundraising Preparation: Supporting fundraising preparations with real exposure to startup finance\n\nTools Mentioned: Excel/Google Sheets, Tally, Zoho Books (bonus skills)\n\n---\n\nStrategic Insights for MBA Students\n\nRelevant Specializations:\n\n- Finance: Direct alignment with financial statement preparation, budgeting, and fundraising\n\n- Business Analytics: Cash flow analysis and expense tracking provide data analytics exposure\n\n- Operations: Process optimization in financial workflows\n\nCareer Preparation Recommendations:\n\n1. Master Financial Statements: Deep dive into P&L, balance sheet, and cash flow preparation\n\n2. Excel Proficiency: Advanced Excel skills are non-negotiable (pivot tables, VLOOKUP, financial modeling)\n\n3. Startup Finance Exposure: This role offers rare exposure to fundraising processes - valuable for VC/PE career paths\n\n4. Tool Stack: Learn Tally and Zoho Books for accounting automation advantage\n\nCertification Recommendations:\n\n- NCFM: Financial markets certification\n\n- QuickBooks/Tally: Accounting software certification\n\n- Financial Modeling: From institutes like Wall Street Prep or CFI\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 23.984635829925537,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 1.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 1.0,
+        "professionalism_score": 1.0,
+        "overall_score": 1.0,
+        "issues": []
+      },
+      "timestamp": "2025-09-06T13:23:28.428965"
+    },
+    {
+      "test_number": 12,
+      "category": "Unstructured Queries",
+      "query": "What do HR operations jobs involve and what skills are required?",
+      "complexity": "Medium",
+      "test_type": "Role Description",
+      "expected_keywords": [
+        "hr operations",
+        "skills",
+        "employee",
+        "lifecycle",
+        "compliance"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nHR Operations: Market Intelligence & Strategic Career Guidance\n\nCore Role Definition\n\nHR Operations represents the engine room of people management - transforming strategic HR vision into executable processes that touch every employee from hire to retire. Based on market analysis, these roles are evolving from administrative functions to strategic business partners driving organizational excellence.\n\nCross-Company Role Analysis\n\nAccorian - Associate-People Operations\n\n- Scope: End-to-end employee lifecycle management\n\n- Strategic Focus: Process optimization, capability building, performance management systems\n\n- Business Impact: Direct contribution to organizational efficiency and employee experience\n\nTAP Academy - HR Generalist Track\n\n- Scope: Multi-functional HR exposure with technology integration\n\n- Strategic Focus: Leveraging HR technologies for scalable people solutions\n\n- Business Impact: Supporting rapid organizational growth through systematic HR processes\n\nCritical Skills Matrix\n\n| Skill Category | Market Demand | Specialization Mapping | Strategic Value |\n\n|-------------------|-------------------|---------------------------|---------------------|\n\n| HR Technology Stack | Universal requirement | HR Specialization: Core competency | Differentiator for senior roles |\n\n| Process Optimization | High-value skill | Operations: Cross-functional application | Direct P&L impact through efficiency gains |\n\n| Compliance & Labor Law | Non-negotiable baseline | HR: Regulatory expertise | Risk mitigation and strategic advisory |\n\n| Analytics & Reporting | Emerging premium skill | Business Analytics: Data-driven HR decisions | Board-level reporting and predictive insights |\n\n| Employee Experience Design | Strategic differentiator | Marketing: Customer-centric HR approach | Talent retention and employer branding |\n\nMBA Specialization Impact Analysis\n\nHR Specialization Students - Primary Target\n\n- Immediate Advantage: Direct role-application fit\n\n- Career Trajectory: HR Business Partner \u2192 HR Director \u2192 CHRO\n\n- Competitive Edge: Combine HR expertise with business acumen\n\nOperations Specialization Students - Hidden Opportunity\n\n- Strategic Positioning: Frame HR operations as operational excellence\n\n- Career Trajectory: Operations Excellence Lead \u2192 COO Advisory roles\n\n- Unique Value: Process optimization expertise with people-centric approach\n\nBusiness Analytics Students - Emerging High-Value Path\n\n- Strategic Positioning: People analytics and HR data science\n\n- Career Trajectory: HR Analytics Consultant \u2192 Strategic Workforce Planning\n\n- Premium Value: Bridge technical analytics with human capital strategy\n\nMarket Compensation Intelligence\n\n- Entry Level: 6-8 LPA (HR Operations Executive)\n\n- 2-3 Years: 10-15 LPA (HR Business Partner)\n\n- 5+ Years: 20-35 LPA (HR Operations Manager/Head of People Operations)\n\nStrategic Certification Roadmap\n\nTier 1 - Foundation (0-6 months)\n\n- SHRM-CP or PHR certification\n\n- Six Sigma Green Belt (process optimization)\n\n- HR Analytics certification (Coursera/LinkedIn Learning)\n\nTier 2 - Specialization (6-18 months)\n\n- SAP SuccessFactors or Workday certification\n\n- Labor Law Compliance certification\n\n- Advanced Excel/PowerBI for HR dashboards\n\nTier 3 - Executive Preparation (18+ months)\n\n- SHRM-SCP or SPHR\n\n- Executive HR Leadership programs (IIMs/ISB)\n\n- Strategic Workforce Planning certification\n\nImmediate Action Plan for MBA Students\n\nPhase 1: Skill Acquisition (Next 3 months)\n\n1. Master HRMS platforms (practical exposure through internships)\n\n2. Build compliance expertise through case study analysis\n\n3. Create portfolio: Process improvement project with measurable ROI\n\nPhase 2: Market Positioning (3-6 months)\n\n1. Position yourself as \"Business-First HR Professional\"\n\n2. Develop expertise in HR technology implementation\n\n3. Build thought leadership through LinkedIn content on HR innovations\n\nPhase 3: Strategic Career Launch (6-12 months)\n\n1. Target roles in high-growth companies (startups/scale-ups)\n\n2. Negotiate for exposure to strategic HR projects\n\n3. Build network with CHROs and HR Tech leaders\n\nRed Flags to Avoid\n\n- Pure administrative HR roles without strategic exposure\n\n- Companies without HR technology adoption\n\n- Roles without measurable business impact\n\n2025-2027 Market Predictions\n\n- HR Tech Integration: 70% of HR operations will be technology-driven\n\n- Analytics Premium: 40% salary premium for HR professionals with analytics skills\n\n- Strategic Evolution: HR Operations will merge with Business Operations roles\n\nFinal Strategic Recommendation\n\nPosition yourself not as an \"HR professional\" but as a \"Business Operations Expert specializing in Human Capital Excellence.\" This framing opens doors across specializations and commands premium compensation in the evolving market landscape.\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 29.831719875335693,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 1.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 1.0,
+        "professionalism_score": 1.0,
+        "overall_score": 1.0,
+        "issues": []
+      },
+      "timestamp": "2025-09-06T13:23:58.261472"
+    },
+    {
+      "test_number": 13,
+      "category": "Unstructured Queries",
+      "query": "What opportunities does TAP Academy offer for MBA students?",
+      "complexity": "Medium",
+      "test_type": "Company Analysis",
+      "expected_keywords": [
+        "tap academy",
+        "opportunities",
+        "mba",
+        "lead generation",
+        "partnership"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL RESPONSE\n\nStrategic Consultant Analysis \u2013 TAP Academy & MBA Students\n\n(All insights drawn exclusively from the retrieved data)\n\n1. Core Opportunity\n\n\u2022 Job Title: Business Development Associate (BDA)\n\n\u2022 Company: TAP Academy \u2013 Ed-Tech, BTM Layout, Bangalore\n\n\u2022 Experience Band: 0\u20133 years (Ed-tech background is a plus)\n\n2. Role Mandate & MBA Relevance\n\nSkill / Task | MBA Specialization Fit | Strategic Value\n\n---|---|---\n\nLead Generation for Placements \u2013 cold calling, emailing, LinkedIn outreach | Marketing & Sales, Business Analytics | Direct exposure to B2B demand generation; builds pipeline management skills prized by SaaS & Ed-Tech firms.\n\nPartnership Development \u2013 nurturing HR managers & recruiters | HR, Marketing | Live stakeholder management with hiring decision-makers; perfect for students targeting HR Business Partner or Corporate Relations roles.\n\nLinkedIn & Social Media Outreach | Marketing, Digital Strategy | Hands-on experience in personal branding and social selling\u2014critical for modern marketing careers.\n\nInside Sales / CRM usage (implied by \u201cEd-tech plus\u201d) | Business Analytics, Marketing | Early command of CRM analytics and funnel metrics\u2014differentiates candidates for revenue-operations roles.\n\n3. Compensation & Career Trajectory\n\n\u2022 Data does not specify salary; however, Ed-tech BDAs in Bangalore with 0\u20133 yrs typically see CTC \u20b96\u201310 LPA + incentives.\n\n\u2022 Fast-track path: BDA \u2192 Senior BDA \u2192 Team Lead \u2192 Strategic Partnerships/Account Director within 3\u20134 years.\n\n4. Certification & Upskilling Recommendations\n\n\u2022 Cross-functional must-haves:\n\n\u2013 CRM certification (HubSpot or Salesforce Trailhead)\n\n\u2013 LinkedIn Sales Navigator mastery (LinkedIn Learning)\n\n\u2022 Specialization boosters:\n\n\u2013 Marketing: Google Ads & Analytics, Hootsuite Social Marketing\n\n\u2013 HR: SHRM Talent Acquisition micro-credential\n\n\u2013 Analytics: SQL + Tableau/Power BI for funnel dashboards\n\n5. Portfolio Projects to Pitch in Interviews\n\n\u2022 Design a 30-day outreach campaign targeting 50 tech firms for campus placements\u2014include KPIs (response rate, conversion to interview).\n\n\u2022 Build a CRM dashboard visualizing lead-to-placement funnel; present insights on recruiter engagement trends.\n\n6. Immediate Action Plan for MBA Students\n\n1. Tailor r\u00e9sum\u00e9 headline: \u201cMBA (Marketing/HR) | Ed-Tech Business Development | CRM & LinkedIn Outreach Expertise\u201d.\n\n2. Secure HubSpot CRM certification within 2 weeks.\n\n3. Create a mock LinkedIn sequence (5-touch cadence) for TAP Academy\u2019s target recruiters; attach as portfolio link.\n\n4. Apply early\u2014TAP Academy values 0\u20133 yrs experience, making it ideal for final-year or recent MBA graduates.\n\nBottom line: TAP Academy offers a high-leverage entry point for MBA students to master B2B demand generation and recruiter relationship management\u2014skills that are transferable across Ed-Tech, SaaS, and HR-tech sectors.\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 20.473264932632446,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 1.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 0.8,
+        "professionalism_score": 1.0,
+        "overall_score": 0.95,
+        "issues": []
+      },
+      "timestamp": "2025-09-06T13:24:18.735119"
+    },
+    {
+      "test_number": 14,
+      "category": "Unstructured Queries",
+      "query": "List all the tools and software mentioned in the job descriptions",
+      "complexity": "Medium",
+      "test_type": "Tool Extraction",
+      "expected_keywords": [
+        "tools",
+        "software",
+        "excel",
+        "hrms",
+        "office"
+      ],
+      "response": {
+        "success": false,
+        "response": "HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)",
+        "response_time": 30.003373861312866,
+        "status_code": 0
+      },
+      "evaluation": {
+        "relevance_score": 0,
+        "completeness_score": 0,
+        "accuracy_score": 0,
+        "professionalism_score": 0,
+        "overall_score": 0,
+        "issues": [
+          "Query failed or no response"
+        ]
+      },
+      "timestamp": "2025-09-06T13:24:48.738629"
+    },
+    {
+      "test_number": 15,
+      "category": "Unstructured Queries",
+      "query": "What are the key responsibilities for marketing roles across different companies?",
+      "complexity": "Medium",
+      "test_type": "Cross-Company Analysis",
+      "expected_keywords": [
+        "marketing",
+        "responsibilities",
+        "companies",
+        "lead generation",
+        "outreach"
+      ],
+      "response": {
+        "success": false,
+        "response": "HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)",
+        "response_time": 30.00299096107483,
+        "status_code": 0
+      },
+      "evaluation": {
+        "relevance_score": 0,
+        "completeness_score": 0,
+        "accuracy_score": 0,
+        "professionalism_score": 0,
+        "overall_score": 0,
+        "issues": [
+          "Query failed or no response"
+        ]
+      },
+      "timestamp": "2025-09-06T13:25:18.741751"
+    },
+    {
+      "test_number": 16,
+      "category": "Multi-hop Reasoning",
+      "query": "Which companies offer both internships and full-time roles?",
+      "complexity": "High",
+      "test_type": "Multi-hop Query",
+      "expected_keywords": [
+        "companies",
+        "internships",
+        "full-time",
+        "roles"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nFound 1 company\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 25.162817001342773,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 1.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 0.0,
+        "professionalism_score": 1.0,
+        "overall_score": 0.75,
+        "issues": [
+          "Missing expected keywords"
+        ]
+      },
+      "timestamp": "2025-09-06T13:25:43.904821"
+    },
+    {
+      "test_number": 17,
+      "category": "Multi-hop Reasoning",
+      "query": "What are the common skills required across all HR-related positions?",
+      "complexity": "High",
+      "test_type": "Pattern Recognition",
+      "expected_keywords": [
+        "skills",
+        "hr",
+        "common",
+        "positions",
+        "analytical"
+      ],
+      "response": {
+        "success": false,
+        "response": "HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)",
+        "response_time": 30.00263285636902,
+        "status_code": 0
+      },
+      "evaluation": {
+        "relevance_score": 0,
+        "completeness_score": 0,
+        "accuracy_score": 0,
+        "professionalism_score": 0,
+        "overall_score": 0,
+        "issues": [
+          "Query failed or no response"
+        ]
+      },
+      "timestamp": "2025-09-06T13:26:13.907523"
+    },
+    {
+      "test_number": 18,
+      "category": "Multi-hop Reasoning",
+      "query": "Which companies have the most diverse role offerings?",
+      "complexity": "High",
+      "test_type": "Comparative Analysis",
+      "expected_keywords": [
+        "companies",
+        "diverse",
+        "roles",
+        "offerings"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nQuery result: Structured query engine not available (fallback disabled).\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 5.708656072616577,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 0.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 0.0,
+        "professionalism_score": 1.0,
+        "overall_score": 0.45,
+        "issues": [
+          "Error in response",
+          "Missing expected keywords"
+        ]
+      },
+      "timestamp": "2025-09-06T13:26:19.616332"
+    },
+    {
+      "test_number": 19,
+      "category": "Multi-hop Reasoning",
+      "query": "What is the relationship between company industry and role specializations?",
+      "complexity": "High",
+      "test_type": "Correlation Analysis",
+      "expected_keywords": [
+        "industry",
+        "specializations",
+        "relationship",
+        "companies"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nSTRATEGIC CONSULTANT INSIGHT\n\nRelationship between Company Industry and MBA Role Specializations\n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n1. Industry-to-Specialization Mapping Matrix (cross-company evidence)\n\n| Industry Segment | Dominant MBA Specialization(s) | Secondary / Emerging Specialization | Representative Evidence from Data |\n\n|------------------|--------------------------------|--------------------------------------|-----------------------------------|\n\n| Ed-Tech / Professional Training (TAP Academy) | Marketing (demand gen, brand) | HR (talent acquisition & L&D) | Job post explicitly asks for \u201cBusiness / Marketing / HR\u201d bachelor\u2019s; role involves market research & networking. |\n\n| Cyber-Security Services (Accorian) | HR (People Operations) | Operations (process optimization) | Associate-People Ops role focuses on employee life-cycle, engagement, performance management\u2014classic HR-Ops hybrid. |\n\n| Retail & E-Commerce (Target India) | Marketing (retail & e-com focus) | Business Analytics (omnichannel insights) | JD mandates \u201cMaster\u2019s in Management with Marketing specialization\u201d and highlights \u201cretail & e-Commerce overview\u201d. |\n\nKey Observation: Each industry funnels almost exclusively into one primary MBA specialization, with a deliberate secondary overlap that reflects the industry\u2019s value-chain pain-point.\n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n2. Strategic Implications for MBA Students\n\nA. Ed-Tech / Professional Training\n\n\u2022 Primary Track: Marketing (customer acquisition, digital campaigns, brand partnerships).\n\n\u2022 Secondary Track: HR (internal capability building, trainer talent supply).\n\n\u2022 Certification Edge: Google Ads, HubSpot Inbound, SHRM-CP.\n\nB. Cyber-Security & SaaS Services\n\n\u2022 Primary Track: HR (People Ops, employee engagement, DEI).\n\n\u2022 Secondary Track: Operations (process re-engineering, ISO/SOC compliance).\n\n\u2022 Certification Edge: SHRM-CP / PHR, Lean Six Sigma Green Belt.\n\nC. Retail & E-Commerce\n\n\u2022 Primary Track: Marketing (category management, omnichannel strategy).\n\n\u2022 Secondary Track: Business Analytics (consumer 360, promo ROI).\n\n\u2022 Certification Edge: Google Analytics 4, Tableau, Retail Management (NRF).\n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n3. Cross-Company Trend Analysis\n\n1. Marketing is the universal \u201cbridge\u201d specialization\u2014present in both B2C (Target) and B2B2C (TAP) industries.\n\n2. HR demand is industry-agnostic when the firm is services-heavy (Accorian, TAP) and talent retention is a strategic differentiator.\n\n3. Analytics is emerging as a secondary requirement even in traditionally \u201csoft-skill\u201d industries (retail, ed-tech), indicating convergence toward data-driven decision making.\n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n4. Placement Cell Recommendations\n\n\u2022 Create \u201cIndustry-Specialization Sprints\u201d: 4-week micro-programs pairing core MBA courses with industry-specific certifications (e.g., \u201cRetail Marketing + Google Analytics Sprint\u201d).\n\n\u2022 Dual-track Resume Templates: Encourage students to craft two versions\u2014one highlighting primary specialization, the second emphasizing the secondary overlap\u2014to widen funnel.\n\n\u2022 Cross-Industry Case Competitions: Simulate how an HR solution in Cyber-Security can be repurposed for Ed-Tech, reinforcing transferable skills.\n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\nBottom Line\n\nThe industry dictates the dominant specialization, but the fastest-moving candidates will position themselves at the intersection of that primary track with the industry\u2019s secondary pain-point\u2014creating a T-shaped profile that is highly portable across sectors.\n\n*Note: Structured data could not be retrieved.*\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 24.30084204673767,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 1.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 0.75,
+        "professionalism_score": 1.0,
+        "overall_score": 0.9375,
+        "issues": []
+      },
+      "timestamp": "2025-09-06T13:26:43.917476"
+    },
+    {
+      "test_number": 20,
+      "category": "Multi-hop Reasoning",
+      "query": "Which roles would be best suited for someone interested in both finance and operations?",
+      "complexity": "High",
+      "test_type": "Recommendation Query",
+      "expected_keywords": [
+        "roles",
+        "finance",
+        "operations",
+        "suited",
+        "interested"
+      ],
+      "response": {
+        "success": false,
+        "response": "HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)",
+        "response_time": 30.00256896018982,
+        "status_code": 0
+      },
+      "evaluation": {
+        "relevance_score": 0,
+        "completeness_score": 0,
+        "accuracy_score": 0,
+        "professionalism_score": 0,
+        "overall_score": 0,
+        "issues": [
+          "Query failed or no response"
+        ]
+      },
+      "timestamp": "2025-09-06T13:27:13.920148"
+    },
+    {
+      "test_number": 21,
+      "category": "Edge Cases",
+      "query": "What companies are offering data science roles?",
+      "complexity": "Low",
+      "test_type": "Non-existent Data",
+      "expected_keywords": [
+        "companies",
+        "data science"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nQuery result: Structured query engine not available (fallback disabled).\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 11.333724737167358,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 0.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 0.0,
+        "professionalism_score": 1.0,
+        "overall_score": 0.45,
+        "issues": [
+          "Error in response",
+          "Missing expected keywords"
+        ]
+      },
+      "timestamp": "2025-09-06T13:27:25.254147"
+    },
+    {
+      "test_number": 22,
+      "category": "Edge Cases",
+      "query": "Show me all the job details for every position",
+      "complexity": "Medium",
+      "test_type": "Broad Query",
+      "expected_keywords": [
+        "job",
+        "details",
+        "position"
+      ],
+      "response": {
+        "success": false,
+        "response": "HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)",
+        "response_time": 30.002940893173218,
+        "status_code": 0
+      },
+      "evaluation": {
+        "relevance_score": 0,
+        "completeness_score": 0,
+        "accuracy_score": 0,
+        "professionalism_score": 0,
+        "overall_score": 0,
+        "issues": [
+          "Query failed or no response"
+        ]
+      },
+      "timestamp": "2025-09-06T13:27:55.257178"
+    },
+    {
+      "test_number": 23,
+      "category": "Edge Cases",
+      "query": "Which companies are offering remote work opportunities?",
+      "complexity": "Low",
+      "test_type": "Missing Information",
+      "expected_keywords": [
+        "companies",
+        "remote",
+        "work"
+      ],
+      "response": {
+        "success": false,
+        "response": "HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)",
+        "response_time": 30.003311157226562,
+        "status_code": 0
+      },
+      "evaluation": {
+        "relevance_score": 0,
+        "completeness_score": 0,
+        "accuracy_score": 0,
+        "professionalism_score": 0,
+        "overall_score": 0,
+        "issues": [
+          "Query failed or no response"
+        ]
+      },
+      "timestamp": "2025-09-06T13:28:25.260624"
+    },
+    {
+      "test_number": 24,
+      "category": "Edge Cases",
+      "query": "What is the average salary for these positions?",
+      "complexity": "Low",
+      "test_type": "Missing Data",
+      "expected_keywords": [
+        "salary",
+        "average",
+        "positions"
+      ],
+      "response": {
+        "success": true,
+        "response": "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS\n\nQuery result: Structured query engine not available (fallback disabled).\n\n---\nFor more detailed information or specific questions, please ask follow-up questions.",
+        "response_time": 11.642011880874634,
+        "status_code": 200
+      },
+      "evaluation": {
+        "relevance_score": 0.0,
+        "completeness_score": 1.0,
+        "accuracy_score": 0.0,
+        "professionalism_score": 1.0,
+        "overall_score": 0.45,
+        "issues": [
+          "Error in response",
+          "Missing expected keywords"
+        ]
+      },
+      "timestamp": "2025-09-06T13:28:36.902919"
+    },
+    {
+      "test_number": 25,
+      "category": "Edge Cases",
+      "query": "Compare the benefits offered by different companies",
+      "complexity": "Medium",
+      "test_type": "Missing Information",
+      "expected_keywords": [
+        "benefits",
+        "companies",
+        "compare"
+      ],
+      "response": {
+        "success": false,
+        "response": "HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)",
+        "response_time": 30.004956007003784,
+        "status_code": 0
+      },
+      "evaluation": {
+        "relevance_score": 0,
+        "completeness_score": 0,
+        "accuracy_score": 0,
+        "professionalism_score": 0,
+        "overall_score": 0,
+        "issues": [
+          "Query failed or no response"
+        ]
+      },
+      "timestamp": "2025-09-06T13:29:06.908114"
+    },
+    {
+      "test_number": 26,
+      "category": "Performance Tests",
+      "query": "Give me a comprehensive analysis of all available opportunities with detailed recommendations for MBA students",
+      "complexity": "High",
+      "test_type": "Comprehensive Analysis",
+      "expected_keywords": [
+        "analysis",
+        "opportunities",
+        "mba",
+        "students",
+        "recommendations"
+      ],
+      "response": {
+        "success": false,
+        "response": "HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)",
+        "response_time": 30.029088020324707,
+        "status_code": 0
+      },
+      "evaluation": {
+        "relevance_score": 0,
+        "completeness_score": 0,
+        "accuracy_score": 0,
+        "professionalism_score": 0,
+        "overall_score": 0,
+        "issues": [
+          "Query failed or no response"
+        ]
+      },
+      "timestamp": "2025-09-06T13:29:36.937836"
+    },
+    {
+      "test_number": 27,
+      "category": "Performance Tests",
+      "query": "What are the career progression paths for each specialization mentioned in the job descriptions?",
+      "complexity": "High",
+      "test_type": "Career Analysis",
+      "expected_keywords": [
+        "career",
+        "progression",
+        "specialization",
+        "paths"
+      ],
+      "response": {
+        "success": false,
+        "response": "HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)",
+        "response_time": 30.011714935302734,
+        "status_code": 0
+      },
+      "evaluation": {
+        "relevance_score": 0,
+        "completeness_score": 0,
+        "accuracy_score": 0,
+        "professionalism_score": 0,
+        "overall_score": 0,
+        "issues": [
+          "Query failed or no response"
+        ]
+      },
+      "timestamp": "2025-09-06T13:30:06.950001"
+    },
+    {
+      "test_number": 28,
+      "category": "Performance Tests",
+      "query": "Provide a detailed comparison of all companies including their culture, values, and growth opportunities",
+      "complexity": "High",
+      "test_type": "Company Comparison",
+      "expected_keywords": [
+        "comparison",
+        "companies",
+        "culture",
+        "values",
+        "growth"
+      ],
+      "response": {
+        "success": false,
+        "response": "HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)",
+        "response_time": 30.00798010826111,
+        "status_code": 0
+      },
+      "evaluation": {
+        "relevance_score": 0,
+        "completeness_score": 0,
+        "accuracy_score": 0,
+        "professionalism_score": 0,
+        "overall_score": 0,
+        "issues": [
+          "Query failed or no response"
+        ]
+      },
+      "timestamp": "2025-09-06T13:30:36.958261"
+    },
+    {
+      "test_number": 29,
+      "category": "Performance Tests",
+      "query": "What are the industry trends and market insights based on the available job descriptions?",
+      "complexity": "High",
+      "test_type": "Market Analysis",
+      "expected_keywords": [
+        "trends",
+        "market",
+        "insights",
+        "industry"
+      ],
+      "response": {
+        "success": false,
+        "response": "HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)",
+        "response_time": 30.004217863082886,
+        "status_code": 0
+      },
+      "evaluation": {
+        "relevance_score": 0,
+        "completeness_score": 0,
+        "accuracy_score": 0,
+        "professionalism_score": 0,
+        "overall_score": 0,
+        "issues": [
+          "Query failed or no response"
+        ]
+      },
+      "timestamp": "2025-09-06T13:31:06.962755"
+    },
+    {
+      "test_number": 30,
+      "category": "Performance Tests",
+      "query": "Create a strategic placement guide for MBA students with specific recommendations for each specialization",
+      "complexity": "High",
+      "test_type": "Strategic Guide",
+      "expected_keywords": [
+        "strategic",
+        "placement",
+        "guide",
+        "mba",
+        "specialization"
+      ],
+      "response": {
+        "success": false,
+        "response": "HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)",
+        "response_time": 30.01205086708069,
+        "status_code": 0
+      },
+      "evaluation": {
+        "relevance_score": 0,
+        "completeness_score": 0,
+        "accuracy_score": 0,
+        "professionalism_score": 0,
+        "overall_score": 0,
+        "issues": [
+          "Query failed or no response"
+        ]
+      },
+      "timestamp": "2025-09-06T13:31:36.975220"
+    }
+  ],
+  "timestamp": "2025-09-06T13:31:36.978774"
+}

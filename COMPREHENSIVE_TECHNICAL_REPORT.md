@@ -90,15 +90,7 @@ Language     API             Middleware  (4 Types)      (SQL + Vector)  + Contex
 | **Animations** | Framer Motion | 10.18.0 | Smooth UI animations |
 | **Build Tool** | Vite | 4.5.0 | Fast development server |
 | **Icons** | Lucide React | 0.294.0 | Modern icon library |
-
-### **Mobile Technology Stack**
-
-| Component | Technology | Version | Purpose |
-|-----------|------------|---------|---------|
-| **Framework** | Flutter | Latest | Cross-platform mobile |
-| **State Management** | Provider | Latest | State management |
-| **HTTP Client** | Dio | Latest | API communication |
-| **UI Components** | Material Design | Latest | Native look and feel |
+| **Mobile** | React (PWA) | 18.2.0 | Progressive Web App for mobile |
 
 ---
 
@@ -157,14 +149,14 @@ Language     API             Middleware  (4 Types)      (SQL + Vector)  + Contex
   - Responsive design
   - Animation system
 
-#### **2. Flutter Mobile App**
-- **Location**: `flutter_ui/lib/`
-- **Components**: 40+ Dart files
+#### **2. React Mobile App (PWA)**
+- **Location**: `React Style/` (Progressive Web App)
+- **Components**: 60+ TypeScript components
 - **Features**:
-  - Native mobile experience
-  - Offline capability
-  - Push notifications
-  - Cross-platform support
+  - Mobile-responsive design
+  - Offline capability (Service Workers)
+  - Push notifications (Web Push API)
+  - Cross-platform support (iOS/Android via PWA)
 
 ---
 

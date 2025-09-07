@@ -1,0 +1,16 @@
+{
+  "status": "commited",
+  "type": "backend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:8000",
+  "backendAuthType": "public",
+  "executionArgs": {
+    "projectName": "JD-Copilot",
+    "projectPath": "/Users/navinsivakumar/Desktop/JD-Copilot",
+    "testIds": [],
+    "additionalInstruction": "Test all API endpoints, frontend components, and integration flows comprehensively. Focus on chat functionality, RAG system, database operations, and React interface performance.",
+    "envs": {
+      "API_KEY": ""
+    }
+  }
+}

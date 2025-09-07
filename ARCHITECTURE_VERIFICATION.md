@@ -248,15 +248,16 @@ class OpenRouterLLM(LLM):
 
 ---
 
-## 🔄 **Migration Summary: Flutter → React**
+## 🔄 **Frontend Architecture: React-Based**
 
-### **What Changed**
+### **Technology Stack**
 
-- **Frontend Framework**: Flutter → React 18
-- **Language**: Dart → TypeScript
-- **UI Library**: Flutter Widgets → React Components
-- **Build Tool**: Flutter Build → Vite
-- **Styling**: Flutter Styling → Tailwind CSS
+- **Frontend Framework**: React 18
+- **Language**: TypeScript
+- **UI Library**: React Components
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
+- **Mobile**: Progressive Web App (PWA)
 
 ### **What Remained**
 

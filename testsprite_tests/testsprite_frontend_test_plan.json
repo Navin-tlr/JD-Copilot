@@ -1,0 +1,156 @@
+{
+  "test_plan": {
+    "name": "JD-Copilot Frontend Test Plan",
+    "version": "1.0.0",
+    "description": "Comprehensive frontend testing for JD-Copilot React interface",
+    "tests": [
+      {
+        "id": "test_app_loading",
+        "name": "Application Loading",
+        "description": "Test that the React application loads correctly",
+        "url": "http://localhost:3000",
+        "expected_elements": [
+          "ChatInterface component",
+          "ChatHeader component",
+          "MascotCharacter component",
+          "ParticleVortex component"
+        ],
+        "expected_behavior": "Application loads without errors"
+      },
+      {
+        "id": "test_theme_toggle",
+        "name": "Theme Toggle Functionality",
+        "description": "Test dark/light theme switching",
+        "actions": [
+          "Click theme toggle button",
+          "Verify theme changes",
+          "Check localStorage persistence"
+        ],
+        "expected_behavior": "Theme switches between dark and light modes"
+      },
+      {
+        "id": "test_mascot_character",
+        "name": "Mascot Character Animation",
+        "description": "Test mascot character states and animations",
+        "expected_states": [
+          "Welcome state with wave animation",
+          "Idle state with floating animation",
+          "Listening state when user types",
+          "Thinking state during AI response"
+        ],
+        "expected_behavior": "Mascot transitions between states smoothly"
+      },
+      {
+        "id": "test_particle_vortex",
+        "name": "Particle Vortex Animation",
+        "description": "Test particle vortex background animation",
+        "expected_behavior": "Particles animate smoothly with vortex effect"
+      },
+      {
+        "id": "test_chat_input",
+        "name": "Chat Input Functionality",
+        "description": "Test chat input component behavior",
+        "actions": [
+          "Type message in input field",
+          "Press Enter to send",
+          "Test input expansion/collapse",
+          "Test typing indicators"
+        ],
+        "expected_behavior": "Input handles user interactions correctly"
+      },
+      {
+        "id": "test_message_sending",
+        "name": "Message Sending",
+        "description": "Test sending messages to backend",
+        "actions": [
+          "Type test message",
+          "Send message",
+          "Verify message appears in chat",
+          "Wait for AI response"
+        ],
+        "expected_behavior": "Messages are sent and responses received"
+      },
+      {
+        "id": "test_message_bubbles",
+        "name": "Message Bubble Display",
+        "description": "Test message bubble rendering",
+        "expected_elements": [
+          "User message bubbles",
+          "AI response bubbles",
+          "Proper styling and layout",
+          "Timestamp display"
+        ],
+        "expected_behavior": "Messages display correctly with proper styling"
+      },
+      {
+        "id": "test_ai_thinking_feedback",
+        "name": "AI Thinking Feedback",
+        "description": "Test AI thinking animation during responses",
+        "expected_behavior": "Thinking animation shows while waiting for AI response"
+      },
+      {
+        "id": "test_scroll_functionality",
+        "name": "Scroll to Bottom",
+        "description": "Test scroll to bottom button functionality",
+        "actions": [
+          "Send multiple messages",
+          "Scroll up",
+          "Click scroll to bottom button"
+        ],
+        "expected_behavior": "Scroll button appears and works correctly"
+      },
+      {
+        "id": "test_responsive_design",
+        "name": "Responsive Design",
+        "description": "Test responsive design on different screen sizes",
+        "test_sizes": [
+          "Mobile (375px)",
+          "Tablet (768px)",
+          "Desktop (1024px)",
+          "Large Desktop (1440px)"
+        ],
+        "expected_behavior": "Interface adapts to different screen sizes"
+      },
+      {
+        "id": "test_error_handling",
+        "name": "Error Handling",
+        "description": "Test error handling when backend is unavailable",
+        "actions": [
+          "Disconnect from backend",
+          "Try to send message",
+          "Verify error message display"
+        ],
+        "expected_behavior": "Graceful error handling with user feedback"
+      },
+      {
+        "id": "test_session_management",
+        "name": "Session Management",
+        "description": "Test chat session persistence",
+        "actions": [
+          "Send messages in session",
+          "Refresh page",
+          "Verify session persistence"
+        ],
+        "expected_behavior": "Session data persists across page refreshes"
+      },
+      {
+        "id": "test_animations_performance",
+        "name": "Animation Performance",
+        "description": "Test animation performance and smoothness",
+        "expected_behavior": "Animations run smoothly without lag"
+      },
+      {
+        "id": "test_accessibility",
+        "name": "Accessibility Features",
+        "description": "Test accessibility features",
+        "checks": [
+          "Keyboard navigation",
+          "Screen reader compatibility",
+          "Focus management",
+          "ARIA labels"
+        ],
+        "expected_behavior": "Interface is accessible to all users"
+      }
+    ]
+  }
+}

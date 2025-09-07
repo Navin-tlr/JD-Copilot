@@ -1,0 +1,461 @@
+{
+  "individual_results": [
+    {
+      "query": "How many companies are offering finance roles?",
+      "expected_answer": "1 (Mill Story \u2013 Finance & Accounting Internship)",
+      "generated_answer": "Result: SQL Query: SELECT COUNT(DISTINCT c.id) AS company_count\nFROM companies c\nJOIN roles r ON c.id = r.company_id\nJOIN offers o ON r.id = o.role_id\nWHERE r.specialization = 'finance';\nResult: ('[(0,)]', {'result': [(0,)], 'col_keys': ['company_count']})",
+      "category": "company_count",
+      "difficulty": "easy",
+      "response_time": 6.649052,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.14524457",
+        "keyword_overlap": 0.0,
+        "entity_extraction_accuracy": 1.0
+      },
+      "overall_accuracy": 0.1290489137172699,
+      "timestamp": "2025-09-05T10:55:42.416384"
+    },
+    {
+      "query": "Who are the companies with HR opportunities?",
+      "expected_answer": "Accorian (Associate \u2013 People Operations)",
+      "generated_answer": "Result: SQL Query: SELECT DISTINCT c.company_name\nFROM companies c\nJOIN roles r ON c.id = r.company_id\nWHERE r.specialization = 'HR';\nResult: (\"[('Accorian',)]\", {'result': [('Accorian',)], 'col_keys': ['company_name']})",
+      "category": "company_identification",
+      "difficulty": "easy",
+      "response_time": 3.728924,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.23281448",
+        "keyword_overlap": 0.0,
+        "entity_extraction_accuracy": 0.0
+      },
+      "overall_accuracy": 0.04656289517879486,
+      "timestamp": "2025-09-05T10:55:49.696698"
+    },
+    {
+      "query": "Which companies are hiring for PR or communications roles?",
+      "expected_answer": "Madison PR (Account Executive)",
+      "generated_answer": "Result: SQL Query: SELECT DISTINCT c.company_name\nFROM companies c\nJOIN roles r ON c.id = r.company_id\nWHERE LOWER(r.title) LIKE '%pr%' \n   OR LOWER(r.title) LIKE '%public relations%'\n   OR LOWER(r.title) LIKE '%communications%'\n   OR LOWER(r.specialization) LIKE '%pr%'\n   OR LOWER(r.specialization) LIKE '%public relations%'\n   OR LOWER(r.specialization) LIKE '%communications%';\nResult: (\"[('Target',)]\", {'result': [('Target',)], 'col_keys': ['company_name']})",
+      "category": "company_identification",
+      "difficulty": "easy",
+      "response_time": 6.875623,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.12465056",
+        "keyword_overlap": 0.25,
+        "entity_extraction_accuracy": 0.5
+      },
+      "overall_accuracy": 0.09993011206388475,
+      "timestamp": "2025-09-05T10:55:53.619127"
+    },
+    {
+      "query": "Are there any admission-related jobs?",
+      "expected_answer": "Yes, Masters' Union (Admission Counselor)",
+      "generated_answer": "Result: SQL Query: SELECT DISTINCT r.id, r.title, c.company_name\nFROM roles r\nJOIN companies c ON r.company_id = c.id\nWHERE LOWER(r.title) LIKE '%admission%' OR LOWER(r.role_description) LIKE '%admission%' OR LOWER(r.specialization) LIKE '%admission%';\nResult: ('[(8, \\'Admission Counselor\\', \"Masters\\' Union\")]', {'result': [(8, 'Admission Counselor', \"Masters' Union\")], 'col_keys': ['id', 'title', 'company_name']})",
+      "category": "yes_no_question",
+      "difficulty": "easy",
+      "response_time": 5.756215,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.38387534",
+        "keyword_overlap": 0.8,
+        "entity_extraction_accuracy": 1.0
+      },
+      "overall_accuracy": 0.25677506804466255,
+      "timestamp": "2025-09-05T10:56:00.867380"
+    },
+    {
+      "query": "Which roles are open for freshers?",
+      "expected_answer": "Accorian (Associate HR Ops \u2013 Fresher), TAP Academy (BDA \u2013 freshers encouraged)",
+      "generated_answer": "Result: SQL Query: SELECT DISTINCT r.title\nFROM roles r\nJOIN requirements req ON r.id = req.role_id\nWHERE req.requirement_text LIKE '%fresher%' OR req.requirement_text LIKE '%0 years%' OR req.requirement_text LIKE '%no experience%';\nResult: ('[]', {'result': [], 'col_keys': ['title']})",
+      "category": "role_listing",
+      "difficulty": "medium",
+      "response_time": 5.868185,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.1853349",
+        "keyword_overlap": 0.1,
+        "entity_extraction_accuracy": 0.0
+      },
+      "overall_accuracy": 0.047066981196403505,
+      "timestamp": "2025-09-05T10:56:06.777158"
+    },
+    {
+      "query": "Which jobs mention placements explicitly?",
+      "expected_answer": "TAP Academy (student placements)",
+      "generated_answer": "Based on the available documents, I found **one role** that explicitly mentions placements:\n\n---\n\n**Job Title:** *Not explicitly stated, but contextually inferred as a Placement/Outreach Role*  \n**Company:** TAP Academy  \n**Location:** Not specified  \n**Key Responsibilities (Placement-Related):**  \n- **Market Research & Networking:** Stay updated on industry hiring trends, skill requirements, and **placement opportunities**.  \n- **Reporting & Pipeline Management:** Track and report on **outreach activities, lead generation efforts, and placement successes**.  \n\n**Relevance for MBA Students:**  \nThis role is directly aligned with **MBA career services, corporate relations, or placement coordination functions**. It involves:  \n- **Strategic networking** with recruiters to secure roles for students.  \n- **Data-driven reporting** on placement metrics (e.g., offer-to-interview ratios, salary trends).  \n- **Cross-functional collaboration** with marketing (branding), HR (candidate profiling), and analytics (dashboards).  \n\n**Strategic Insight:**  \nWhile no other companies explicitly mention \"placements\" in the provided data, TAP Academy\u2019s focus on **placement tracking and industry trend analysis** highlights a niche opportunity for MBA students specializing in **HR (talent acquisition), Business Analytics (dashboarding), or Marketing (employer branding)**.  \n\n**Recommendation:**  \nIf you\u2019re targeting **corporate relations, campus recruitment, or ed-tech placement roles**, emphasize:  \n- **CRM proficiency** (e.g., Salesforce, Zoho).  \n- **Data visualization** (PowerBI/Tableau for placement dashboards).  \n- **Stakeholder management** (bridging students and recruiters).  \n\nNo other companies in the dataset explicitly reference placements.",
+      "category": "feature_identification",
+      "difficulty": "easy",
+      "response_time": 15.509197,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.45227927",
+        "keyword_overlap": 0.75,
+        "entity_extraction_accuracy": 0.0
+      },
+      "overall_accuracy": 0.16545585393905643,
+      "timestamp": "2025-09-05T10:56:12.934316"
+    },
+    {
+      "query": "Are there any ed-tech companies hiring?",
+      "expected_answer": "TAP Academy (BDA role)",
+      "generated_answer": "Result: SQL Query: SELECT DISTINCT c.company_name\nFROM companies c\nJOIN roles r ON c.id = r.company_id\nJOIN offers o ON r.id = o.role_id\nWHERE c.industry = 'ed-tech' AND o.expected_hires > 0;\nResult: ('[]', {'result': [], 'col_keys': ['company_name']})",
+      "category": "industry_identification",
+      "difficulty": "medium",
+      "response_time": 5.646999,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.07139848",
+        "keyword_overlap": 0.0,
+        "entity_extraction_accuracy": 1.0
+      },
+      "overall_accuracy": 0.11427969634532929,
+      "timestamp": "2025-09-05T10:56:28.716524"
+    },
+    {
+      "query": "Which companies are in consulting or cybersecurity?",
+      "expected_answer": "Accorian (cybersecurity advisory firm)",
+      "generated_answer": "Result: SQL Query: SELECT DISTINCT company_name\nFROM companies\nWHERE industry IN ('consulting', 'cybersecurity');\nResult: ('[]', {'result': [], 'col_keys': ['company_name']})",
+      "category": "industry_identification",
+      "difficulty": "medium",
+      "response_time": 4.671639,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.24045639",
+        "keyword_overlap": 0.0,
+        "entity_extraction_accuracy": 1.0
+      },
+      "overall_accuracy": 0.14809127748012543,
+      "timestamp": "2025-09-05T10:56:34.531498"
+    },
+    {
+      "query": "Which jobs are specifically internships?",
+      "expected_answer": "Mill Story (Finance Internship)",
+      "generated_answer": "Result: SQL Query: SELECT * FROM roles WHERE LOWER(title) LIKE '%intern%' OR LOWER(title) LIKE '%internship%';\nResult: (\"[(9, 9, 'Finance & Accounting Intern', 'FINANCE', 'Sarjapur Road, Bengaluru', '', '2025-08-19 15:55:38')]\", {'result': [(9, 9, 'Finance & Accounting Intern', 'FINANCE', 'Sarjapur Road, Bengaluru', '', '2025-08-19 15:55:38')], 'col_keys': ['id', 'company_id', 'title', 'specialization', 'location', 'role_description', 'created_at']})",
+      "category": "job_type",
+      "difficulty": "easy",
+      "response_time": 3.839037,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.22231922",
+        "keyword_overlap": 0.25,
+        "entity_extraction_accuracy": 0.0
+      },
+      "overall_accuracy": 0.0694638431072235,
+      "timestamp": "2025-09-05T10:56:39.667684"
+    },
+    {
+      "query": "Which job is in the food & consumer space?",
+      "expected_answer": "Mill Story (D2C food brand \u2013 chemical-free flour)",
+      "generated_answer": "Result: SQL Query: SELECT DISTINCT r.title\nFROM roles r\nJOIN companies c ON r.company_id = c.id\nWHERE c.industry = 'food & consumer';\nResult: ('[]', {'result': [], 'col_keys': ['title']})",
+      "category": "industry_identification",
+      "difficulty": "medium",
+      "response_time": 5.110389,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.095194414",
+        "keyword_overlap": 0.0,
+        "entity_extraction_accuracy": 1.0
+      },
+      "overall_accuracy": 0.11903888285160065,
+      "timestamp": "2025-09-05T10:56:43.701788"
+    },
+    {
+      "query": "What finance-related tasks are mentioned?",
+      "expected_answer": "Accounting, P&L, balance sheet, cash flow, budgeting, expense tracking, invoice checks, audits, compliance, fundraising support, pitch deck prep",
+      "generated_answer": "Finance-Related Tasks Identified in the Available Data\n----------------------------------------------------\n\nCompany: Mill Story  \nRole: Finance & Accounting Intern  \n\nKey Finance Tasks Mentioned  \n1. Book-keeping & Accuracy  \n   \u2022 Maintain clean and accurate books of accounts.  \n\n2. Financial Statement Preparation  \n   \u2022 Build Pro-forma accounting statements:  \n     \u2013 Profit & Loss (P&L)  \n     \u2013 Balance Sheet  \n     \u2013 Cash-Flow Statement  \n\n3. Budgeting & Expense Control  \n   \u2022 Assist in budgeting processes.  \n   \u2022 Track expenses and verify invoices.  \n\n4. Fund-Raising Support  \n   \u2022 Contribute to fundraising preparation activities\u2014hands-on exposure to how early-stage start-ups ready themselves for investor rounds.\n\nRelevance for MBA Students  \n\u2022 Specialization Fit: Directly aligns with Finance specialization; also useful for Entrepreneurship electives.  \n\u2022 Skill Development: Offers practical experience in start-up finance, investor-readiness, and financial modeling\u2014competencies highly valued by VC/PE firms and corporate finance roles.",
+      "category": "task_listing",
+      "difficulty": "hard",
+      "response_time": 25.031295,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.5031193",
+        "keyword_overlap": 0.47368421052631576,
+        "entity_extraction_accuracy": 0.0
+      },
+      "overall_accuracy": 0.1479922790276377,
+      "timestamp": "2025-09-05T10:56:49.016561"
+    },
+    {
+      "query": "What do HR operations jobs involve?",
+      "expected_answer": "Employee lifecycle management, engagement, compliance audits, labor law adherence, HR processes, people initiatives",
+      "generated_answer": "## Strategic Analysis: HR Operations Roles Across the Market\n\n### Core Responsibilities in HR Operations\n\nBased on the available data from **Accorian** and **TAP Academy**, HR Operations roles encompass a comprehensive employee lifecycle management approach:\n\n**Primary Functions:**\n- **End-to-End Employee Lifecycle Management**: From hire-to-retire processes including onboarding, transfers, performance management, and exit formalities\n- **Employee Experience Design**: Strategizing and deploying initiatives that enhance employee touchpoints throughout their journey\n- **Stakeholder Partnership**: Acting as the Single Point of Contact (SPOC) for employee queries while collaborating with leadership on organization design and development\n- **Process Optimization**: Streamlining HR processes to enhance operational efficiency and reduce turnaround times\n- **Compliance Management**: Ensuring adherence to labor laws and regulatory requirements across all people practices\n\n### Strategic Implications for MBA-HR Students\n\n**Relevance for MBA-HR Specialization:**\n- **High Strategic Value**: These roles sit at the intersection of operational excellence and strategic HR, making them ideal for MBA graduates who understand both business strategy and people management\n- **Cross-Functional Exposure**: You'll interact with finance (compensation), operations (productivity metrics), and business leaders (organization design), providing T-shaped skill development\n- **Data-Driven Decision Making**: The emphasis on reporting and pipeline management aligns with modern HR analytics requirements\n\n### Market Trends & Skills Gap Analysis\n\n**Most Critical Skills Identified:**\n1. **HR Technology Proficiency** (HRMS systems)\n2. **Process Re-engineering** capabilities\n3. **Labor Law & Compliance** expertise\n4. **MS Office Suite** (particularly Excel for analytics)\n5. **Stakeholder Management** and communication\n\n**Strategic Advice for Career Preparation:**\n\n**Immediate Actions:**\n- **Certification Path**: Pursue SHRM-CP or PHR certifications to demonstrate compliance expertise\n- **Technical Upskilling**: Gain hands-on experience with popular HRMS platforms (Workday, SAP SuccessFactors, or BambooHR)\n- **Process Excellence**: Consider Six Sigma Green Belt certification to strengthen process optimization credentials\n\n**Long-term Career Trajectory:**\n- **Entry Point**: Associate-People Operations roles serve as excellent gateways to strategic HR business partner positions\n- **Specialization Opportunities**: Focus on either **Employee Experience Design** (high-growth area) or **HR Analytics & Technology** (future-proof skill set)\n- **Compensation Growth**: These foundational roles typically lead to HR Manager positions within 3-4 years, with significant salary progression\n\n### Competitive Positioning for Placements\n\n**Differentiation Strategy:**\n- **Combine MBA Business Acumen**: Leverage your strategic thinking to propose data-driven HR solutions\n- **Technology-First Approach**: Position yourself as an HR professional who can bridge traditional HR with digital transformation\n- **Quantify Impact**: Prepare case studies showing how HR process improvements can directly impact business metrics (retention rates, productivity indices)\n\n**Recommended Portfolio Projects:**\n- Design an employee onboarding journey map with measurable KPIs\n- Create a compliance dashboard tracking key labor law metrics\n- Develop a process optimization proposal for a specific HR function with ROI projections\n\nThis analysis positions HR Operations not just as administrative roles, but as strategic business enablers where MBA-HR graduates can create measurable business impact from day one.",
+      "category": "role_description",
+      "difficulty": "hard",
+      "response_time": 21.493842,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.5246111",
+        "keyword_overlap": 0.8461538461538461,
+        "entity_extraction_accuracy": 0.0
+      },
+      "overall_accuracy": 0.18953760770651013,
+      "timestamp": "2025-09-05T10:57:14.646030"
+    },
+    {
+      "query": "What opportunities does TAP Academy offer?",
+      "expected_answer": "Lead generation, partnership development, LinkedIn outreach, placement strategy, market research, reporting, career advancement",
+      "generated_answer": "Strategic Placement Brief \u2013 TAP Academy Opportunities for MBA Students\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n1. Core Opportunity  \n   Job Title: Business Development Associate  \n   Company: TAP Academy (Ed-Tech, BTM Layout, Bangalore)  \n   Experience Band: 0\u20133 years (prior Ed-Tech exposure is a plus)  \n\n2. Role Mandate & MBA Relevance  \n   \u2022 Lead Generation for Placements  \n     \u2013 Identify and engage companies with active hiring demand via cold-calling, cold-emailing, and LinkedIn outreach.  \n     \u2013 MBA Lens: Directly leverages Marketing & Sales funnel concepts; ideal for students specialising in Marketing or Business Analytics who want hands-on experience in B2B demand generation.  \n\n   \u2022 Partnership Development  \n     \u2013 Build and nurture relationships with HR heads, recruiters, and decision-makers to secure placement slots for TAP Academy learners.  \n     \u2013 MBA Lens: Mirrors Strategic HR & Corporate Relations roles; HR majors can showcase stakeholder-management and talent-sourcing capabilities.  \n\n   \u2022 LinkedIn & Social-Media Outreach  \n     \u2013 Craft targeted campaigns, optimise messaging, and track engagement metrics.  \n     \u2013 MBA Lens: Demonstrates digital marketing proficiency\u2014critical for Marketing and Business Analytics students aiming to prove ROI on social channels.  \n\n   \u2022 Competitor Intelligence & Opportunity Mapping  \n     \u2013 Monitor rival Ed-Tech placement records to uncover whitespace and refine value propositions.  \n     \u2013 MBA Lens: Combines Competitive Strategy (core to General Management) with data-driven decision making.  \n\n   \u2022 Reporting & Pipeline Management  \n     \u2013 Maintain dashboards on outreach volume, lead conversion, and placement success rates.  \n     \u2013 MBA Lens: Showcases Operations & Analytics acumen\u2014perfect for students targeting roles in Sales Operations or Business Intelligence.  \n\n3. Compensation & Logistics  \n   \u2022 Location: BTM Layout, Bangalore (start-up hub; strong peer-learning ecosystem).  \n   \u2022 Compensation: Not disclosed in retrieved data; recommend clarifying CTC, variable pay, and ESOPs during interviews.  \n\n4. Strategic Advice for MBA Applicants  \n   \u2022 Position Yourself as a \u201cRevenue-Linked HR-Marketing Hybrid\u201d  \n     \u2013 Emphasise coursework in B2B Sales, Digital Marketing, and Strategic HRM.  \n     \u2013 Quantify prior achievements: e.g., \u201cIncreased LinkedIn response rate by 35 % through A/B-tested messaging.\u201d  \n\n   \u2022 Skill Stack to Highlight  \n     \u2013 CRM tools (HubSpot, Salesforce).  \n     \u2013 LinkedIn Sales Navigator & social-listening platforms.  \n     \u2013 Excel / Google Sheets for pipeline dashboards; basic SQL a bonus.  \n     \u2013 Storytelling with data (PowerBI or Tableau quick-wins).  \n\n   \u2022 Certifications That Add Immediate Credibility  \n     \u2013 HubSpot Inbound Sales or LinkedIn Marketing Labs (Marketing).  \n     \u2013 SHRM-CP learning modules (HR).  \n     \u2013 Google Analytics & Ads certificates (cross-functional).  \n\n   \u2022 Interview Differentiator  \n     \u2013 Present a 30-60-90-day plan: target company list, outreach cadence, KPI milestones (e.g., 50 qualified leads/month, 15 % placement conversion).  \n\n5. Long-Term Career Trajectory  \n   \u2022 12\u201318 months in this role can pivot you into:  \n     \u2013 Corporate Relations / Campus Recruitment Manager in larger Ed-Techs or universities.  \n     \u2013 Account Executive or Customer Success Manager in SaaS firms (leveraging Ed-Tech network).  \n     \u2013 Strategic HR Business Partner roles with a strong talent-branding narrative.  \n\n6. Immediate Next Steps  \n   1. Customise your r\u00e9sum\u00e9 headline: \u201cMBA (Marketing/HR) | B2B Lead Generation | Ed-Tech Placement Specialist.\u201d  \n   2. Build a 1-page outreach portfolio: sample cold-email sequence + mock dashboard screenshot.  \n   3. Reach out to TAP Academy\u2019s HR via LinkedIn with a concise value proposition referencing their placement KPIs.  \n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nBottom line: TAP Academy offers a rare, cross-functional entry point where MBA students can simultaneously sharpen sales, marketing, HR, and analytics capabilities while directly impacting revenue and learner outcomes.",
+      "category": "opportunity_listing",
+      "difficulty": "hard",
+      "response_time": 22.557697,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.5241831",
+        "keyword_overlap": 0.7692307692307693,
+        "entity_extraction_accuracy": 1.0
+      },
+      "overall_accuracy": 0.281759695823376,
+      "timestamp": "2025-09-05T10:57:36.450208"
+    },
+    {
+      "query": "What are the most sought-after skills across these JDs?",
+      "expected_answer": "Communication, problem-solving, Excel/Google Sheets, HRMS, CRM, cold calling, negotiation, PR/media skills",
+      "generated_answer": "Strategic Market Insight \u2013 Skill Heat-Map Across Retrieved JDs  \n(Scope: Masters\u2019 Union & Accorian postings only)\n\n1. Presentation & Negotiation Mastery  \n   Cited By: Masters\u2019 Union (100 % of its JDs)  \n   Relevant Specializations: Marketing, Sales, Business Development, General Management  \n   Why It Matters: In B2C inside-sales / admission-counsellor roles, the candidate who can pitch value propositions crisply and close prospects on the same call outperforms peers by 2-3\u00d7 conversion rates.  \n   Strategic Advice: Treat this as a cross-functional \u201cmust-have\u201d; even Finance & HR majors who interface with internal clients need persuasive storytelling.  \n   Recommended Certifications:  \n   \u2013 \u201cHigh-Impact Presentation\u201d \u2013 Dale Carnegie (2-day)  \n   \u2013 \u201cNegotiation Mastery\u201d \u2013 Harvard Online (6 wks, \u20b965 k)\n\n2. CRM & Sales Pipeline Discipline  \n   Cited By: Masters\u2019 Union (explicitly in both JDs)  \n   Relevant Specializations: Marketing, Business Analytics, Sales & Channel Management  \n   Why It Matters: Companies are moving from gut-feel to data-driven funnel management; ability to tag, score and forecast leads in CRM is now baseline employability for customer-facing MBA roles.  \n   Strategic Advice: Pair CRM literacy with basic SQL / Power BI to become the \u201ctech-savvy marketer\u201d every ed-tech & fintech firm is hunting.  \n   Recommended Certifications:  \n   \u2013 Salesforce Sales-Operations Bootcamp (free Trailhead + Super-badge)  \n   \u2013 HubSpot CRM + HubSpot Reporting\n\n3. Time-Management & Multi-Tasking Under Six-Day Week Pressure  \n   Cited By: Masters\u2019 Union (all JDs)  \n   Relevant Specializations: Operations, General Management, HR (for high-volume recruiting)  \n   Why It Matters: Six-day work cultures (start-ups, ed-tech, consulting) filter for stamina; students who have practised 14-hour term-project sprints + live client simulations adapt fastest.  \n   Strategic Advice: Build visible proof \u2013 use \u201csprint retrospectives\u201d from your term projects / live practicum to demonstrate throughput in interviews.  \n   Recommended Tools: Notion, Trello, Pomodoro Tracker; certify on \u201cGetting Things Done\u201d (GTD) Practitioner.\n\n4. Analytical & Problem-Solving Acumen  \n   Cited By: Accorian (HR role)  \n   Relevant Specializations: Business Analytics, HR (People Analytics), Finance  \n   Why It Matters: Even HR is becoming a data function; Accorian wants evidence-based redesign of \u201chire-to-retire\u201d processes.  \n   Strategic Advice: Position yourself as the MBA who can quantify cost-per-hire, predict attrition, and justify policy changes with ROI.  \n   Recommended Certifications:  \n   \u2013 People Analytics \u2013 Wharton Online  \n   \u2013 Tableau Desktop Specialist + basic Python (pandas) for HR data sets\n\n5. HR Tech & Compliance (Labour-Law) Fluency  \n   Cited By: Accorian  \n   Relevant Specializations: HR, Operations (plant IR), Legal & Corporate Governance  \n   Why It Matters: Post-pandemic, every firm is digitizing HRMS and needs in-house talent who can translate statutory changes into system workflows.  \n   Strategic Advice: This is a niche but high-margin skill; fewer MBA-HR students certify on labour codes \u2192 premium pay.  \n   Recommended Certifications:  \n   \u2013 SHRM-SCP (global) + India Labour Codes Certificate \u2013 NLSIU  \n   \u2013 SAP SuccessFactors or Workday HCM Functional (any one)\n\nCross-Company Trend Summary  \n\u2022 Sales & Customer-facing DNA dominates Masters\u2019 Union JDs \u2192 demand for \u201cRevenue Engineers\u201d who blend CRM analytics with persuasive communication.  \n\u2022 Accorian signals the rise of \u201cHR-Analytics\u201d hybrids; pure admin HR roles are disappearing.  \n\u2022 Both companies implicitly reward candidates who can thrive in 6-day, high-velocity cultures \u2192 resilience & productivity frameworks are now employability differentiators.\n\nActionable Portfolio Recommendation for MBA Students  \nA. Build a T-shaped profile:  \n   \u2013 Vertical depth: pick ONE of (a) CRM+Sales Analytics, (b) People Analytics, (c) Financial Modelling.  \n   \u2013 Horizontal breadth: certify in Presentation, Negotiation, and Productivity tools (every recruiter asks for these).  \n\nB. Demonstrate stamina & results simultaneously: show metrics (leads converted, process cycle-time reduced) achieved during 60-hour weeks\u2014this maps directly to the six-day requirement.\n\nC. Differentiate early:  \n   \u2013 Marketing/BA majors \u2192 stack Salesforce + Tableau.  \n   \u2013 HR majors \u2192 stack HRMS + Labour Codes + Power BI.  \n   \u2013 Finance/Ops \u2192 add Six-Sigma-Green-Belt to analytical core.\n\nIf you need comparative insights beyond these two firms, let me know and I\u2019ll pull the wider 2024-25 placement database.",
+      "category": "skill_analysis",
+      "difficulty": "hard",
+      "response_time": 14.421176,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.46482977",
+        "keyword_overlap": 0.5,
+        "entity_extraction_accuracy": 0.625
+      },
+      "overall_accuracy": 0.20546595454216005,
+      "timestamp": "2025-09-05T10:57:59.152539"
+    },
+    {
+      "query": "Which jobs are based in Bangalore?",
+      "expected_answer": "Mill Story, TAP Academy, Madison PR (also Gurgaon/Mumbai)",
+      "generated_answer": "Result: SQL Query: SELECT * FROM roles WHERE location = 'Bangalore';\nResult: ('[]', {'result': [], 'col_keys': ['id', 'company_id', 'title', 'specialization', 'location', 'role_description', 'created_at']})",
+      "category": "location_based",
+      "difficulty": "medium",
+      "response_time": 4.375398,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.049760584",
+        "keyword_overlap": 0.0,
+        "entity_extraction_accuracy": 0.0
+      },
+      "overall_accuracy": 0.009952116757631302,
+      "timestamp": "2025-09-05T10:58:13.766564"
+    },
+    {
+      "query": "Which role has the highest salary package?",
+      "expected_answer": "Madison PR (up to 5.5 LPA)",
+      "generated_answer": "Result: SQL Query: SELECT r.title\nFROM roles r\nJOIN offers o ON r.id = o.role_id\nORDER BY o.salary_max_lpa DESC\nLIMIT 1;\nResult: (\"[('Account Executive',)]\", {'result': [('Account Executive',)], 'col_keys': ['title']})",
+      "category": "salary_comparison",
+      "difficulty": "medium",
+      "response_time": 4.337195,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.103989705",
+        "keyword_overlap": 0.0,
+        "entity_extraction_accuracy": 0.0
+      },
+      "overall_accuracy": 0.020797941088676455,
+      "timestamp": "2025-09-05T10:58:18.346852"
+    },
+    {
+      "query": "Which jobs are paid internships?",
+      "expected_answer": "Mill Story (Finance Internship)",
+      "generated_answer": "Result: SQL Query: SELECT DISTINCT r.title\nFROM roles r\nJOIN offers o ON r.id = o.role_id\nWHERE LOWER(r.title) LIKE '%intern%'\n  AND o.salary_min_lpa > 0;\nResult: ('[]', {'result': [], 'col_keys': ['title']})",
+      "category": "compensation_type",
+      "difficulty": "easy",
+      "response_time": 4.614685,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.08726538",
+        "keyword_overlap": 0.0,
+        "entity_extraction_accuracy": 0.0
+      },
+      "overall_accuracy": 0.01745307594537735,
+      "timestamp": "2025-09-05T10:58:22.820111"
+    },
+    {
+      "query": "List all the tools/software mentioned in the JDs",
+      "expected_answer": "Excel, Google Sheets, Tally, Zoho Books, HRMS, CRM, LinkedIn, PR tools, MS Office",
+      "generated_answer": "Based on the available job descriptions, here are the tools/software explicitly mentioned:\n\n**Tools/Software Identified:**\n- **MS Office Suite** (mentioned by Accorian)\n- **HRMS** (Human Resource Management System) (mentioned by Accorian)\n\n**Strategic Analysis for MBA Students:**\n\n**Skill Name:** MS Office Suite & HRMS Proficiency\n**Cited By Companies:** Accorian\n**Relevant Specializations:** HR, Operations, Business Analytics\n**Why It Matters:** These are foundational tools for any HR professional. MS Office (especially Excel for data analysis, PowerPoint for presentations, and Word for documentation) is essential for day-to-day operations. HRMS proficiency is critical as companies increasingly digitize their HR processes.\n\n**Strategic Advice:** While these are table-stakes skills, the emphasis on HRMS indicates a broader trend toward HR digitization. MBA students should view this as an opportunity to differentiate themselves by gaining expertise in advanced HR technologies beyond basic HRMS.\n\n**Recommended Certifications/Training:**\n- **MS Office:** Advanced Excel certification (for data analysis), PowerBI certification (for HR dashboards)\n- **HRMS:** Workday HCM certification, SAP SuccessFactors certification, or Oracle HCM Cloud certification\n- **Cross-functional:** Tableau or PowerBI for HR analytics, Python/R for advanced HR data analysis\n\n**Note:** The limited tool mentions suggest these JDs focus more on process expertise than specific technical tools. MBA students should proactively seek exposure to modern HR tech stacks (like People Analytics platforms, Employee Experience tools, and AI-driven HR systems) to stay competitive.",
+      "category": "tool_listing",
+      "difficulty": "hard",
+      "response_time": 11.99814,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.6127318",
+        "keyword_overlap": 0.38461538461538464,
+        "entity_extraction_accuracy": 0.3333333333333333
+      },
+      "overall_accuracy": 0.1943412346717639,
+      "timestamp": "2025-09-05T10:58:27.613938"
+    },
+    {
+      "query": "Which jobs are better for freshers?",
+      "expected_answer": "Accorian (fresher role), TAP Academy (freshers encouraged)",
+      "generated_answer": "## Strategic Market Analysis: Fresher-Friendly Opportunities\n\nBased on comprehensive analysis of available placement data, here are the **most accessible entry points** for MBA freshers:\n\n### **Tier 1: Immediate Entry Opportunities**\n\n**1. TAP Academy - Business Development/Sales Trainee**\n- **Why It's Ideal**: Explicitly welcomes freshers with \"excellent communication skills\"\n- **Core Requirements**: \n  - Cold calling & emailing proficiency\n  - LinkedIn networking skills\n  - Strong verbal/written communication\n- **MBA Relevance**: Perfect for Marketing specialization students to build foundational sales skills\n- **Strategic Advantage**: Provides direct client interaction experience, crucial for marketing careers\n\n**2. Masters' Union - Admission Counselor**\n- **Entry Barrier**: While requiring \"proven experience,\" the role focuses on B2C sales which freshers can demonstrate through internships\n- **Key Skills**: CRM usage, target achievement, understanding professional learning needs\n- **MBA Mapping**: Excellent for Marketing/HR students interested in education sector careers\n\n### **Tier 2: Specialized Entry with Internship Experience**\n\n**3. MADISON PUBLIC RELATIONS - PR Executive**\n- **Entry Requirement**: Previous internship experience (manageable during MBA)\n- **Ideal Specialization**: Marketing (Public Relations/Communications track)\n- **Unique Value**: Combines storytelling skills with media relations - highly valued in corporate communications roles\n\n### **Cross-Company Strategic Insights**\n\n**Most Fresher-Friendly Skills to Develop:**\n1. **Communication Excellence** (mentioned by 100% of companies)\n2. **LinkedIn & Social Media Proficiency** (TAP Academy emphasis)\n3. **CRM Familiarity** (Masters' Union requirement - easily learned via online certifications)\n4. **Cold Outreach Skills** (TAP Academy - can be practiced independently)\n\n**Specialization-Specific Recommendations:**\n\n- **Marketing Students**: Focus on TAP Academy and MADISON PR roles. Build portfolio with social media campaigns and PR writing samples.\n- **HR Students**: Masters' Union role aligns well with talent acquisition aspects. Emphasize counseling and professional development understanding.\n- **Business Analytics**: While not directly listed, data-driven sales approaches using CRM analytics could be your differentiator.\n\n**Immediate Action Plan for Freshers:**\n1. **Week 1-2**: Complete HubSpot CRM certification (free)\n2. **Week 3-4**: Build LinkedIn presence with 500+ connections and regular industry content sharing\n3. **Week 5-6**: Create mock cold outreach campaigns as portfolio pieces\n4. **Apply Strategy**: Target TAP Academy immediately, use gained experience for Masters' Union applications\n\n**Pro Tip**: The market shows clear preference for **communication-heavy roles** for freshers. Your MBA differentiator should be combining these communication skills with business strategy understanding that non-MBA candidates lack.\n\n*Note: Structured data could not be retrieved.*",
+      "category": "comparative_analysis",
+      "difficulty": "medium",
+      "response_time": 24.774481,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.46214986",
+        "keyword_overlap": 0.5714285714285714,
+        "entity_extraction_accuracy": 0.0
+      },
+      "overall_accuracy": 0.14957282883780343,
+      "timestamp": "2025-09-05T10:58:39.763377"
+    },
+    {
+      "query": "Is there any role where I can learn fundraising?",
+      "expected_answer": "Yes, Mill Story (finance intern supports fundraising & pitch decks)",
+      "generated_answer": "Fundraising exposure is explicitly offered by only one company in the current data set.\n\nRole: Finance & Accounting Intern  \nCompany: Mill Story  \nLocation: Not specified  \nCompensation: Not specified  \n\nWhat you will do (fundraising-related)  \n- \u201cSupport in fundraising preparations \u2014 real exposure to how start-ups raise capital.\u201d  \n- Work on pro-forma accounting and core statements (P&L, balance-sheet, cash-flow) that are typically folded into investor decks & data rooms.  \n- Assist in keeping books \u201cclean and accurate\u201d \u2013 a prerequisite for any due-diligence exercise.  \n\nRelevance for MBA students  \n\u2022 Specialization fit: Corporate Finance / Strategy / Entrepreneurship.  \n\u2022 Skill bridge: Links classroom valuation, financial-modeling and term-sheet concepts to live deal work.  \n\u2022 Network upside: Early-stage start-ups give interns direct access to founders and often to angel/VC conversations\u2014valuable for placement pitches in PE/VC, I-banking or start-up roles later.  \n\nStrategic advice  \n1. Highlight start-up finance coursework and DCF/LBO models on your r\u00e9sum\u00e9.  \n2. Build a simple sample financial model + three-statement projection you can walk through in interviews.  \n3. If offered the internship, volunteer to build the KPI dashboard that feeds into the investor deck\u2014this becomes a strong CV bullet.  \n\nRecommended certifications / training  \n\u2022 \u201cStartup Valuation & Financial Modelling\u201d (Coursera \u2013 HEC/Wharton)  \n\u2022 \u201cRaising Capital & Valuing Early-Stage Businesses\u201d (Wall Street Prep)  \n\u2022 Advanced Excel & Power BI for investor dashboards.  \n\nBottom line: Among the companies documented, Mill Story is the only opportunity that advertises hands-on fundraising exposure; target this role if learning the funding process is your primary objective.",
+      "category": "learning_opportunity",
+      "difficulty": "medium",
+      "response_time": 16.052086,
+      "accuracy_metrics": {
+        "exact_match": 0.0,
+        "partial_match": 0.0,
+        "semantic_similarity": "0.4923646",
+        "keyword_overlap": 0.6666666666666666,
+        "entity_extraction_accuracy": 1.0
+      },
+      "overall_accuracy": 0.2651395837465922,
+      "timestamp": "2025-09-05T10:59:04.717291"
+    }
+  ],
+  "aggregate_metrics": {
+    "overall": {
+      "total_queries": 20,
+      "avg_accuracy": 0.13388629210359398,
+      "std_accuracy": 0.08078194700511825,
+      "avg_response_time": 10.665562750000001,
+      "std_response_time": 7.459884977993675,
+      "exact_match_rate": 0.0,
+      "avg_semantic_similarity": "0.29892868"
+    },
+    "by_category": {
+      "tool_listing": {
+        "count": 1,
+        "avg_accuracy": 0.1943412346717639,
+        "avg_response_time": 11.99814
+      },
+      "location_based": {
+        "count": 1,
+        "avg_accuracy": 0.009952116757631302,
+        "avg_response_time": 4.375398
+      },
+      "learning_opportunity": {
+        "count": 1,
+        "avg_accuracy": 0.2651395837465922,
+        "avg_response_time": 16.052086
+      },
+      "role_listing": {
+        "count": 1,
+        "avg_accuracy": 0.047066981196403505,
+        "avg_response_time": 5.868185
+      },
+      "salary_comparison": {
+        "count": 1,
+        "avg_accuracy": 0.020797941088676455,
+        "avg_response_time": 4.337195
+      },
+      "role_description": {
+        "count": 1,
+        "avg_accuracy": 0.18953760770651013,
+        "avg_response_time": 21.493842
+      },
+      "task_listing": {
+        "count": 1,
+        "avg_accuracy": 0.1479922790276377,
+        "avg_response_time": 25.031295
+      },
+      "opportunity_listing": {
+        "count": 1,
+        "avg_accuracy": 0.281759695823376,
+        "avg_response_time": 22.557697
+      },
+      "company_identification": {
+        "count": 2,
+        "avg_accuracy": 0.0732465036213398,
+        "avg_response_time": 5.3022735
+      },
+      "comparative_analysis": {
+        "count": 1,
+        "avg_accuracy": 0.14957282883780343,
+        "avg_response_time": 24.774481
+      },
+      "company_count": {
+        "count": 1,
+        "avg_accuracy": 0.1290489137172699,
+        "avg_response_time": 6.649052
+      },
+      "yes_no_question": {
+        "count": 1,
+        "avg_accuracy": 0.25677506804466255,
+        "avg_response_time": 5.756215
+      },
+      "industry_identification": {
+        "count": 3,
+        "avg_accuracy": 0.12713661889235178,
+        "avg_response_time": 5.143009
+      },
+      "skill_analysis": {
+        "count": 1,
+        "avg_accuracy": 0.20546595454216005,
+        "avg_response_time": 14.421176
+      },
+      "feature_identification": {
+        "count": 1,
+        "avg_accuracy": 0.16545585393905643,
+        "avg_response_time": 15.509197
+      },
+      "job_type": {
+        "count": 1,
+        "avg_accuracy": 0.0694638431072235,
+        "avg_response_time": 3.839037
+      },
+      "compensation_type": {
+        "count": 1,
+        "avg_accuracy": 0.01745307594537735,
+        "avg_response_time": 4.614685
+      }
+    },
+    "by_difficulty": {
+      "easy": {
+        "count": 7,
+        "avg_accuracy": 0.11209853742803848,
+        "avg_response_time": 6.710390428571429
+      },
+      "medium": {
+        "count": 8,
+        "avg_accuracy": 0.10924241353802028,
+        "avg_response_time": 8.8545465
+      },
+      "hard": {
+        "count": 5,
+        "avg_accuracy": 0.20381935435428958,
+        "avg_response_time": 19.10043
+      }
+    }
+  },
+  "benchmark_report": "\n# JD-Copilot RAG System Benchmark Report\nGenerated: 2025-09-05 10:59:20\n\n## Executive Summary\n- **Total Queries Evaluated:** 20\n- **Overall Accuracy:** 0.134 \u00b1 0.081\n- **Exact Match Rate:** 0.000\n- **Average Response Time:** 10.67s \u00b1 7.46s\n- **Semantic Similarity:** 0.299\n\n## Performance by Category\n\n### Tool Listing (1 queries)\n- Average Accuracy: 0.194\n- Average Response Time: 12.00s\n\n### Location Based (1 queries)\n- Average Accuracy: 0.010\n- Average Response Time: 4.38s\n\n### Learning Opportunity (1 queries)\n- Average Accuracy: 0.265\n- Average Response Time: 16.05s\n\n### Role Listing (1 queries)\n- Average Accuracy: 0.047\n- Average Response Time: 5.87s\n\n### Salary Comparison (1 queries)\n- Average Accuracy: 0.021\n- Average Response Time: 4.34s\n\n### Role Description (1 queries)\n- Average Accuracy: 0.190\n- Average Response Time: 21.49s\n\n### Task Listing (1 queries)\n- Average Accuracy: 0.148\n- Average Response Time: 25.03s\n\n### Opportunity Listing (1 queries)\n- Average Accuracy: 0.282\n- Average Response Time: 22.56s\n\n### Company Identification (2 queries)\n- Average Accuracy: 0.073\n- Average Response Time: 5.30s\n\n### Comparative Analysis (1 queries)\n- Average Accuracy: 0.150\n- Average Response Time: 24.77s\n\n### Company Count (1 queries)\n- Average Accuracy: 0.129\n- Average Response Time: 6.65s\n\n### Yes No Question (1 queries)\n- Average Accuracy: 0.257\n- Average Response Time: 5.76s\n\n### Industry Identification (3 queries)\n- Average Accuracy: 0.127\n- Average Response Time: 5.14s\n\n### Skill Analysis (1 queries)\n- Average Accuracy: 0.205\n- Average Response Time: 14.42s\n\n### Feature Identification (1 queries)\n- Average Accuracy: 0.165\n- Average Response Time: 15.51s\n\n### Job Type (1 queries)\n- Average Accuracy: 0.069\n- Average Response Time: 3.84s\n\n### Compensation Type (1 queries)\n- Average Accuracy: 0.017\n- Average Response Time: 4.61s\n\n## Performance by Difficulty\n\n### Easy Queries (7 queries)\n- Average Accuracy: 0.112\n- Average Response Time: 6.71s\n\n### Medium Queries (8 queries)\n- Average Accuracy: 0.109\n- Average Response Time: 8.85s\n\n### Hard Queries (5 queries)\n- Average Accuracy: 0.204\n- Average Response Time: 19.10s\n\n## Detailed Results\n\n### Query 1: How many companies are offering finance roles?\n- **Category:** company_count\n- **Difficulty:** easy\n- **Overall Accuracy:** 0.129\n- **Response Time:** 6.65s\n\n**Expected Answer:**\n1 (Mill Story \u2013 Finance & Accounting Internship)\n\n**Generated Answer:**\nResult: SQL Query: SELECT COUNT(DISTINCT c.id) AS company_count\nFROM companies c\nJOIN roles r ON c.id = r.company_id\nJOIN offers o ON r.id = o.role_id\nWHERE r.specialization = 'finance';\nResult: ('[(0,)]', {'result': [(0,)], 'col_keys': ['company_count']})\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.145\n- Keyword Overlap: 0.000\n- Entity Accuracy: 1.000\n\n---\n\n### Query 2: Who are the companies with HR opportunities?\n- **Category:** company_identification\n- **Difficulty:** easy\n- **Overall Accuracy:** 0.047\n- **Response Time:** 3.73s\n\n**Expected Answer:**\nAccorian (Associate \u2013 People Operations)\n\n**Generated Answer:**\nResult: SQL Query: SELECT DISTINCT c.company_name\nFROM companies c\nJOIN roles r ON c.id = r.company_id\nWHERE r.specialization = 'HR';\nResult: (\"[('Accorian',)]\", {'result': [('Accorian',)], 'col_keys': ['company_name']})\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.233\n- Keyword Overlap: 0.000\n- Entity Accuracy: 0.000\n\n---\n\n### Query 3: Which companies are hiring for PR or communications roles?\n- **Category:** company_identification\n- **Difficulty:** easy\n- **Overall Accuracy:** 0.100\n- **Response Time:** 6.88s\n\n**Expected Answer:**\nMadison PR (Account Executive)\n\n**Generated Answer:**\nResult: SQL Query: SELECT DISTINCT c.company_name\nFROM companies c\nJOIN roles r ON c.id = r.company_id\nWHERE LOWER(r.title) LIKE '%pr%' \n   OR LOWER(r.title) LIKE '%public relations%'\n   OR LOWER(r.title) LIKE '%communications%'\n   OR LOWER(r.specialization) LIKE '%pr%'\n   OR LOWER(r.specialization) LIKE '%public relations%'\n   OR LOWER(r.specialization) LIKE '%communications%';\nResult: (\"[('Target',)]\", {'result': [('Target',)], 'col_keys': ['company_name']})\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.125\n- Keyword Overlap: 0.250\n- Entity Accuracy: 0.500\n\n---\n\n### Query 4: Are there any admission-related jobs?\n- **Category:** yes_no_question\n- **Difficulty:** easy\n- **Overall Accuracy:** 0.257\n- **Response Time:** 5.76s\n\n**Expected Answer:**\nYes, Masters' Union (Admission Counselor)\n\n**Generated Answer:**\nResult: SQL Query: SELECT DISTINCT r.id, r.title, c.company_name\nFROM roles r\nJOIN companies c ON r.company_id = c.id\nWHERE LOWER(r.title) LIKE '%admission%' OR LOWER(r.role_description) LIKE '%admission%' OR LOWER(r.specialization) LIKE '%admission%';\nResult: ('[(8, \\'Admission Counselor\\', \"Masters\\' Union\")]', {'result': [(8, 'Admission Counselor', \"Masters' Union\")], 'col_keys': ['id', 'title', 'company_name']})\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.384\n- Keyword Overlap: 0.800\n- Entity Accuracy: 1.000\n\n---\n\n### Query 5: Which roles are open for freshers?\n- **Category:** role_listing\n- **Difficulty:** medium\n- **Overall Accuracy:** 0.047\n- **Response Time:** 5.87s\n\n**Expected Answer:**\nAccorian (Associate HR Ops \u2013 Fresher), TAP Academy (BDA \u2013 freshers encouraged)\n\n**Generated Answer:**\nResult: SQL Query: SELECT DISTINCT r.title\nFROM roles r\nJOIN requirements req ON r.id = req.role_id\nWHERE req.requirement_text LIKE '%fresher%' OR req.requirement_text LIKE '%0 years%' OR req.requirement_text LIKE '%no experience%';\nResult: ('[]', {'result': [], 'col_keys': ['title']})\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.185\n- Keyword Overlap: 0.100\n- Entity Accuracy: 0.000\n\n---\n\n### Query 6: Which jobs mention placements explicitly?\n- **Category:** feature_identification\n- **Difficulty:** easy\n- **Overall Accuracy:** 0.165\n- **Response Time:** 15.51s\n\n**Expected Answer:**\nTAP Academy (student placements)\n\n**Generated Answer:**\nBased on the available documents, I found **one role** that explicitly mentions placements:\n\n---\n\n**Job Title:** *Not explicitly stated, but contextually inferred as a Placement/Outreach Role*  \n**Company:** TAP Academy  \n**Location:** Not specified  \n**Key Responsibilities (Placement-Related):**  \n- **Market Research & Networking:** Stay updated on industry hiring trends, skill requirements, and **placement opportunities**.  \n- **Reporting & Pipeline Management:** Track and report on **outreach activities, lead generation efforts, and placement successes**.  \n\n**Relevance for MBA Students:**  \nThis role is directly aligned with **MBA career services, corporate relations, or placement coordination functions**. It involves:  \n- **Strategic networking** with recruiters to secure roles for students.  \n- **Data-driven reporting** on placement metrics (e.g., offer-to-interview ratios, salary trends).  \n- **Cross-functional collaboration** with marketing (branding), HR (candidate profiling), and analytics (dashboards).  \n\n**Strategic Insight:**  \nWhile no other companies explicitly mention \"placements\" in the provided data, TAP Academy\u2019s focus on **placement tracking and industry trend analysis** highlights a niche opportunity for MBA students specializing in **HR (talent acquisition), Business Analytics (dashboarding), or Marketing (employer branding)**.  \n\n**Recommendation:**  \nIf you\u2019re targeting **corporate relations, campus recruitment, or ed-tech placement roles**, emphasize:  \n- **CRM proficiency** (e.g., Salesforce, Zoho).  \n- **Data visualization** (PowerBI/Tableau for placement dashboards).  \n- **Stakeholder management** (bridging students and recruiters).  \n\nNo other companies in the dataset explicitly reference placements.\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.452\n- Keyword Overlap: 0.750\n- Entity Accuracy: 0.000\n\n---\n\n### Query 7: Are there any ed-tech companies hiring?\n- **Category:** industry_identification\n- **Difficulty:** medium\n- **Overall Accuracy:** 0.114\n- **Response Time:** 5.65s\n\n**Expected Answer:**\nTAP Academy (BDA role)\n\n**Generated Answer:**\nResult: SQL Query: SELECT DISTINCT c.company_name\nFROM companies c\nJOIN roles r ON c.id = r.company_id\nJOIN offers o ON r.id = o.role_id\nWHERE c.industry = 'ed-tech' AND o.expected_hires > 0;\nResult: ('[]', {'result': [], 'col_keys': ['company_name']})\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.071\n- Keyword Overlap: 0.000\n- Entity Accuracy: 1.000\n\n---\n\n### Query 8: Which companies are in consulting or cybersecurity?\n- **Category:** industry_identification\n- **Difficulty:** medium\n- **Overall Accuracy:** 0.148\n- **Response Time:** 4.67s\n\n**Expected Answer:**\nAccorian (cybersecurity advisory firm)\n\n**Generated Answer:**\nResult: SQL Query: SELECT DISTINCT company_name\nFROM companies\nWHERE industry IN ('consulting', 'cybersecurity');\nResult: ('[]', {'result': [], 'col_keys': ['company_name']})\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.240\n- Keyword Overlap: 0.000\n- Entity Accuracy: 1.000\n\n---\n\n### Query 9: Which jobs are specifically internships?\n- **Category:** job_type\n- **Difficulty:** easy\n- **Overall Accuracy:** 0.069\n- **Response Time:** 3.84s\n\n**Expected Answer:**\nMill Story (Finance Internship)\n\n**Generated Answer:**\nResult: SQL Query: SELECT * FROM roles WHERE LOWER(title) LIKE '%intern%' OR LOWER(title) LIKE '%internship%';\nResult: (\"[(9, 9, 'Finance & Accounting Intern', 'FINANCE', 'Sarjapur Road, Bengaluru', '', '2025-08-19 15:55:38')]\", {'result': [(9, 9, 'Finance & Accounting Intern', 'FINANCE', 'Sarjapur Road, Bengaluru', '', '2025-08-19 15:55:38')], 'col_keys': ['id', 'company_id', 'title', 'specialization', 'location', 'role_description', 'created_at']})\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.222\n- Keyword Overlap: 0.250\n- Entity Accuracy: 0.000\n\n---\n\n### Query 10: Which job is in the food & consumer space?\n- **Category:** industry_identification\n- **Difficulty:** medium\n- **Overall Accuracy:** 0.119\n- **Response Time:** 5.11s\n\n**Expected Answer:**\nMill Story (D2C food brand \u2013 chemical-free flour)\n\n**Generated Answer:**\nResult: SQL Query: SELECT DISTINCT r.title\nFROM roles r\nJOIN companies c ON r.company_id = c.id\nWHERE c.industry = 'food & consumer';\nResult: ('[]', {'result': [], 'col_keys': ['title']})\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.095\n- Keyword Overlap: 0.000\n- Entity Accuracy: 1.000\n\n---\n\n### Query 11: What finance-related tasks are mentioned?\n- **Category:** task_listing\n- **Difficulty:** hard\n- **Overall Accuracy:** 0.148\n- **Response Time:** 25.03s\n\n**Expected Answer:**\nAccounting, P&L, balance sheet, cash flow, budgeting, expense tracking, invoice checks, audits, compliance, fundraising support, pitch deck prep\n\n**Generated Answer:**\nFinance-Related Tasks Identified in the Available Data\n----------------------------------------------------\n\nCompany: Mill Story  \nRole: Finance & Accounting Intern  \n\nKey Finance Tasks Mentioned  \n1. Book-keeping & Accuracy  \n   \u2022 Maintain clean and accurate books of accounts.  \n\n2. Financial Statement Preparation  \n   \u2022 Build Pro-forma accounting statements:  \n     \u2013 Profit & Loss (P&L)  \n     \u2013 Balance Sheet  \n     \u2013 Cash-Flow Statement  \n\n3. Budgeting & Expense Control  \n   \u2022 Assist in budgeting processes.  \n   \u2022 Track expenses and verify invoices.  \n\n4. Fund-Raising Support  \n   \u2022 Contribute to fundraising preparation activities\u2014hands-on exposure to how early-stage start-ups ready themselves for investor rounds.\n\nRelevance for MBA Students  \n\u2022 Specialization Fit: Directly aligns with Finance specialization; also useful for Entrepreneurship electives.  \n\u2022 Skill Development: Offers practical experience in start-up finance, investor-readiness, and financial modeling\u2014competencies highly valued by VC/PE firms and corporate finance roles.\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.503\n- Keyword Overlap: 0.474\n- Entity Accuracy: 0.000\n\n---\n\n### Query 12: What do HR operations jobs involve?\n- **Category:** role_description\n- **Difficulty:** hard\n- **Overall Accuracy:** 0.190\n- **Response Time:** 21.49s\n\n**Expected Answer:**\nEmployee lifecycle management, engagement, compliance audits, labor law adherence, HR processes, people initiatives\n\n**Generated Answer:**\n## Strategic Analysis: HR Operations Roles Across the Market\n\n### Core Responsibilities in HR Operations\n\nBased on the available data from **Accorian** and **TAP Academy**, HR Operations roles encompass a comprehensive employee lifecycle management approach:\n\n**Primary Functions:**\n- **End-to-End Employee Lifecycle Management**: From hire-to-retire processes including onboarding, transfers, performance management, and exit formalities\n- **Employee Experience Design**: Strategizing and deploying initiatives that enhance employee touchpoints throughout their journey\n- **Stakeholder Partnership**: Acting as the Single Point of Contact (SPOC) for employee queries while collaborating with leadership on organization design and development\n- **Process Optimization**: Streamlining HR processes to enhance operational efficiency and reduce turnaround times\n- **Compliance Management**: Ensuring adherence to labor laws and regulatory requirements across all people practices\n\n### Strategic Implications for MBA-HR Students\n\n**Relevance for MBA-HR Specialization:**\n- **High Strategic Value**: These roles sit at the intersection of operational excellence and strategic HR, making them ideal for MBA graduates who understand both business strategy and people management\n- **Cross-Functional Exposure**: You'll interact with finance (compensation), operations (productivity metrics), and business leaders (organization design), providing T-shaped skill development\n- **Data-Driven Decision Making**: The emphasis on reporting and pipeline management aligns with modern HR analytics requirements\n\n### Market Trends & Skills Gap Analysis\n\n**Most Critical Skills Identified:**\n1. **HR Technology Proficiency** (HRMS systems)\n2. **Process Re-engineering** capabilities\n3. **Labor Law & Compliance** expertise\n4. **MS Office Suite** (particularly Excel for analytics)\n5. **Stakeholder Management** and communication\n\n**Strategic Advice for Career Preparation:**\n\n**Immediate Actions:**\n- **Certification Path**: Pursue SHRM-CP or PHR certifications to demonstrate compliance expertise\n- **Technical Upskilling**: Gain hands-on experience with popular HRMS platforms (Workday, SAP SuccessFactors, or BambooHR)\n- **Process Excellence**: Consider Six Sigma Green Belt certification to strengthen process optimization credentials\n\n**Long-term Career Trajectory:**\n- **Entry Point**: Associate-People Operations roles serve as excellent gateways to strategic HR business partner positions\n- **Specialization Opportunities**: Focus on either **Employee Experience Design** (high-growth area) or **HR Analytics & Technology** (future-proof skill set)\n- **Compensation Growth**: These foundational roles typically lead to HR Manager positions within 3-4 years, with significant salary progression\n\n### Competitive Positioning for Placements\n\n**Differentiation Strategy:**\n- **Combine MBA Business Acumen**: Leverage your strategic thinking to propose data-driven HR solutions\n- **Technology-First Approach**: Position yourself as an HR professional who can bridge traditional HR with digital transformation\n- **Quantify Impact**: Prepare case studies showing how HR process improvements can directly impact business metrics (retention rates, productivity indices)\n\n**Recommended Portfolio Projects:**\n- Design an employee onboarding journey map with measurable KPIs\n- Create a compliance dashboard tracking key labor law metrics\n- Develop a process optimization proposal for a specific HR function with ROI projections\n\nThis analysis positions HR Operations not just as administrative roles, but as strategic business enablers where MBA-HR graduates can create measurable business impact from day one.\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.525\n- Keyword Overlap: 0.846\n- Entity Accuracy: 0.000\n\n---\n\n### Query 13: What opportunities does TAP Academy offer?\n- **Category:** opportunity_listing\n- **Difficulty:** hard\n- **Overall Accuracy:** 0.282\n- **Response Time:** 22.56s\n\n**Expected Answer:**\nLead generation, partnership development, LinkedIn outreach, placement strategy, market research, reporting, career advancement\n\n**Generated Answer:**\nStrategic Placement Brief \u2013 TAP Academy Opportunities for MBA Students\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n1. Core Opportunity  \n   Job Title: Business Development Associate  \n   Company: TAP Academy (Ed-Tech, BTM Layout, Bangalore)  \n   Experience Band: 0\u20133 years (prior Ed-Tech exposure is a plus)  \n\n2. Role Mandate & MBA Relevance  \n   \u2022 Lead Generation for Placements  \n     \u2013 Identify and engage companies with active hiring demand via cold-calling, cold-emailing, and LinkedIn outreach.  \n     \u2013 MBA Lens: Directly leverages Marketing & Sales funnel concepts; ideal for students specialising in Marketing or Business Analytics who want hands-on experience in B2B demand generation.  \n\n   \u2022 Partnership Development  \n     \u2013 Build and nurture relationships with HR heads, recruiters, and decision-makers to secure placement slots for TAP Academy learners.  \n     \u2013 MBA Lens: Mirrors Strategic HR & Corporate Relations roles; HR majors can showcase stakeholder-management and talent-sourcing capabilities.  \n\n   \u2022 LinkedIn & Social-Media Outreach  \n     \u2013 Craft targeted campaigns, optimise messaging, and track engagement metrics.  \n     \u2013 MBA Lens: Demonstrates digital marketing proficiency\u2014critical for Marketing and Business Analytics students aiming to prove ROI on social channels.  \n\n   \u2022 Competitor Intelligence & Opportunity Mapping  \n     \u2013 Monitor rival Ed-Tech placement records to uncover whitespace and refine value propositions.  \n     \u2013 MBA Lens: Combines Competitive Strategy (core to General Management) with data-driven decision making.  \n\n   \u2022 Reporting & Pipeline Management  \n     \u2013 Maintain dashboards on outreach volume, lead conversion, and placement success rates.  \n     \u2013 MBA Lens: Showcases Operations & Analytics acumen\u2014perfect for students targeting roles in Sales Operations or Business Intelligence.  \n\n3. Compensation & Logistics  \n   \u2022 Location: BTM Layout, Bangalore (start-up hub; strong peer-learning ecosystem).  \n   \u2022 Compensation: Not disclosed in retrieved data; recommend clarifying CTC, variable pay, and ESOPs during interviews.  \n\n4. Strategic Advice for MBA Applicants  \n   \u2022 Position Yourself as a \u201cRevenue-Linked HR-Marketing Hybrid\u201d  \n     \u2013 Emphasise coursework in B2B Sales, Digital Marketing, and Strategic HRM.  \n     \u2013 Quantify prior achievements: e.g., \u201cIncreased LinkedIn response rate by 35 % through A/B-tested messaging.\u201d  \n\n   \u2022 Skill Stack to Highlight  \n     \u2013 CRM tools (HubSpot, Salesforce).  \n     \u2013 LinkedIn Sales Navigator & social-listening platforms.  \n     \u2013 Excel / Google Sheets for pipeline dashboards; basic SQL a bonus.  \n     \u2013 Storytelling with data (PowerBI or Tableau quick-wins).  \n\n   \u2022 Certifications That Add Immediate Credibility  \n     \u2013 HubSpot Inbound Sales or LinkedIn Marketing Labs (Marketing).  \n     \u2013 SHRM-CP learning modules (HR).  \n     \u2013 Google Analytics & Ads certificates (cross-functional).  \n\n   \u2022 Interview Differentiator  \n     \u2013 Present a 30-60-90-day plan: target company list, outreach cadence, KPI milestones (e.g., 50 qualified leads/month, 15 % placement conversion).  \n\n5. Long-Term Career Trajectory  \n   \u2022 12\u201318 months in this role can pivot you into:  \n     \u2013 Corporate Relations / Campus Recruitment Manager in larger Ed-Techs or universities.  \n     \u2013 Account Executive or Customer Success Manager in SaaS firms (leveraging Ed-Tech network).  \n     \u2013 Strategic HR Business Partner roles with a strong talent-branding narrative.  \n\n6. Immediate Next Steps  \n   1. Customise your r\u00e9sum\u00e9 headline: \u201cMBA (Marketing/HR) | B2B Lead Generation | Ed-Tech Placement Specialist.\u201d  \n   2. Build a 1-page outreach portfolio: sample cold-email sequence + mock dashboard screenshot.  \n   3. Reach out to TAP Academy\u2019s HR via LinkedIn with a concise value proposition referencing their placement KPIs.  \n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nBottom line: TAP Academy offers a rare, cross-functional entry point where MBA students can simultaneously sharpen sales, marketing, HR, and analytics capabilities while directly impacting revenue and learner outcomes.\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.524\n- Keyword Overlap: 0.769\n- Entity Accuracy: 1.000\n\n---\n\n### Query 14: What are the most sought-after skills across these JDs?\n- **Category:** skill_analysis\n- **Difficulty:** hard\n- **Overall Accuracy:** 0.205\n- **Response Time:** 14.42s\n\n**Expected Answer:**\nCommunication, problem-solving, Excel/Google Sheets, HRMS, CRM, cold calling, negotiation, PR/media skills\n\n**Generated Answer:**\nStrategic Market Insight \u2013 Skill Heat-Map Across Retrieved JDs  \n(Scope: Masters\u2019 Union & Accorian postings only)\n\n1. Presentation & Negotiation Mastery  \n   Cited By: Masters\u2019 Union (100 % of its JDs)  \n   Relevant Specializations: Marketing, Sales, Business Development, General Management  \n   Why It Matters: In B2C inside-sales / admission-counsellor roles, the candidate who can pitch value propositions crisply and close prospects on the same call outperforms peers by 2-3\u00d7 conversion rates.  \n   Strategic Advice: Treat this as a cross-functional \u201cmust-have\u201d; even Finance & HR majors who interface with internal clients need persuasive storytelling.  \n   Recommended Certifications:  \n   \u2013 \u201cHigh-Impact Presentation\u201d \u2013 Dale Carnegie (2-day)  \n   \u2013 \u201cNegotiation Mastery\u201d \u2013 Harvard Online (6 wks, \u20b965 k)\n\n2. CRM & Sales Pipeline Discipline  \n   Cited By: Masters\u2019 Union (explicitly in both JDs)  \n   Relevant Specializations: Marketing, Business Analytics, Sales & Channel Management  \n   Why It Matters: Companies are moving from gut-feel to data-driven funnel management; ability to tag, score and forecast leads in CRM is now baseline employability for customer-facing MBA roles.  \n   Strategic Advice: Pair CRM literacy with basic SQL / Power BI to become the \u201ctech-savvy marketer\u201d every ed-tech & fintech firm is hunting.  \n   Recommended Certifications:  \n   \u2013 Salesforce Sales-Operations Bootcamp (free Trailhead + Super-badge)  \n   \u2013 HubSpot CRM + HubSpot Reporting\n\n3. Time-Management & Multi-Tasking Under Six-Day Week Pressure  \n   Cited By: Masters\u2019 Union (all JDs)  \n   Relevant Specializations: Operations, General Management, HR (for high-volume recruiting)  \n   Why It Matters: Six-day work cultures (start-ups, ed-tech, consulting) filter for stamina; students who have practised 14-hour term-project sprints + live client simulations adapt fastest.  \n   Strategic Advice: Build visible proof \u2013 use \u201csprint retrospectives\u201d from your term projects / live practicum to demonstrate throughput in interviews.  \n   Recommended Tools: Notion, Trello, Pomodoro Tracker; certify on \u201cGetting Things Done\u201d (GTD) Practitioner.\n\n4. Analytical & Problem-Solving Acumen  \n   Cited By: Accorian (HR role)  \n   Relevant Specializations: Business Analytics, HR (People Analytics), Finance  \n   Why It Matters: Even HR is becoming a data function; Accorian wants evidence-based redesign of \u201chire-to-retire\u201d processes.  \n   Strategic Advice: Position yourself as the MBA who can quantify cost-per-hire, predict attrition, and justify policy changes with ROI.  \n   Recommended Certifications:  \n   \u2013 People Analytics \u2013 Wharton Online  \n   \u2013 Tableau Desktop Specialist + basic Python (pandas) for HR data sets\n\n5. HR Tech & Compliance (Labour-Law) Fluency  \n   Cited By: Accorian  \n   Relevant Specializations: HR, Operations (plant IR), Legal & Corporate Governance  \n   Why It Matters: Post-pandemic, every firm is digitizing HRMS and needs in-house talent who can translate statutory changes into system workflows.  \n   Strategic Advice: This is a niche but high-margin skill; fewer MBA-HR students certify on labour codes \u2192 premium pay.  \n   Recommended Certifications:  \n   \u2013 SHRM-SCP (global) + India Labour Codes Certificate \u2013 NLSIU  \n   \u2013 SAP SuccessFactors or Workday HCM Functional (any one)\n\nCross-Company Trend Summary  \n\u2022 Sales & Customer-facing DNA dominates Masters\u2019 Union JDs \u2192 demand for \u201cRevenue Engineers\u201d who blend CRM analytics with persuasive communication.  \n\u2022 Accorian signals the rise of \u201cHR-Analytics\u201d hybrids; pure admin HR roles are disappearing.  \n\u2022 Both companies implicitly reward candidates who can thrive in 6-day, high-velocity cultures \u2192 resilience & productivity frameworks are now employability differentiators.\n\nActionable Portfolio Recommendation for MBA Students  \nA. Build a T-shaped profile:  \n   \u2013 Vertical depth: pick ONE of (a) CRM+Sales Analytics, (b) People Analytics, (c) Financial Modelling.  \n   \u2013 Horizontal breadth: certify in Presentation, Negotiation, and Productivity tools (every recruiter asks for these).  \n\nB. Demonstrate stamina & results simultaneously: show metrics (leads converted, process cycle-time reduced) achieved during 60-hour weeks\u2014this maps directly to the six-day requirement.\n\nC. Differentiate early:  \n   \u2013 Marketing/BA majors \u2192 stack Salesforce + Tableau.  \n   \u2013 HR majors \u2192 stack HRMS + Labour Codes + Power BI.  \n   \u2013 Finance/Ops \u2192 add Six-Sigma-Green-Belt to analytical core.\n\nIf you need comparative insights beyond these two firms, let me know and I\u2019ll pull the wider 2024-25 placement database.\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.465\n- Keyword Overlap: 0.500\n- Entity Accuracy: 0.625\n\n---\n\n### Query 15: Which jobs are based in Bangalore?\n- **Category:** location_based\n- **Difficulty:** medium\n- **Overall Accuracy:** 0.010\n- **Response Time:** 4.38s\n\n**Expected Answer:**\nMill Story, TAP Academy, Madison PR (also Gurgaon/Mumbai)\n\n**Generated Answer:**\nResult: SQL Query: SELECT * FROM roles WHERE location = 'Bangalore';\nResult: ('[]', {'result': [], 'col_keys': ['id', 'company_id', 'title', 'specialization', 'location', 'role_description', 'created_at']})\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.050\n- Keyword Overlap: 0.000\n- Entity Accuracy: 0.000\n\n---\n\n### Query 16: Which role has the highest salary package?\n- **Category:** salary_comparison\n- **Difficulty:** medium\n- **Overall Accuracy:** 0.021\n- **Response Time:** 4.34s\n\n**Expected Answer:**\nMadison PR (up to 5.5 LPA)\n\n**Generated Answer:**\nResult: SQL Query: SELECT r.title\nFROM roles r\nJOIN offers o ON r.id = o.role_id\nORDER BY o.salary_max_lpa DESC\nLIMIT 1;\nResult: (\"[('Account Executive',)]\", {'result': [('Account Executive',)], 'col_keys': ['title']})\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.104\n- Keyword Overlap: 0.000\n- Entity Accuracy: 0.000\n\n---\n\n### Query 17: Which jobs are paid internships?\n- **Category:** compensation_type\n- **Difficulty:** easy\n- **Overall Accuracy:** 0.017\n- **Response Time:** 4.61s\n\n**Expected Answer:**\nMill Story (Finance Internship)\n\n**Generated Answer:**\nResult: SQL Query: SELECT DISTINCT r.title\nFROM roles r\nJOIN offers o ON r.id = o.role_id\nWHERE LOWER(r.title) LIKE '%intern%'\n  AND o.salary_min_lpa > 0;\nResult: ('[]', {'result': [], 'col_keys': ['title']})\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.087\n- Keyword Overlap: 0.000\n- Entity Accuracy: 0.000\n\n---\n\n### Query 18: List all the tools/software mentioned in the JDs\n- **Category:** tool_listing\n- **Difficulty:** hard\n- **Overall Accuracy:** 0.194\n- **Response Time:** 12.00s\n\n**Expected Answer:**\nExcel, Google Sheets, Tally, Zoho Books, HRMS, CRM, LinkedIn, PR tools, MS Office\n\n**Generated Answer:**\nBased on the available job descriptions, here are the tools/software explicitly mentioned:\n\n**Tools/Software Identified:**\n- **MS Office Suite** (mentioned by Accorian)\n- **HRMS** (Human Resource Management System) (mentioned by Accorian)\n\n**Strategic Analysis for MBA Students:**\n\n**Skill Name:** MS Office Suite & HRMS Proficiency\n**Cited By Companies:** Accorian\n**Relevant Specializations:** HR, Operations, Business Analytics\n**Why It Matters:** These are foundational tools for any HR professional. MS Office (especially Excel for data analysis, PowerPoint for presentations, and Word for documentation) is essential for day-to-day operations. HRMS proficiency is critical as companies increasingly digitize their HR processes.\n\n**Strategic Advice:** While these are table-stakes skills, the emphasis on HRMS indicates a broader trend toward HR digitization. MBA students should view this as an opportunity to differentiate themselves by gaining expertise in advanced HR technologies beyond basic HRMS.\n\n**Recommended Certifications/Training:**\n- **MS Office:** Advanced Excel certification (for data analysis), PowerBI certification (for HR dashboards)\n- **HRMS:** Workday HCM certification, SAP SuccessFactors certification, or Oracle HCM Cloud certification\n- **Cross-functional:** Tableau or PowerBI for HR analytics, Python/R for advanced HR data analysis\n\n**Note:** The limited tool mentions suggest these JDs focus more on process expertise than specific technical tools. MBA students should proactively seek exposure to modern HR tech stacks (like People Analytics platforms, Employee Experience tools, and AI-driven HR systems) to stay competitive.\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.613\n- Keyword Overlap: 0.385\n- Entity Accuracy: 0.333\n\n---\n\n### Query 19: Which jobs are better for freshers?\n- **Category:** comparative_analysis\n- **Difficulty:** medium\n- **Overall Accuracy:** 0.150\n- **Response Time:** 24.77s\n\n**Expected Answer:**\nAccorian (fresher role), TAP Academy (freshers encouraged)\n\n**Generated Answer:**\n## Strategic Market Analysis: Fresher-Friendly Opportunities\n\nBased on comprehensive analysis of available placement data, here are the **most accessible entry points** for MBA freshers:\n\n### **Tier 1: Immediate Entry Opportunities**\n\n**1. TAP Academy - Business Development/Sales Trainee**\n- **Why It's Ideal**: Explicitly welcomes freshers with \"excellent communication skills\"\n- **Core Requirements**: \n  - Cold calling & emailing proficiency\n  - LinkedIn networking skills\n  - Strong verbal/written communication\n- **MBA Relevance**: Perfect for Marketing specialization students to build foundational sales skills\n- **Strategic Advantage**: Provides direct client interaction experience, crucial for marketing careers\n\n**2. Masters' Union - Admission Counselor**\n- **Entry Barrier**: While requiring \"proven experience,\" the role focuses on B2C sales which freshers can demonstrate through internships\n- **Key Skills**: CRM usage, target achievement, understanding professional learning needs\n- **MBA Mapping**: Excellent for Marketing/HR students interested in education sector careers\n\n### **Tier 2: Specialized Entry with Internship Experience**\n\n**3. MADISON PUBLIC RELATIONS - PR Executive**\n- **Entry Requirement**: Previous internship experience (manageable during MBA)\n- **Ideal Specialization**: Marketing (Public Relations/Communications track)\n- **Unique Value**: Combines storytelling skills with media relations - highly valued in corporate communications roles\n\n### **Cross-Company Strategic Insights**\n\n**Most Fresher-Friendly Skills to Develop:**\n1. **Communication Excellence** (mentioned by 100% of companies)\n2. **LinkedIn & Social Media Proficiency** (TAP Academy emphasis)\n3. **CRM Familiarity** (Masters' Union requirement - easily learned via online certifications)\n4. **Cold Outreach Skills** (TAP Academy - can be practiced independently)\n\n**Specialization-Specific Recommendations:**\n\n- **Marketing Students**: Focus on TAP Academy and MADISON PR roles. Build portfolio with social media campaigns and PR writing samples.\n- **HR Students**: Masters' Union role aligns well with talent acquisition aspects. Emphasize counseling and professional development understanding.\n- **Business Analytics**: While not directly listed, data-driven sales approaches using CRM analytics could be your differentiator.\n\n**Immediate Action Plan for Freshers:**\n1. **Week 1-2**: Complete HubSpot CRM certification (free)\n2. **Week 3-4**: Build LinkedIn presence with 500+ connections and regular industry content sharing\n3. **Week 5-6**: Create mock cold outreach campaigns as portfolio pieces\n4. **Apply Strategy**: Target TAP Academy immediately, use gained experience for Masters' Union applications\n\n**Pro Tip**: The market shows clear preference for **communication-heavy roles** for freshers. Your MBA differentiator should be combining these communication skills with business strategy understanding that non-MBA candidates lack.\n\n*Note: Structured data could not be retrieved.*\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.462\n- Keyword Overlap: 0.571\n- Entity Accuracy: 0.000\n\n---\n\n### Query 20: Is there any role where I can learn fundraising?\n- **Category:** learning_opportunity\n- **Difficulty:** medium\n- **Overall Accuracy:** 0.265\n- **Response Time:** 16.05s\n\n**Expected Answer:**\nYes, Mill Story (finance intern supports fundraising & pitch decks)\n\n**Generated Answer:**\nFundraising exposure is explicitly offered by only one company in the current data set.\n\nRole: Finance & Accounting Intern  \nCompany: Mill Story  \nLocation: Not specified  \nCompensation: Not specified  \n\nWhat you will do (fundraising-related)  \n- \u201cSupport in fundraising preparations \u2014 real exposure to how start-ups raise capital.\u201d  \n- Work on pro-forma accounting and core statements (P&L, balance-sheet, cash-flow) that are typically folded into investor decks & data rooms.  \n- Assist in keeping books \u201cclean and accurate\u201d \u2013 a prerequisite for any due-diligence exercise.  \n\nRelevance for MBA students  \n\u2022 Specialization fit: Corporate Finance / Strategy / Entrepreneurship.  \n\u2022 Skill bridge: Links classroom valuation, financial-modeling and term-sheet concepts to live deal work.  \n\u2022 Network upside: Early-stage start-ups give interns direct access to founders and often to angel/VC conversations\u2014valuable for placement pitches in PE/VC, I-banking or start-up roles later.  \n\nStrategic advice  \n1. Highlight start-up finance coursework and DCF/LBO models on your r\u00e9sum\u00e9.  \n2. Build a simple sample financial model + three-statement projection you can walk through in interviews.  \n3. If offered the internship, volunteer to build the KPI dashboard that feeds into the investor deck\u2014this becomes a strong CV bullet.  \n\nRecommended certifications / training  \n\u2022 \u201cStartup Valuation & Financial Modelling\u201d (Coursera \u2013 HEC/Wharton)  \n\u2022 \u201cRaising Capital & Valuing Early-Stage Businesses\u201d (Wall Street Prep)  \n\u2022 Advanced Excel & Power BI for investor dashboards.  \n\nBottom line: Among the companies documented, Mill Story is the only opportunity that advertises hands-on fundraising exposure; target this role if learning the funding process is your primary objective.\n\n**Accuracy Breakdown:**\n- Exact Match: 0.000\n- Partial Match: 0.000\n- Semantic Similarity: 0.492\n- Keyword Overlap: 0.667\n- Entity Accuracy: 1.000\n\n---\n",
+  "evaluation_timestamp": "2025-09-05T10:59:20.850453"
+}

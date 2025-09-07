@@ -19,7 +19,10 @@ from .database import PlacementDatabase
 from .rag import retrieve_snippets, synthesize_answer
 from .agent import route_query  # Import the simple router instead of agent functions
 from .chat_memory import ChatMemory
+from .enhanced_chat_memory import enhanced_memory_manager
 from .sql_tool import run_sql_query
+from .chat_api import include_chat_router
+from .workflow_api import include_workflow_router
 
 app = FastAPI(title="JD-Copilot API", version="1.0.0")
 
@@ -34,6 +37,12 @@ app.add_middleware(
 
 # Initialize chat memory
 chat_memory = ChatMemory()
+
+# Include chat router
+include_chat_router(app)
+
+# Include workflow router for durable workflow features
+include_workflow_router(app)
 
 # Simple LLM router system (no more complex agents)
 # The route_query function handles all query processing
@@ -146,7 +155,7 @@ async def query_endpoint(request: ChatRequest = Body(...)):
         traceback.print_exc()
         
         # Return a structured error response instead of raising an exception
-        # This ensures the Flutter app always gets valid JSON
+        # This ensures the React app always gets valid JSON
         return ChatResponse(
             answer=f"An error occurred while processing your query: {str(e)}",
             snippets=[],
@@ -225,6 +234,99 @@ async def chat_endpoint(request: QueryRequest):
     except Exception as e:
         # Log the error for debugging
         print(f"An error occurred: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="An error occurred while processing your query.")
+
+
+@app.post("/chat/enhanced", response_model=ChatResponse)
+async def enhanced_chat_endpoint(request: QueryRequest):
+    """
+    Enhanced chat endpoint with durable workflow features.
+    """
+    try:
+        question = request.question.strip()
+        session_id = request.session_id
+        user_id = "anonymous"  # Could be extracted from request headers or auth
+        
+        print(f"🤖 Enhanced processing query: {question}")
+        
+        # Get enhanced conversation memory
+        enhanced_session = enhanced_memory_manager.get_session(session_id, user_id)
+        
+        # Add user message with enhanced tracking
+        await enhanced_session.add_message(
+            role="user",
+            content=question,
+            metadata={"endpoint": "enhanced", "timestamp": datetime.now().isoformat()}
+        )
+        
+        # Use the simple router to process the query
+        print("🚀 Using simple LLM router for enhanced query processing")
+        try:
+            answer = route_query(question)
+            print(f"🔍 Router answer: {answer}")
+            
+            if not answer or answer.strip() == "":
+                answer = "I couldn't process your query. Please try again."
+                
+            print(f"🔍 Final answer: {answer}")
+        except Exception as router_error:
+            print(f"❌ Router error: {router_error}")
+            # Return a graceful error response instead of crashing
+            return ChatResponse(
+                answer=f"Sorry, I encountered an error while processing your query: {str(router_error)}",
+                snippets=[],
+                citations=[],
+                error=True
+            )
+        
+        # Extract snippets from the answer if available
+        snippets = []
+        try:
+            # Try to get relevant snippets for citations
+            temp_snippets = retrieve_snippets(question, top_k=3, filters={})
+            if temp_snippets:
+                snippets = temp_snippets
+        except Exception as e:
+            print(f"Warning: Could not retrieve snippets for citations: {e}")
+        
+        # Prepare citations for the response object (but don't add to answer text)
+        citations = []
+        if snippets:
+            for snippet in snippets:
+                metadata = snippet.get("metadata", {})
+                if metadata.get("company") or metadata.get("role") or metadata.get("year"):
+                    citations.append({
+                        "company": metadata.get("company", ""),
+                        "role": metadata.get("role", ""),
+                        "year": metadata.get("year", ""),
+                        "extracted_skills": metadata.get("extracted_skills", [])
+                    })
+        
+        # Add assistant response with enhanced tracking
+        await enhanced_session.add_message(
+            role="assistant",
+            content=answer,
+            metadata={
+                "endpoint": "enhanced",
+                "snippets_count": len(snippets),
+                "citations_count": len(citations),
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+        
+        print(f"✅ Enhanced query processed successfully. Answer length: {len(answer)} chars")
+        
+        return ChatResponse(
+            answer=answer,
+            snippets=snippets,
+            citations=citations
+        )
+        
+    except Exception as e:
+        # Log the error for debugging
+        print(f"An error occurred in enhanced chat: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="An error occurred while processing your query.")

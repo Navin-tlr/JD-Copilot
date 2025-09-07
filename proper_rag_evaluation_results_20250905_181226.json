@@ -1,0 +1,295 @@
+{
+  "summary": {
+    "total_tests": 11,
+    "passed_tests": 6,
+    "failed_tests": 5,
+    "success_rate": 54.54545454545454,
+    "average_match_score": 0.4106060606060606
+  },
+  "routing_results": {
+    "STRUCTURED": {
+      "total": 4,
+      "passed": 3,
+      "success_rate": 75.0,
+      "average_score": 0.5416666666666666
+    },
+    "UNSTRUCTURED": {
+      "total": 4,
+      "passed": 3,
+      "success_rate": 75.0,
+      "average_score": 0.5875
+    },
+    "HYBRID": {
+      "total": 2,
+      "passed": 0,
+      "success_rate": 0.0,
+      "average_score": 0.0
+    },
+    "MULTI_HOP": {
+      "total": 1,
+      "passed": 0,
+      "success_rate": 0.0,
+      "average_score": 0.0
+    }
+  },
+  "detailed_results": [
+    {
+      "test_number": 1,
+      "query": "How many companies are offering finance roles?",
+      "expected_routing": "STRUCTURED",
+      "expected_keywords": [
+        "Mill Story",
+        "Finance",
+        "1",
+        "one"
+      ],
+      "actual_response": "1 company (Mill Story) is offering finance roles.",
+      "found_keywords": [
+        "Mill Story",
+        "Finance",
+        "1"
+      ],
+      "missing_keywords": [
+        "one"
+      ],
+      "match_score": 0.75,
+      "passed": true,
+      "description": "Should route to STRUCTURED DB query"
+    },
+    {
+      "test_number": 2,
+      "query": "Which companies are hiring for HR roles?",
+      "expected_routing": "STRUCTURED",
+      "expected_keywords": [
+        "Accorian",
+        "HR",
+        "People Operations"
+      ],
+      "actual_response": "Companies with HR opportunities: Accorian",
+      "found_keywords": [
+        "Accorian",
+        "HR"
+      ],
+      "missing_keywords": [
+        "People Operations"
+      ],
+      "match_score": 0.6666666666666666,
+      "passed": true,
+      "description": "Should route to STRUCTURED DB query"
+    },
+    {
+      "test_number": 3,
+      "query": "Which companies are hiring for PR or communications roles?",
+      "expected_routing": "STRUCTURED",
+      "expected_keywords": [
+        "Madison PR",
+        "PR",
+        "communications",
+        "Account Executive"
+      ],
+      "actual_response": "Companies hiring for PR/communications roles: Madison PR",
+      "found_keywords": [
+        "Madison PR",
+        "PR",
+        "communications"
+      ],
+      "missing_keywords": [
+        "Account Executive"
+      ],
+      "match_score": 0.75,
+      "passed": true,
+      "description": "Should route to STRUCTURED DB query"
+    },
+    {
+      "test_number": 4,
+      "query": "Are there any admission-related jobs?",
+      "expected_routing": "STRUCTURED",
+      "expected_keywords": [
+        "Masters' Union",
+        "Admission",
+        "Counselor",
+        "Yes"
+      ],
+      "actual_response": "Query result: [(2,)]",
+      "found_keywords": [],
+      "missing_keywords": [
+        "Masters' Union",
+        "Admission",
+        "Counselor",
+        "Yes"
+      ],
+      "match_score": 0.0,
+      "passed": false,
+      "description": "Should route to STRUCTURED DB query"
+    },
+    {
+      "test_number": 5,
+      "query": "What finance-related tasks are mentioned in the job descriptions?",
+      "expected_routing": "UNSTRUCTURED",
+      "expected_keywords": [
+        "Accounting",
+        "P&L",
+        "balance sheet",
+        "budgeting",
+        "expense tracking"
+      ],
+      "actual_response": "Finance-Related Tasks Identified Across Available Job Descriptions\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n1. Mill Story \u2013 Finance & Accounting Intern  \n   \u2022 Maintain accurate and \u201cclean\u201d books of accounts  \n   \u2022 Prepare pro-forma financial statements (P&L, Balance Sheet, Cash-Flow)  \n   \u2022 Handle budgeting, expense tracking, and invoice verification  \n   \u2022 Assist in fundraising preparation\u2014gaining direct exposure to how start-ups structure financial data for investors  \n\n2. Accorian \u2013 Associate-People Operations  \n   \u2022 No finance-specific tasks mentioned in the available excerpt.\n\n3. Masters\u2019 Union \u2013 Unspecified Role(s)  \n   \u2022 No finance-specific tasks mentioned in the available excerpt.\n\nSummary for MBA Students\n\u2022 Only Mill Story\u2019s internship explicitly lists finance tasks. These tasks map directly to the Finance specialization and provide hands-on experience in core financial reporting, budgeting, and investor-facing documentation\u2014skills that are foundational for roles in Corporate Finance, FP&A, and Investment Banking.",
+      "found_keywords": [
+        "Accounting",
+        "P&L",
+        "balance sheet",
+        "budgeting",
+        "expense tracking"
+      ],
+      "missing_keywords": [],
+      "match_score": 1.0,
+      "passed": true,
+      "description": "Should route to UNSTRUCTURED vector search"
+    },
+    {
+      "test_number": 6,
+      "query": "What do HR operations jobs involve?",
+      "expected_routing": "UNSTRUCTURED",
+      "expected_keywords": [
+        "Employee lifecycle",
+        "engagement",
+        "compliance",
+        "audits",
+        "HR processes"
+      ],
+      "actual_response": "HR Operations \u2013 What the Work Actually Looks Like  \n(Based on Accorian & TAP Academy JDs + cross-company patterns extracted from our 2024-25 placement database)\n\n1. Core Workflow (\u201cHire-to-Retire\u201d Engine)  \n   \u2022 Employee Life-cycle Ownership: onboarding, payroll & benefits administration, separations, full-and-final settlement, exit analytics.  \n   \u2022 HRIS / HRMS Stewardship: data integrity, workflow configuration, user access audits, dashboard creation for HRBPs and Finance.  \n   \u2022 Compliance & Risk Mitigation: PF/ESI/PT/LWF filings, POSH, Shops & Establishment renewals, labour-law audits, ISO & SOC documentation.  \n   \u2022 Query Resolution: single-point-of-contact (SPOC) ticket queue \u2013 SLA 24-48 h; >90 % first-time-closure is the KPI most tracked by recruiters.\n\n2. Strategic Layer (what differentiates an MBA from a generic HR exec)  \n   \u2022 Process Re-engineering: Six-Sigma or Lean projects that cut cycle-time (Accorian explicitly asks for \u201cproven expertise in streamlining\u201d).  \n   \u2022 People Analytics: attrition prediction, cost-per-hire, offer-to-join ratio, engagement pulse drivers \u2013 delivered through Power BI / Tableau.  \n   \u2022 Employee Experience Design: journey-mapping touch-points (Day-0, 30, 90, 180), digital onboarding kits, EVP branding.  \n   \u2022 Org Design Support: span-of-control analysis, grading frameworks, job evaluation committees \u2013 work done hand-in-hand with Head-HR and line managers.\n\n3. Daily / Weekly Cadence (what you will actually do in the first 6 months)  \n   Monday: Payroll lock \u2013 validate inputs from 3 sources (HRIS, Finance, Attendance).  \n   Tuesday: Compliance clinic \u2013 file monthly statutory returns, reconcile challans, update labour-law tracker.  \n   Wednesday: Ticket Triage \u2013 40-50 employee queries on leave, reimbursements, policy clarifications.  \n   Thursday: Analytics sprint \u2013 refresh attrition dashboard, send heat-map to HRBPs.  \n   Friday: Program roll-out \u2013 coordinate wellness or engagement initiative (virtual meet, R&R ceremony).  \n   Month-end: Audit pack \u2013 head-count reconciliation, cost report, SOC-2 evidence folder.\n\n4. Skill Heat-map (cross-company, 2024-25)  \n   Skill | % JDs mentioning | MBA relevance | Certifications that give you an edge  \n   \u2022 HRIS/HRMS configuration | 78 % | Ops & HR majors | Workday HCM, SAP SuccessFactors, Zoho People  \n   \u2022 Advanced Excel / Power BI | 74 % | Business Analytics | MOS-Excel Expert, PL-300 Microsoft Power BI  \n   \u2022 Indian Labour Law | 68 % | HR & Ops | NIPM Labour Law Diploma, ISTD Compliance Certificate  \n   \u2022 Six Sigma / Lean | 45 % | Ops specialization | Green Belt (IASSC / KPMG)  \n   \u2022 Stakeholder Management | 41 % | All specializations | SHRM-CP, IHRM-Accord\n\n5. MBA Specialization Fit  \n   \u2022 Human Resources: natural pipeline \u2013 60 % of HR Ops offers went to HR majors.  \n   \u2022 Operations: second-best fit \u2013 payroll & compliance are \u201cops inside HR\u201d; Six-Sigma projects give Ops students an edge.  \n   \u2022 Business Analytics: emerging \u2013 companies want dashboards, attrition models, cost simulations; analytics majors can enter HR Ops as \u201cHR Analyst\u201d track.  \n   \u2022 Finance: niche \u2013 if you like cost-centre accounting, budgeting for head-count, you can slot into \u201cHR Controlling\u201d sub-team inside HR Ops.\n\n6. Compensation Benchmark (2024-25 cohort, companies with published data)  \n   \u2022 Median CTC: \u20b9 8.3 LPA (range 6 \u2013 12 LPA).  \n   \u2022 Top-decile threshold: \u20b9 11 LPA \u2013 usually requires Workday/SuccessFactors certification + 1 analytics project.\n\n7. Strategic Advice to MBA Students  \n   a. T-shaped must-haves (apply to every applicant):  \n      \u2013 End-to-end payroll & statutory compliance literacy.  \n      \u2013 Intermediate-to-advanced Excel (pivot, Power Query) + one BI tool.  \n   b. Differentiators (pick one):  \n      \u2013 Green Belt project that reduced onboarding TAT by \u226520 %.  \n      \u2013 Workday or SAP HCM sandbox certification.  \n      \u2013 Labour-law case-study win in national competition (NIPM, CII).  \n   c. Prepare a \u201cHR Ops portfolio\u201d \u2013 3 artifacts:  \n      \u2013 Sample dashboard (dummy data) showing attrition vs. manager rating.  \n      \u2013 One-page process SOP you authored (onboarding / exit).  \n      \u2013 Compliance checklist template \u2013 recruiters love ready-to-use artefacts.\n\n8. 90-day Preparation Road-map  \n   Month 1: Complete Microsoft Power BI & advanced Excel badges (free MOOCs).  \n   Month 2: Pick one HRIS \u2013 Workday or Zoho \u2013 finish functional config course; build dummy tenant.  \n   Month 3: Join NIPM 30-hr Labour Law e-coach; simultaneously run a live Six-Sigma project in your college hostel or canteen (cycle-time reduction) \u2013 gives you a KPI to talk about in interviews.\n\nBottom line: HR Operations is no longer \u201cpaper-pushing\u201d; it is data-driven, compliance-critical, and experience-obsessed. MBA students who can marry statutory depth with analytics storytelling will command the \u20b9 10 LPA+ offers in 2025.",
+      "found_keywords": [
+        "engagement",
+        "compliance",
+        "audits"
+      ],
+      "missing_keywords": [
+        "Employee lifecycle",
+        "HR processes"
+      ],
+      "match_score": 0.6,
+      "passed": true,
+      "description": "Should route to UNSTRUCTURED vector search"
+    },
+    {
+      "test_number": 7,
+      "query": "What opportunities does TAP Academy offer?",
+      "expected_routing": "UNSTRUCTURED",
+      "expected_keywords": [
+        "Lead generation",
+        "partnership development",
+        "LinkedIn outreach",
+        "placement strategy"
+      ],
+      "actual_response": "## Strategic Market Analysis: TAP Academy Opportunities\n\n### **Primary Opportunity: Business Development Associate**\n\n**Job Title:** Business Development Associate  \n**Company:** TAP Academy  \n**Location:** BTM Layout, Bangalore  \n**Experience:** 0-3 years (EdTech experience is a plus)  \n**Sector:** EdTech/Skill Development\n\n---\n\n### **Core Responsibilities & Strategic Value for MBA Students**\n\n**1. Lead Generation for Placements**\n- **What You'll Do:** Identify and target companies with hiring needs through cold calling, cold emailing, and LinkedIn outreach\n- **MBA Relevance:** This is pure B2B sales and market development - critical for Marketing and Business Analytics specializations\n- **Strategic Insight:** You'll build a live database of hiring companies, giving you insider knowledge of recruitment patterns across industries\n\n**2. Partnership Development**\n- **What You'll Do:** Establish relationships with HR managers, recruiters, and decision-makers\n- **MBA Relevance:** Direct HR specialization relevance - you'll understand recruitment psychology and corporate hiring processes\n- **Strategic Insight:** Builds your professional network across Bangalore's tech ecosystem, valuable for future career pivots\n\n**3. LinkedIn & Social Media Outreach**\n- **What You'll Do:** Execute digital marketing campaigns for student placements\n- **MBA Relevance:** Combines Marketing specialization with digital skills\n- **Strategic Insight:** Master LinkedIn Sales Navigator and social selling - increasingly critical for modern business roles\n\n**4. Reporting & Pipeline Management**\n- **What You'll Do:** Track outreach activities, lead generation, and placement successes\n- **MBA Relevance:** Direct Business Analytics application - you'll work with CRM data and conversion metrics\n- **Strategic Insight:** Develop data-driven decision-making skills using placement success rates and market feedback\n\n---\n\n### **Compensation & Growth Trajectory**\nWhile specific salary data isn't available in the documents, based on market standards for EdTech BDA roles in Bangalore:\n- **Expected Range:** 4-8 LPA for 0-3 years experience\n- **Growth Path:** BDA \u2192 Senior BDA \u2192 Team Lead \u2192 Regional Manager\n- **Commission Potential:** Likely includes placement-based incentives\n\n---\n\n### **Strategic Recommendations for MBA Students**\n\n**For Marketing Specialization:**\n- This role offers hands-on B2B sales experience in a high-growth EdTech sector\n- You'll master customer acquisition cost (CAC) and lifetime value (LTV) concepts\n- Perfect for building case studies on sales funnel optimization\n\n**For HR Specialization:**\n- Direct exposure to recruitment processes and employer requirements\n- Understand skills gap analysis from the supply side\n- Build relationships with 50+ companies' HR teams within 6 months\n\n**For Business Analytics:**\n- Work with real placement data and conversion metrics\n- Opportunity to build predictive models for placement success\n- Create dashboards for tracking outreach effectiveness\n\n**For Operations:**\n- Learn process optimization in a service delivery context\n- Understand scalability challenges in EdTech placement services\n\n---\n\n### **Immediate Action Items**\n\n1. **Skill Development Priority:**\n   - Master LinkedIn Sales Navigator (free trial available)\n   - Complete HubSpot CRM certification (free)\n   - Learn basic SQL for reporting (Mode Analytics free course)\n\n2. **Application Strategy:**\n   - Highlight any EdTech exposure or education sector understanding\n   - Showcase campus placement coordination experience\n   - Demonstrate social media marketing skills with metrics\n\n3. **Interview Preparation:**\n   - Prepare a 30-60-90 day plan for placement partnerships\n   - Research TAP Academy's current hiring partners\n   - Be ready to pitch how you'd identify new placement opportunities\n\n---\n\n### **Long-term Career Implications**\n\nThis role positions you at the intersection of:\n- **EdTech growth story** (sector expected to reach $10B by 2025)\n- **Skills-based hiring trends** (companies moving beyond degree requirements)\n- **Network effects** (building relationships across 100+ companies)\n\n**Exit Opportunities after 2-3 years:**\n- Corporate L&D roles\n- EdTech product management\n- HR tech sales\n- Management consulting (education practice)\n- Start your own placement/training venture\n\n**TAP Academy offers a unique opportunity to understand both the supply (skilled candidates) and demand (corporate hiring) sides of the talent market - invaluable experience for any MBA specialization.**",
+      "found_keywords": [
+        "Lead generation",
+        "partnership development",
+        "LinkedIn outreach"
+      ],
+      "missing_keywords": [
+        "placement strategy"
+      ],
+      "match_score": 0.75,
+      "passed": true,
+      "description": "Should route to UNSTRUCTURED vector search"
+    },
+    {
+      "test_number": 8,
+      "query": "List all the tools/software mentioned in the JDs",
+      "expected_routing": "UNSTRUCTURED",
+      "expected_keywords": [
+        "Excel",
+        "Google Sheets",
+        "HRMS",
+        "CRM",
+        "LinkedIn"
+      ],
+      "actual_response": "Error: HTTPSConnectionPool(host='jd-copilot-99rlovz.svc.aped-4627-b74a.pinecone.io', port=443): Max retries exceeded with url: /query (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x166aeccd0>: Failed to resolve 'jd-copilot-99rlovz.svc.aped-4627-b74a.pinecone.io' ([Errno 8] nodename nor servname provided, or not known)\"))",
+      "found_keywords": [],
+      "missing_keywords": [
+        "Excel",
+        "Google Sheets",
+        "HRMS",
+        "CRM",
+        "LinkedIn"
+      ],
+      "match_score": 0.0,
+      "passed": false,
+      "description": "Should route to UNSTRUCTURED vector search"
+    },
+    {
+      "test_number": 9,
+      "query": "Which companies are hiring for HR roles, and what skills do they emphasize?",
+      "expected_routing": "HYBRID",
+      "expected_keywords": [
+        "Accorian",
+        "HR",
+        "skills",
+        "communication",
+        "problem-solving"
+      ],
+      "actual_response": "OpenRouter generation failed after retries.",
+      "found_keywords": [],
+      "missing_keywords": [
+        "Accorian",
+        "HR",
+        "skills",
+        "communication",
+        "problem-solving"
+      ],
+      "match_score": 0.0,
+      "passed": false,
+      "description": "Should route to HYBRID (structured + unstructured)"
+    },
+    {
+      "test_number": 10,
+      "query": "Compare salaries and skills across companies",
+      "expected_routing": "HYBRID",
+      "expected_keywords": [
+        "salary",
+        "Madison PR",
+        "5.5 LPA",
+        "skills",
+        "communication"
+      ],
+      "actual_response": "OpenRouter generation failed after retries.",
+      "found_keywords": [],
+      "missing_keywords": [
+        "salary",
+        "Madison PR",
+        "5.5 LPA",
+        "skills",
+        "communication"
+      ],
+      "match_score": 0.0,
+      "passed": false,
+      "description": "Should route to HYBRID (structured + unstructured)"
+    },
+    {
+      "test_number": 11,
+      "query": "Among the highest-paying companies, what skills are most valued?",
+      "expected_routing": "MULTI_HOP",
+      "expected_keywords": [
+        "Madison PR",
+        "highest",
+        "salary",
+        "skills",
+        "communication"
+      ],
+      "actual_response": "OpenRouter generation failed after retries.",
+      "found_keywords": [],
+      "missing_keywords": [
+        "Madison PR",
+        "highest",
+        "salary",
+        "skills",
+        "communication"
+      ],
+      "match_score": 0.0,
+      "passed": false,
+      "description": "Should route to MULTI_HOP (sequential reasoning)"
+    }
+  ],
+  "timestamp": "2025-09-05T18:12:26.820567"
+}

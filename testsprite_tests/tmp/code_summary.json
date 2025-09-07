@@ -1,0 +1,711 @@
+{
+  "tech_stack": [
+    "Python",
+    "FastAPI",
+    "SQLite",
+    "React",
+    "TypeScript",
+    "Tailwind CSS",
+    "Pinecone",
+    "OpenAI",
+    "Gemini",
+    "OpenRouter",
+    "LlamaIndex",
+    "WebSocket",
+    "Vite",
+    "Framer Motion"
+  ],
+  "features": [
+    {
+      "name": "Chat API",
+      "description": "Main chat interface with AI-powered responses, session management, and real-time messaging",
+      "files": [
+        "app/main.py",
+        "app/chat_api.py",
+        "app/chat_service.py",
+        "app/chat_memory.py",
+        "app/enhanced_chat_memory.py"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "JD-Copilot Chat API",
+          "version": "1.0.0",
+          "description": "AI-powered chat interface for job description analysis and career guidance"
+        },
+        "servers": [
+          {
+            "url": "http://localhost:8000",
+            "description": "Development server"
+          }
+        ],
+        "paths": {
+          "/query": {
+            "post": {
+              "summary": "Send a query to the AI agent",
+              "requestBody": {
+                "required": true,
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "query": {
+                          "type": "string",
+                          "description": "User query"
+                        },
+                        "session_id": {
+                          "type": "string",
+                          "default": "default",
+                          "description": "Chat session identifier"
+                        }
+                      },
+                      "required": ["query"]
+                    }
+                  }
+                }
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful response",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "answer": {
+                            "type": "string",
+                            "description": "AI response"
+                          },
+                          "snippets": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            },
+                            "description": "Relevant document snippets"
+                          },
+                          "citations": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            },
+                            "description": "Source citations"
+                          },
+                          "error": {
+                            "type": "boolean",
+                            "description": "Error flag"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/chat": {
+            "post": {
+              "summary": "Legacy chat endpoint for backward compatibility",
+              "requestBody": {
+                "required": true,
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "question": {
+                          "type": "string",
+                          "description": "User question"
+                        },
+                        "session_id": {
+                          "type": "string",
+                          "default": "default",
+                          "description": "Chat session identifier"
+                        }
+                      },
+                      "required": ["question"]
+                    }
+                  }
+                }
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful response",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "answer": {
+                            "type": "string",
+                            "description": "AI response"
+                          },
+                          "snippets": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            },
+                            "description": "Relevant document snippets"
+                          },
+                          "citations": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            },
+                            "description": "Source citations"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/chat/enhanced": {
+            "post": {
+              "summary": "Enhanced chat endpoint with durable workflow features",
+              "requestBody": {
+                "required": true,
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "question": {
+                          "type": "string",
+                          "description": "User question"
+                        },
+                        "session_id": {
+                          "type": "string",
+                          "default": "default",
+                          "description": "Chat session identifier"
+                        }
+                      },
+                      "required": ["question"]
+                    }
+                  }
+                }
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful response",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "answer": {
+                            "type": "string",
+                            "description": "AI response"
+                          },
+                          "snippets": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            },
+                            "description": "Relevant document snippets"
+                          },
+                          "citations": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            },
+                            "description": "Source citations"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/chat/clear": {
+            "post": {
+              "summary": "Clear chat history for a session",
+              "parameters": [
+                {
+                  "name": "session_id",
+                  "in": "query",
+                  "required": false,
+                  "schema": {
+                    "type": "string",
+                    "default": "default"
+                  },
+                  "description": "Session ID to clear"
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Chat history cleared successfully",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "string",
+                            "description": "Success message"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/chat/history": {
+            "get": {
+              "summary": "Get chat history for a session",
+              "parameters": [
+                {
+                  "name": "session_id",
+                  "in": "query",
+                  "required": false,
+                  "schema": {
+                    "type": "string",
+                    "default": "default"
+                  },
+                  "description": "Session ID to retrieve history for"
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Chat history retrieved successfully",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "session_id": {
+                            "type": "string",
+                            "description": "Session identifier"
+                          },
+                          "messages": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            },
+                            "description": "Chat messages"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Workflow API",
+      "description": "Durable workflow management for advanced chat sessions with state persistence",
+      "files": [
+        "app/workflow_api.py",
+        "app/durable_workflow.py"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "JD-Copilot Workflow API",
+          "version": "1.0.0",
+          "description": "Durable workflow management for advanced chat sessions"
+        },
+        "paths": {
+          "/workflow/sessions/{session_id}/create": {
+            "post": {
+              "summary": "Create a new durable workflow for a chat session",
+              "parameters": [
+                {
+                  "name": "session_id",
+                  "in": "path",
+                  "required": true,
+                  "schema": {
+                    "type": "string"
+                  },
+                  "description": "Session identifier"
+                },
+                {
+                  "name": "user_id",
+                  "in": "query",
+                  "required": false,
+                  "schema": {
+                    "type": "string",
+                    "default": "anonymous"
+                  },
+                  "description": "User identifier"
+                }
+              ],
+              "requestBody": {
+                "required": false,
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "metadata": {
+                          "type": "object",
+                          "description": "Workflow metadata"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": {
+                "200": {
+                  "description": "Workflow created successfully",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "success": {
+                            "type": "boolean"
+                          },
+                          "workflow_instance": {
+                            "type": "object",
+                            "description": "Workflow instance details"
+                          },
+                          "message": {
+                            "type": "string",
+                            "description": "Success message"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/workflow/sessions/{session_id}/status": {
+            "get": {
+              "summary": "Get comprehensive workflow status for a session",
+              "parameters": [
+                {
+                  "name": "session_id",
+                  "in": "path",
+                  "required": true,
+                  "schema": {
+                    "type": "string"
+                  },
+                  "description": "Session identifier"
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Workflow status retrieved successfully",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "session_id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "workflow_data": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "RAG System",
+      "description": "Retrieval-Augmented Generation system for document search and AI responses",
+      "files": [
+        "app/rag.py",
+        "app/agent.py",
+        "app/query_router.py"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "JD-Copilot RAG System",
+          "version": "1.0.0",
+          "description": "Retrieval-Augmented Generation for document search and AI responses"
+        },
+        "paths": {
+          "/structured": {
+            "post": {
+              "summary": "Execute structured SQL queries",
+              "requestBody": {
+                "required": true,
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "question": {
+                          "type": "string",
+                          "description": "Natural language question to convert to SQL"
+                        }
+                      },
+                      "required": ["question"]
+                    }
+                  }
+                }
+              },
+              "responses": {
+                "200": {
+                  "description": "Query executed successfully",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "answer": {
+                            "type": "string",
+                            "description": "Query result"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Database API",
+      "description": "SQLite database operations for placement data, companies, and statistics",
+      "files": [
+        "app/database.py",
+        "app/sql_tool.py",
+        "app/final_sql_tool.py",
+        "app/sql_validator.py"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "JD-Copilot Database API",
+          "version": "1.0.0",
+          "description": "Database operations for placement data and statistics"
+        },
+        "paths": {
+          "/companies": {
+            "get": {
+              "summary": "Get all companies from the database",
+              "responses": {
+                "200": {
+                  "description": "Companies retrieved successfully",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "companies": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            },
+                            "description": "List of companies"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/companies/{specialization}": {
+            "get": {
+              "summary": "Get companies by specialization and optionally by year",
+              "parameters": [
+                {
+                  "name": "specialization",
+                  "in": "path",
+                  "required": true,
+                  "schema": {
+                    "type": "string"
+                  },
+                  "description": "Company specialization"
+                },
+                {
+                  "name": "year",
+                  "in": "query",
+                  "required": false,
+                  "schema": {
+                    "type": "string"
+                  },
+                  "description": "Filter by year"
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Companies retrieved successfully",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "specialization": {
+                            "type": "string"
+                          },
+                          "year": {
+                            "type": "string"
+                          },
+                          "companies": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/stats": {
+            "get": {
+              "summary": "Get placement statistics",
+              "parameters": [
+                {
+                  "name": "year",
+                  "in": "query",
+                  "required": false,
+                  "schema": {
+                    "type": "string"
+                  },
+                  "description": "Filter by year"
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Statistics retrieved successfully",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "year": {
+                            "type": "string"
+                          },
+                          "stats": {
+                            "type": "object",
+                            "description": "Placement statistics"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "React Frontend",
+      "description": "Modern React-based chat interface with animations, theming, and real-time messaging",
+      "files": [
+        "React Style/App.tsx",
+        "React Style/main.tsx",
+        "React Style/components/ChatInterface.tsx",
+        "React Style/components/ChatInput.tsx",
+        "React Style/components/MessageBubble.tsx",
+        "React Style/components/ChatHeader.tsx",
+        "React Style/components/MascotCharacter.tsx",
+        "React Style/components/AiThinkingFeedback.tsx",
+        "React Style/components/ScrollToBottom.tsx",
+        "React Style/components/ParticleVortex.tsx"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "JD-Copilot React Frontend",
+          "version": "1.0.0",
+          "description": "Modern React-based chat interface with animations and real-time messaging"
+        },
+        "paths": {
+          "/": {
+            "get": {
+              "summary": "Main chat interface",
+              "responses": {
+                "200": {
+                  "description": "Chat interface loaded successfully",
+                  "content": {
+                    "text/html": {
+                      "schema": {
+                        "type": "string",
+                        "description": "HTML page with React chat interface"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Health Check",
+      "description": "System health monitoring and status endpoints",
+      "files": [
+        "app/main.py"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "JD-Copilot Health Check",
+          "version": "1.0.0",
+          "description": "System health monitoring and status endpoints"
+        },
+        "paths": {
+          "/health": {
+            "get": {
+              "summary": "Health check endpoint",
+              "responses": {
+                "200": {
+                  "description": "System is healthy",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "example": "healthy"
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Current timestamp"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

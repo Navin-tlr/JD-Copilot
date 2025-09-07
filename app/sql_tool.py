@@ -81,6 +81,71 @@ CANONICAL_QUERIES = {
             "WHERE LOWER(r.specialization) = 'operations' ORDER BY c.company_name;"
         ),
     },
+    # PR/Communications
+    "count_pr_companies": {
+        "keywords": ["companies came for pr", "pr role", "count companies for pr", "for pr", "communications", "public relations"],
+        "query": (
+            "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'marketing' AND LOWER(c.industry) = 'public relations';"
+        ),
+    },
+    "list_pr_companies": {
+        "keywords": ["list companies for pr", "pr companies list", "communications companies", "public relations companies"],
+        "query": (
+            "SELECT DISTINCT c.company_name FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'marketing' AND LOWER(c.industry) = 'public relations' ORDER BY c.company_name;"
+        ),
+    },
+    # Admission/Operations
+    "count_admission_jobs": {
+        "keywords": ["admission", "admission-related", "admission jobs", "counselor"],
+        "query": (
+            "SELECT COUNT(*) FROM roles r "
+            "WHERE LOWER(r.title) LIKE '%admission%' OR LOWER(r.title) LIKE '%counselor%';"
+        ),
+    },
+    "list_admission_jobs": {
+        "keywords": ["admission jobs", "admission roles", "counselor jobs"],
+        "query": (
+            "SELECT r.title, c.company_name FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.title) LIKE '%admission%' OR LOWER(r.title) LIKE '%counselor%';"
+        ),
+    },
+    # Internships
+    "count_internships": {
+        "keywords": ["internships", "intern", "internship jobs", "specifically internships"],
+        "query": (
+            "SELECT COUNT(*) FROM roles r "
+            "WHERE LOWER(r.title) LIKE '%intern%' OR LOWER(r.title) LIKE '%internship%';"
+        ),
+    },
+    "list_internships": {
+        "keywords": ["internship jobs", "intern roles", "list internships"],
+        "query": (
+            "SELECT r.title, c.company_name FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.title) LIKE '%intern%' OR LOWER(r.title) LIKE '%internship%';"
+        ),
+    },
+    # Location-based queries
+    "count_bangalore_jobs": {
+        "keywords": ["bangalore", "based in bangalore", "jobs in bangalore", "bangalore location"],
+        "query": (
+            "SELECT COUNT(*) FROM roles r "
+            "WHERE LOWER(r.location) LIKE '%bangalore%' OR LOWER(r.location) LIKE '%bengaluru%';"
+        ),
+    },
+    "list_bangalore_jobs": {
+        "keywords": ["bangalore companies", "jobs bangalore", "companies bangalore"],
+        "query": (
+            "SELECT DISTINCT c.company_name FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.location) LIKE '%bangalore%' OR LOWER(r.location) LIKE '%bengaluru%';"
+        ),
+    },
     # Generic totals and lists (kept last, lowest specificity)
     "count_distinct_companies": {
         "keywords": ["how many companies", "count companies", "number of companies", "total companies"],
