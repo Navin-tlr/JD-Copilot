@@ -16,7 +16,7 @@
         "Experience on HR processes from hire to retire",
         "Good understanding of labor laws and other compliance requirements pertaining to people",
         "Proven expertise in streamlining HR processes whereby enhancing efficiency",
-        "Proven expertise in strategizing, designing and deploying employee engagement initiative catering to global workforce"
+        "Proven expertise in strategizing, designing and deploying employee engagement initiative"
       ],
       "requirements": [
         "Bachelor's Degree/MBA",
@@ -28,9 +28,9 @@
       ]
     }
   ],
-  "company_type": "cybersecurity advisory and consulting firm",
-  "industry": "cybersecurity",
-  "location": "New Jersey with regional offices in India, Canada and UAE",
+  "company_type": null,
+  "industry": "cybersecurity advisory and consulting",
+  "location": "New Jersey",
   "source_file": "Accorian_Job Description_Associate-HR Operations...pdf",
-  "extraction_timestamp": "2025-08-19 19:05:17.075477"
+  "extraction_timestamp": "2025-09-06 21:08:10.266442"
 }

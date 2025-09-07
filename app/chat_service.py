@@ -1,13 +1,14 @@
 import asyncio
 import uuid
 from datetime import datetime
-from typing import AsyncGenerator, Dict, List, Optional
+from typing import AsyncGenerator, Dict, List, Optional, Any
 from dataclasses import dataclass
 
 # Import your existing RAG components
 from .agent import route_query
 from .rag import retrieve_snippets, synthesize_answer
 from .database import PlacementDatabase
+from .config import get_settings
 
 @dataclass
 class ChatMessage:
@@ -66,8 +67,9 @@ class ChatService:
         )
         self.messages[session_id].append(user_message)
         
-        # Generate AI response using your RAG system
-        ai_response = await self._generate_rag_response(content, session_id, user_id)
+        # Generate AI response using your RAG system with context
+        context = self._build_context(session_id)
+        ai_response = await self._generate_rag_response(content, session_id, user_id, context)
         ai_message = ChatMessage(
             id=str(uuid.uuid4()),
             content=ai_response,
@@ -83,30 +85,65 @@ class ChatService:
         
         yield ai_message
     
-    async def _generate_rag_response(self, user_message: str, session_id: str, user_id: str) -> str:
+    def _build_context(self, session_id: str) -> Dict[str, Any]:
+        """Build context from conversation history"""
+        context = {
+            'previous_companies': [],
+            'previous_roles': [],
+            'previous_specializations': []
+        }
+        
+        if session_id in self.messages:
+            # Look at recent messages to extract entities
+            recent_messages = self.messages[session_id][-10:]  # Last 10 messages
+            
+            for message in recent_messages:
+                content = message.content.lower()
+                
+                # Extract company names (simple pattern matching)
+                companies = ['acuity', 'mill story', 'madison pr', 'masters union', 'target', 'tap academy', 'withum', 'accorian', 'wns', 'turtle shell']
+                for company in companies:
+                    if company in content and company not in context['previous_companies']:
+                        context['previous_companies'].append(company.title())
+                
+                # Extract roles (simple pattern matching)
+                roles = ['analyst', 'intern', 'associate', 'counselor', 'executive', 'assistant', 'trainee']
+                for role in roles:
+                    if role in content and role not in context['previous_roles']:
+                        context['previous_roles'].append(role.title())
+        
+        return context
+    
+    async def _generate_rag_response(self, user_message: str, session_id: str, user_id: str, context: Dict[str, Any] = None) -> str:
         """Generate comprehensive response using the query router system"""
         print(f"🎓 Generating routed response for: '{user_message}'")
         try:
-            # Step 1: Use query router to classify the query
-            routing_decision = route_query(user_message)
-            print(f"🔍 Query router decision: {routing_decision}")
+            # Step 1: Use query router to get the response with context
+            router_response = route_query(user_message, context)
+            print(f"🔍 Query router response: {router_response}")
             
-            # Step 2: Route to appropriate processing based on classification
-            if routing_decision == "STRUCTURED":
-                print(f"🔍 Processing as STRUCTURED query")
-                response = await self._handle_structured_query(user_message)
-            elif routing_decision == "UNSTRUCTURED":
-                print(f"🔍 Processing as UNSTRUCTURED query")
-                response = await self._handle_unstructured_query(user_message)
-            elif routing_decision == "HYBRID":
-                print(f"🔍 Processing as HYBRID query")
-                response = await self._handle_hybrid_query(user_message)
-            elif routing_decision == "MULTI_HOP":
-                print(f"🔍 Processing as MULTI_HOP query")
-                response = await self._handle_multi_hop_query(user_message)
+            # Check if the response is a routing decision or a full answer
+            if router_response in ["STRUCTURED", "UNSTRUCTURED", "HYBRID", "MULTI_HOP"]:
+                # It's a routing decision, process accordingly
+                routing_decision = router_response
+                print(f"🔍 Routing decision: {routing_decision}")
+                
+                if routing_decision == "STRUCTURED":
+                    print(f"🔍 Processing as STRUCTURED query")
+                    response = await self._handle_structured_query(user_message)
+                elif routing_decision == "UNSTRUCTURED":
+                    print(f"🔍 Processing as UNSTRUCTURED query")
+                    response = await self._handle_unstructured_query(user_message)
+                elif routing_decision == "HYBRID":
+                    print(f"🔍 Processing as HYBRID query")
+                    response = await self._handle_hybrid_query(user_message)
+                elif routing_decision == "MULTI_HOP":
+                    print(f"🔍 Processing as MULTI_HOP query")
+                    response = await self._handle_multi_hop_query(user_message)
             else:
-                print(f"⚠️ Unknown routing decision: {routing_decision}, using placement cell LLM")
-                response = await self._placement_cell_llm_response(user_message)
+                # It's a full answer from the router, use it directly
+                print(f"🔍 Using direct response from router")
+                response = router_response
             
             # Clean up formatting and make it visually appealing
             response = self._format_response(response, user_message)
@@ -826,8 +863,9 @@ For more detailed information or specific questions, please ask follow-up questi
                 return None
             
             # Prepare comprehensive LLM request
+            settings = get_settings()
             payload = {
-                "model": "google/gemini-2.5-pro-exp-03-25",  # High-capability model
+                "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free",  # High-capability model
                 "messages": [
                     {
                         "role": "system", 

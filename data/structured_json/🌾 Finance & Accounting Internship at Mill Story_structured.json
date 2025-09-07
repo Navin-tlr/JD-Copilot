@@ -1,9 +1,9 @@
 {
   "company_name": "Mill Story",
-  "year": 2024,
+  "year": null,
   "roles": [
     {
-      "title": "Finance & Accounting Intern",
+      "title": "Finance & Accounting Internship",
       "specialization": "FINANCE",
       "location": "Sarjapur Road, Bengaluru",
       "salary_min_lpa": null,
@@ -13,7 +13,7 @@
         "Google Sheets",
         "Tally",
         "Zoho Books",
-        "accounting tools"
+        "accounting tool"
       ],
       "requirements": [
         "Commerce, Finance, or Accounting students (or recent grads)",
@@ -22,18 +22,18 @@
         "Curious, detail-oriented, and ready to learn"
       ],
       "responsibilities": [
-        "Keep books clean and accurate",
+        "Help us keep our books clean and accurate",
         "Work on Performa accounting and financial statements (P&L, balance sheet, cash flow)",
         "Assist with budgeting, expense tracking, and invoice checks",
-        "Support in fundraising preparations",
-        "Coordinate with CA firm on audits and compliance",
+        "Support in fundraising preparations — real exposure to how startups raise money!",
+        "Coordinate with our CA firm on audits and compliance",
         "Help in creating Investment Documents (Pitch Deck)"
       ]
     }
   ],
   "company_type": "D2C food brand",
   "industry": "Food",
-  "location": "Sarjapur Road, Bengaluru",
+  "location": null,
   "source_file": "🌾 Finance & Accounting Internship at Mill Story.pdf",
-  "extraction_timestamp": "2025-08-19 19:08:13.545037"
+  "extraction_timestamp": "2025-09-06 21:13:40.192224"
 }

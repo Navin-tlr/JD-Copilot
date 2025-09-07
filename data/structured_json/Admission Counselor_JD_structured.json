@@ -8,32 +8,24 @@
       "location": "Gurgaon, Haryana",
       "salary_min_lpa": null,
       "salary_max_lpa": null,
-      "skills": [
-        "inside sales",
-        "product demonstrations",
-        "consultations",
-        "objection handling",
-        "negotiation",
-        "pipeline management"
-      ],
+      "skills": [],
       "requirements": [
         "proven experience in inside sales"
       ],
       "responsibilities": [
-        "Engage with working professionals to identify career needs",
-        "Conduct online and offline product demonstrations",
-        "Schedule and conduct consultations and follow-up sessions",
-        "Develop understanding of customer profile and align program offerings",
-        "Handle objections, provide solutions, and negotiate program fees",
-        "Achieve weekly and monthly sales targets",
-        "Build and nurture sales pipeline",
-        "Manage prospects through entire sales cycle"
+        "Engage with working professionals to identify their career needs and how the program can enhance their skills in capital markets.",
+        "Conduct online and offline product demonstrations, providing detailed insights into the program’s features, benefits, and career opportunities.",
+        "Schedule and conduct consultations and follow-up sessions with prospective students, addressing their concerns and queries.",
+        "Develop an in-depth understanding of the customer profile and align the program’s offerings to their career aspirations.",
+        "Handle objections, provide solutions, and negotiate program fees to close sales and generate revenue.",
+        "Consistently achieve weekly and monthly sales targets while maintaining a high level of customer satisfaction.",
+        "Build and nurture a strong sales pipeline, managing prospects effectively through the entire sales cycle."
       ]
     }
   ],
-  "company_type": "new-age business school",
-  "industry": "education",
-  "location": "Gurgaon, Haryana",
+  "company_type": null,
+  "industry": "Education",
+  "location": null,
   "source_file": "Admission Counselor_JD.pdf",
-  "extraction_timestamp": "2025-08-19 19:06:37.123697"
+  "extraction_timestamp": "2025-09-06 21:09:51.723556"
 }

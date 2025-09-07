@@ -5,33 +5,29 @@
     {
       "title": "APPRENTICE – Media Operations",
       "specialization": "MARKETING",
-      "location": "Bengaluru",
+      "location": null,
       "salary_min_lpa": null,
       "salary_max_lpa": null,
       "skills": [
-        "digital media operations",
-        "retail and e-Commerce business",
-        "Media Operations tools & technologies"
+        "learning new tools & technologies",
+        "team player mindset",
+        "\"can-do\" attitude",
+        "ability to follow through with ideas and deliver on commitments"
       ],
       "requirements": [
         "Master’s in management with Marketing specialization",
-        "CGPA or Aggregate as prescribed with no active backlogs",
-        "Passion for learning new tools & technologies",
-        "Team player mindset with a “can-do” attitude",
-        "Ability to follow through with ideas and deliver on commitments"
+        "CGPA or Aggregate as prescribed with no active backlogs"
       ],
       "responsibilities": [
-        "Learn and work alongside Media Operations professionals",
-        "Gain practical, hands-on experience in digital media operations",
-        "Participate in shadow sessions and live case practice within media accounts",
+        "Learn and work alongside Media Operations professionals through practical, hands-on experience in digital media operations, including shadow sessions and live case practice within media accounts",
         "Enhance technical expertise and develop professional capabilities",
-        "Contribute effectively to the Media Operations field upon completion"
+        "Effectively contribute to the Media Operations field and continue career development in this area upon completion of the apprenticeship program"
       ]
     }
   ],
-  "company_type": "Fortune 50 company",
+  "company_type": null,
   "industry": "Retail",
   "location": "Bengaluru",
   "source_file": "Apprentice Media Operations JD (1).pdf",
-  "extraction_timestamp": "2025-08-19 19:07:13.080049"
+  "extraction_timestamp": "2025-09-06 21:11:40.591331"
 }

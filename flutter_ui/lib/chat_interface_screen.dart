@@ -569,7 +569,7 @@ class _ShimmerText extends StatelessWidget {
   final Widget child;
   const _ShimmerText({required this.controller, required this.child});
 
-  @override
+   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: controller,
