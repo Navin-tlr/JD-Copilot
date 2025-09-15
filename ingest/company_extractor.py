@@ -75,6 +75,17 @@ def extract_company_with_langextract(text: str) -> Optional[str]:
 
 def extract_company_heuristic(text: str) -> Optional[str]:
     """Fallback heuristic extraction when LangExtract fails."""
+    special_cases = {
+        "tap academy": "Tap Academy",
+        "mill story": "Mill Story",
+        "masters union": "Masters' Union",
+        "masters' union": "Masters' Union"
+    }
+    text_lower = text[:2000].lower()
+    for pattern, canonical in special_cases.items():
+        if pattern in text_lower:
+            return canonical
+
     head = text[:3000]
     lines = [ln.strip() for ln in head.splitlines() if ln.strip()]
     

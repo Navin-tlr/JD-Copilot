@@ -57,7 +57,7 @@ CANONICAL_QUERIES = {
         ),
     },
     "list_finance_companies": {
-        "keywords": ["list companies for finance", "finance companies list"],
+    "keywords": ["list companies for finance", "finance companies list", "list down companies for finance", "list down companies came for finance", "list down companies came for finance", "list down companies for finance"],
         "query": (
             "SELECT DISTINCT c.company_name FROM roles r "
             "JOIN companies c ON r.company_id = c.id "
@@ -160,6 +160,31 @@ CANONICAL_QUERIES = {
 
 def get_canonical_query(question: str) -> Optional[str]:
     q = question.lower()
+
+    # Handle multi-part questions like "how many companies... among these how many are for marketing"
+    if "among these" in q or "among them" in q:
+        # Extract the specialization from the second part
+        if "marketing" in q:
+            return CANONICAL_QUERIES["count_marketing_companies"]["query"]
+        elif "finance" in q:
+            return CANONICAL_QUERIES["count_finance_companies"]["query"]
+        elif "hr" in q or "human resources" in q:
+            return CANONICAL_QUERIES["count_hr_companies"]["query"]
+        elif "operations" in q:
+            return CANONICAL_QUERIES["count_operations_companies"]["query"]
+
+    # If the user explicitly asked to list items, prefer queries that return DISTINCT rows (lists)
+    list_indicators = ["list", "list down", "show", "which companies", "which companies are"]
+    if any(ind in q for ind in list_indicators):
+        for item in CANONICAL_QUERIES.values():
+            # Prefer queries that use DISTINCT (list-type results)
+            try:
+                if "distinct" in item["query"].lower():
+                    for kw in item["keywords"]:
+                        if kw in q:
+                            return item["query"]
+            except Exception:
+                continue
     # exact keyword containment pass (ordered by specificity via dict order)
     for item in CANONICAL_QUERIES.values():
         for kw in item["keywords"]:
@@ -177,10 +202,11 @@ def get_canonical_query(question: str) -> Optional[str]:
         if ("list" in q or "distinct" in q) and (" hr" in q or "human resources" in q or q.strip().startswith("hr")):
             return CANONICAL_QUERIES["list_hr_companies"]["query"]
 
+        # Finance: prefer LIST when user explicitly asks to 'list' or 'list down'
+        if ("list" in q or "list down" in q or "distinct" in q) and "finance" in q:
+            return CANONICAL_QUERIES["list_finance_companies"]["query"]
         if ("count" in q or "how many" in q) and "finance" in q:
             return CANONICAL_QUERIES["count_finance_companies"]["query"]
-        if ("list" in q or "distinct" in q) and "finance" in q:
-            return CANONICAL_QUERIES["list_finance_companies"]["query"]
 
         if ("count" in q or "how many" in q) and "operations" in q:
             return CANONICAL_QUERIES["count_operations_companies"]["query"]
@@ -218,11 +244,16 @@ def _create_sql_query_engine():
     _engine = create_engine(f"sqlite:///{db_path}")
     sql_db = SQLDatabase(_engine)
 
-    openai_key = os.getenv("OPENAI_API_KEY")
-    if not openai_key:
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    if not openrouter_key:
         return None
 
-    llm = OpenAI(api_key=openai_key, model="gpt-4-turbo")
+    # Set OpenAI-compatible env vars to route through OpenRouter
+    os.environ.setdefault("OPENAI_API_KEY", openrouter_key)
+    os.environ.setdefault("OPENAI_API_BASE", "https://openrouter.ai/api/v1")
+
+    model_name = os.getenv("OPENROUTER_MODEL", "moonshotai/kimi-k2")
+    llm = OpenAI(api_key=openrouter_key, model=model_name)
     _query_engine = NLSQLTableQueryEngine(sql_database=sql_db, tables=None, llm=llm)
     return _query_engine
 
@@ -242,7 +273,28 @@ def run_sql_query(question: str) -> str:
             with sqlite3.connect(db_path) as conn:
                 cur = conn.execute(canonical_sql)
                 rows = cur.fetchall()
-            return str(rows)
+
+            # Format the response based on query type
+            if "COUNT" in canonical_sql.upper():
+                count = rows[0][0] if rows else 0
+                if "marketing" in question.lower():
+                    return f"There are {count} companies offering marketing roles."
+                elif "finance" in question.lower():
+                    return f"There are {count} companies offering finance roles."
+                elif "hr" in question.lower() or "human resources" in question.lower():
+                    return f"There are {count} companies offering HR roles."
+                elif "operations" in question.lower():
+                    return f"There are {count} companies offering operations roles."
+                else:
+                    return f"There are {count} companies in total."
+            else:
+                # For list queries, format as a readable list
+                if rows:
+                    companies = [row[0] for row in rows]
+                    return f"Companies: {', '.join(companies)}"
+                else:
+                    return "No companies found matching the criteria."
+
         except Exception as e:
             return f"Error executing canonical query: {e}"
 

@@ -8,24 +8,33 @@
       "location": "Gurgaon, Haryana",
       "salary_min_lpa": null,
       "salary_max_lpa": null,
-      "skills": [],
+      "skills": [
+        "Inside Sales",
+        "Customer Engagement",
+        "Consultative Selling",
+        "Objection Handling",
+        "Negotiation",
+        "Target Achievement"
+      ],
       "requirements": [
-        "proven experience in inside sales"
+        "Proven experience in inside sales",
+        "Ability to engage with working professionals",
+        "Strong understanding of career counseling or admissions processes",
+        "Excellent communication and negotiation skills"
       ],
       "responsibilities": [
-        "Engage with working professionals to identify their career needs and how the program can enhance their skills in capital markets.",
-        "Conduct online and offline product demonstrations, providing detailed insights into the program’s features, benefits, and career opportunities.",
-        "Schedule and conduct consultations and follow-up sessions with prospective students, addressing their concerns and queries.",
-        "Develop an in-depth understanding of the customer profile and align the program’s offerings to their career aspirations.",
-        "Handle objections, provide solutions, and negotiate program fees to close sales and generate revenue.",
-        "Consistently achieve weekly and monthly sales targets while maintaining a high level of customer satisfaction.",
-        "Build and nurture a strong sales pipeline, managing prospects effectively through the entire sales cycle."
+        "Engage with working professionals to identify their career needs and align program benefits",
+        "Conduct online and offline product demonstrations of the MasterCamp program",
+        "Schedule and conduct consultations and follow-up sessions with prospective students",
+        "Develop an in-depth understanding of customer profiles and career aspirations",
+        "Handle objections, provide solutions, and negotiate program fees to close sales",
+        "Achieve weekly and monthly sales targets while maintaining high customer satisfaction"
       ]
     }
   ],
   "company_type": null,
-  "industry": "Education",
-  "location": null,
+  "industry": "Education (Business School)",
+  "location": "Gurgaon, Haryana",
   "source_file": "Admission Counselor_JD.pdf",
-  "extraction_timestamp": "2025-09-06 21:09:51.723556"
+  "extraction_timestamp": "2025-09-13 16:34:53.482941"
 }

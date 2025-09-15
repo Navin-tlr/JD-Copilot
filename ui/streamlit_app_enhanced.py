@@ -42,6 +42,40 @@ st.markdown("""
         flex: 1;
         margin: 0 0.5rem;
     }
+    .citation-icon {
+        color: #666;
+        cursor: pointer;
+        font-size: 16px;
+        margin-left: 8px;
+        transition: color 0.2s;
+    }
+    .citation-icon:hover {
+        color: #1890ff;
+    }
+    .citation-popup {
+        background: white;
+        border: 1px solid #ddd;
+        padding: 12px;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-top: 8px;
+        max-width: 300px;
+    }
+    .citation-popup h4 {
+        margin: 0 0 8px 0;
+        font-size: 14px;
+        color: #333;
+    }
+    .citation-popup ul {
+        margin: 0;
+        padding-left: 20px;
+        font-size: 13px;
+    }
+    .skill-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -65,7 +99,7 @@ def make_api_request(endpoint: str, method: str = "GET", data: Dict[str, Any] = 
             response = requests.get(f"{api_url}{endpoint}")
         else:
             response = requests.post(f"{api_url}{endpoint}", json=data)
-        
+
         if response.status_code == 200:
             return response.json()
         else:
@@ -74,6 +108,108 @@ def make_api_request(endpoint: str, method: str = "GET", data: Dict[str, Any] = 
         return {"error": "Cannot connect to API server. Is it running?"}
     except Exception as e:
         return {"error": f"Request failed: {str(e)}"}
+
+def create_skill_with_citation(skill_name: str, companies: List[str], key_prefix: str = ""):
+    """Create a skill display with citation popup functionality"""
+    unique_key = f"{key_prefix}_{skill_name.replace(' ', '_').lower()}"
+
+    col1, col2 = st.columns([4, 1])
+
+    with col1:
+        st.markdown(f"**{skill_name}**")
+
+    with col2:
+        if st.button("ℹ️", key=f"citation_{unique_key}", help="Show citations"):
+            with st.container():
+                st.markdown(f"""
+                <div class="citation-popup">
+                    <h4>Cited by:</h4>
+                    <ul>
+                        {"".join(f"<li>{company}</li>" for company in companies)}
+                    </ul>
+                </div>
+                """, unsafe_allow_html=True)
+
+def extract_skills_from_answer(answer_text: str) -> List[Dict[str, Any]]:
+    """Extract skills data from answer text for citation display"""
+    skills = []
+
+    # Look for patterns like "Skill Name: ... Cited By Companies: ..."
+    lines = answer_text.split('\n')
+    current_skill = None
+    companies = []
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        # Check for skill name pattern
+        if line.startswith('**') and '**' in line[2:]:
+            # Extract skill name from bold text
+            skill_part = line.split('**')[1]
+            if ':' in skill_part:
+                skill_name = skill_part.split(':')[0].strip()
+                current_skill = skill_name
+                companies = []
+        elif 'Cited By Companies:' in line or 'Cited by:' in line:
+            # Extract companies
+            if ':' in line:
+                companies_text = line.split(':', 1)[1].strip()
+                # Split by commas and clean up
+                companies = [c.strip() for c in companies_text.split(',') if c.strip()]
+        elif 'Relevant Specializations:' in line:
+            if current_skill and companies:
+                specializations = []
+                if ':' in line:
+                    spec_text = line.split(':', 1)[1].strip()
+                    specializations = [s.strip() for s in spec_text.split(',') if s.strip()]
+
+                skills.append({
+                    'skill': current_skill,
+                    'companies': companies,
+                    'specializations': specializations
+                })
+                current_skill = None
+                companies = []
+
+    # Handle case where we have skill and companies but no specializations line
+    if current_skill and companies:
+        skills.append({
+            'skill': current_skill,
+            'companies': companies,
+            'specializations': []
+        })
+
+    return skills
+
+def display_skills_with_citations(skills_data: List[Dict[str, Any]], section_title: str = "Skills Analysis"):
+    """Display skills with citation functionality"""
+    st.markdown(f"### 🎯 {section_title}")
+
+    if not skills_data:
+        st.info("No skills data available")
+        return
+
+    # Group skills by category if available
+    for i, skill in enumerate(skills_data):
+        skill_name = skill.get('skill', skill.get('name', f'Skill {i+1}'))
+        companies = skill.get('companies', skill.get('cited_by', []))
+
+        # Create unique key for this skill
+        create_skill_with_citation(skill_name, companies, f"skill_{i}")
+
+        # Show additional info if available
+        if skill.get('specializations'):
+            st.caption(f"Relevant for: {', '.join(skill['specializations'])}")
+
+        if skill.get('why_matters'):
+            st.caption(f"Why it matters: {skill['why_matters']}")
+
+        if skill.get('recommendations'):
+            st.caption(f"Recommendations: {skill['recommendations']}")
+
+        st.markdown("---")
 
 @st.cache_data(ttl=300)
 def get_companies_list() -> List[str]:
@@ -117,22 +253,38 @@ if page == "🏠 Home":
     with col2:
         st.markdown("""
         ### 🎯 Key Features
-        
+
         **Smart Q&A System**
         - Ask questions in natural language
         - Get company-specific or global insights
         - Automatic query classification
-        
+
         **Analytics Dashboard**
         - Placement statistics
         - Company comparisons
-        - Skills analysis
-        
+        - Skills analysis with citations
+
         **Resume Matching**
         - Match your skills to job requirements
         - Get personalized improvement plans
         - Company-specific recommendations
         """)
+
+        # Demo citation system
+        st.markdown("### ℹ️ Citation System Demo")
+        demo_skills = [
+            {
+                'skill': 'Communication Execution',
+                'companies': ['Masters\' Union', 'Alstom', 'Tap Academy'],
+                'specializations': ['Marketing', 'HR', 'Operations']
+            },
+            {
+                'skill': 'Data Analytics',
+                'companies': ['Accorian', 'Masters\' Union'],
+                'specializations': ['Business Analytics', 'Finance']
+            }
+        ]
+        display_skills_with_citations(demo_skills, "Demo Skills with Citations")
     
     # Quick stats preview
     st.markdown("### 📊 Quick Stats Preview")
@@ -295,8 +447,19 @@ elif page == "🔍 Smart Q&A":
                     # Display answer
                     if response.get("answer"):
                         st.markdown("### 🎯 Answer")
-                        st.markdown(response["answer"])
-                    
+                        answer_text = response["answer"]
+
+                        # Check if this is a skills-related response and extract skills data
+                        if "skills" in answer_text.lower() or "cited by" in answer_text.lower():
+                            # Try to extract skills from the answer
+                            skills_data = extract_skills_from_answer(answer_text)
+                            if skills_data:
+                                display_skills_with_citations(skills_data, "Skills Analysis")
+                            else:
+                                st.markdown(answer_text)
+                        else:
+                            st.markdown(answer_text)
+
                     # Display snippets
                     if response.get("snippets"):
                         st.markdown("### 📄 Relevant Snippets")
@@ -305,7 +468,7 @@ elif page == "🔍 Smart Q&A":
                             company = metadata.get('company', 'Unknown Company') or 'Unknown Company'
                             source = metadata.get('source', 'Unknown') or 'Unknown'
                             text = snippet.get('text', '') or ''
-                            
+
                             with st.expander(f"Snippet {i+1} - {company}"):
                                 st.markdown(f"**Source:** {source}")
                                 st.markdown(f"**Text:** {text[:300]}...")
@@ -370,13 +533,28 @@ elif page == "📊 Analytics Dashboard":
         if data.get('top_skills'):
             st.markdown("### 🎯 Top Skills in Demand")
             skills_data = data['top_skills'][:10]  # Top 10
-            
+
             # Create a simple bar chart
             skill_names = [skill['skill'] for skill in skills_data]
             skill_counts = [skill['count'] for skill in skills_data]
-            
+
             chart_data = {"Skill": skill_names, "Count": skill_counts}
             st.bar_chart(chart_data)
+
+            # Display skills with citations
+            st.markdown("### 📊 Skills Breakdown")
+            citation_skills = []
+            for skill in skills_data:
+                # For demo purposes, we'll use placeholder companies
+                # In a real implementation, you'd get this from your API
+                companies = ["Masters' Union", "Alstom", "Accorian", "Tap Academy"]  # Placeholder
+                citation_skills.append({
+                    'skill': skill['skill'],
+                    'companies': companies[:skill['count'] % 4 + 1],  # Vary companies based on count
+                    'specializations': ['MBA General']  # Placeholder
+                })
+
+            display_skills_with_citations(citation_skills, "Skills with Citations")
     
     # Company Analysis
     st.markdown("### 🏢 Company Analysis")

@@ -1,0 +1,730 @@
+"""
+Advanced Query Router for Multi-Hop Queries
+Handles complex queries requiring sequential reasoning across structured and unstructured data.
+"""
+
+import re
+from typing import Dict, List, Any, Optional
+import sqlite3
+
+from .config import get_settings
+from .rag import retrieve_snippets, synthesize_answer
+from .final_sql_tool import run_llama_index_sql_query
+
+
+class QueryRouter:
+    """Advanced router for multi-hop queries with sequential reasoning."""
+
+    def __init__(self):
+        self.settings = get_settings()
+
+    
+    def classify_query(self, question: str) -> Tuple[QueryType, Dict[str, Any]]:
+        """Classify the query type using LLM intelligence with fallback to pattern matching"""
+        try:
+            # Try LLM classification first
+            llm_result = self._llm_classify_query(question)
+            if llm_result:
+                return llm_result
+        except Exception as e:
+            logging.warning(f"LLM classification failed, falling back to patterns: {e}")
+        
+        # Fallback to pattern-based classification with strict guards
+        return self._pattern_based_classification(question)
+    
+    def _llm_classify_query(self, question: str) -> Optional[Tuple[QueryType, Dict[str, Any]]]:
+        """LLM-based query classification with strict guardrails"""
+        try:
+            from .config import get_settings
+            settings = get_settings()
+            
+            if not settings.OPENROUTER_API_KEY:
+                return None
+            
+            # Structured prompt with strict constraints
+            classification_prompt = f"""You are a query router for a placement database. Your task is to classify queries into one of these categories:
+
+STRUCTURED: Queries that need numerical data, counts, statistics, comparisons, or filtered lists. Examples:
+- "How many companies came for marketing roles?"
+- "What's the average salary for finance positions?"
+- "Which companies recruited in 2023?"
+- "Count of roles by specialization"
+
+UNSTRUCTURED: Queries that need detailed descriptions, skills analysis, or contextual information. Examples:
+- "What skills are required for this role?"
+- "Tell me about the company culture"
+- "Show me the complete job description"
+- "What are the responsibilities?"
+
+HYBRID: Queries that need both structured data AND detailed analysis. Examples:
+- "Compare salaries and skills across companies"
+- "Which companies pay well and what skills do they need?"
+
+MULTI_HOP: Complex queries requiring multiple steps. Examples:
+- "Among high-paying companies, what skills are most valued?"
+
+IMPORTANT RULES:
+1. If the query asks for counts, numbers, or filtered lists → STRUCTURED
+2. If the query asks for descriptions, skills, or detailed info → UNSTRUCTURED  
+3. If the query needs both → HYBRID
+4. If the query is complex with multiple conditions → MULTI_HOP
+5. When in doubt, choose UNSTRUCTURED for safety
+
+User Query: "{question}"
+
+Respond with ONLY one word: STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
+            
+            payload = {
+                "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free",
+                "messages": [
+                    {"role": "system", "content": "You are a precise query classifier. Respond with ONLY one word: STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP."},
+                    {"role": "user", "content": classification_prompt}
+                ],
+                "temperature": 0.0,
+                "max_tokens": 10,
+            }
+            
+            headers = {
+                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+            }
+            
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=10,
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                content = result["choices"][0]["message"]["content"].strip().upper()
+                
+                logging.info(f"🤖 LLM Classification: {content}")
+                
+                # Map LLM response to QueryType with strict validation
+                if "STRUCTURED" in content:
+                    qtype = QueryType.STRUCTURED
+                    override = self._enforce_post_llm_guards(question, qtype)
+                    qtype = override or qtype
+                    extractor = {
+                        QueryType.STRUCTURED: self._extract_structured_params,
+                        QueryType.UNSTRUCTURED: self._extract_unstructured_params,
+                    }[qtype]
+                    return qtype, extractor(question)
+                elif "UNSTRUCTURED" in content:
+                    qtype = QueryType.UNSTRUCTURED
+                    override = self._enforce_post_llm_guards(question, qtype)
+                    qtype = override or qtype
+                    extractor = {
+                        QueryType.STRUCTURED: self._extract_structured_params,
+                        QueryType.UNSTRUCTURED: self._extract_unstructured_params,
+                    }[qtype]
+                    return qtype, extractor(question)
+                elif "HYBRID" in content:
+                    return QueryType.HYBRID, self._extract_hybrid_params(question)
+                elif "MULTI_HOP" in content:
+                    return QueryType.MULTI_HOP, self._extract_multi_hop_params(question)
+                else:
+                    logging.warning(f"Unexpected LLM response: {content}, defaulting to UNSTRUCTURED")
+                    return QueryType.UNSTRUCTURED, {"query": question, "fallback": "unexpected_llm_response"}
+            
+            else:
+                logging.warning(f"LLM API error: {response.status_code}, falling back to patterns")
+                return None
+                
+        except Exception as e:
+            logging.error(f"LLM classification failed: {e}")
+            return None
+    
+    def _pattern_based_classification(self, question: str) -> Tuple[QueryType, Dict[str, Any]]:
+        """Fallback pattern-based classification when LLM fails"""
+        question_lower = question.lower()
+
+        # Quick guard: explicit numeric/count queries should always be STRUCTURED
+        if re.search(r"\b(how many|count|total|number of)\b", question_lower) and \
+           re.search(r"\b(companies|roles|offers|salary|salaries)\b", question_lower):
+            return QueryType.STRUCTURED, self._extract_structured_params(question_lower)
+
+        # Check for multi-hop queries first (most complex)
+        if self._matches_patterns(question_lower, self.multi_hop_patterns):
+            return QueryType.MULTI_HOP, self._extract_multi_hop_params(question_lower)
+
+        # Check for hybrid queries
+        if self._matches_patterns(question_lower, self.hybrid_patterns):
+            return QueryType.HYBRID, self._extract_hybrid_params(question_lower)
+
+        # Prefer UNSTRUCTURED first to avoid false positives
+        if self._matches_patterns(question_lower, self.unstructured_patterns):
+            return QueryType.UNSTRUCTURED, self._extract_unstructured_params(question_lower)
+
+        # Structured only if strict patterns match
+        if self._matches_patterns(question_lower, self.structured_patterns):
+            return QueryType.STRUCTURED, self._extract_structured_params(question_lower)
+
+        # Check for unstructured queries
+        if self._matches_patterns(question_lower, self.unstructured_patterns):
+            return QueryType.UNSTRUCTURED, self._extract_unstructured_params(question_lower)
+
+        # Default to unstructured (safety)
+        return QueryType.UNSTRUCTURED, {"query": question, "fallback": "pattern_default"}
+    
+    def _matches_patterns(self, text: str, patterns: List[str]) -> bool:
+        """Check if text matches any of the patterns"""
+        return any(re.search(pattern, text) for pattern in patterns)
+
+    def _enforce_post_llm_guards(self, question: str, llm_type: QueryType) -> Optional[QueryType]:
+        """If LLM says STRUCTURED but the question clearly asks for skills/descriptions,
+        override to UNSTRUCTURED. If LLM says UNSTRUCTURED but query clearly demands counts, override to STRUCTURED."""
+        q = question.lower()
+        if llm_type == QueryType.STRUCTURED:
+            # If query mentions skills/description/culture without numeric intent → UNSTRUCTURED
+            if self._matches_patterns(q, self.unstructured_patterns) and not self._matches_patterns(q, self.structured_patterns):
+                return QueryType.UNSTRUCTURED
+        if llm_type == QueryType.UNSTRUCTURED:
+            # If query clearly asks for counts/salaries → STRUCTURED
+            if self._matches_patterns(q, self.structured_patterns):
+                return QueryType.STRUCTURED
+        return None
+    
+    def _extract_structured_params(self, question: str) -> Dict[str, Any]:
+        """Extract parameters for structured queries"""
+        params = {"query": question}
+        
+        # Extract year information
+        year_match = re.search(r"(\d{4})", question)
+        if year_match:
+            params["year"] = int(year_match.group(1))
+        elif "last year" in question.lower():
+            params["year"] = "2023-2024"
+        elif "this year" in question.lower():
+            params["year"] = "2024-2025"
+        
+        # Extract MBA specialization
+        mba_specializations = [
+            "marketing", "finance", "hr", "operations", "strategy", "it", "analytics",
+            "human resources", "supply chain", "consulting", "digital transformation"
+        ]
+        
+        for spec in mba_specializations:
+            if spec in question.lower():
+                params["specialization"] = spec.title()
+                break
+        
+        # Extract salary-related parameters
+        if "salary" in question:
+            if "median" in question:
+                params["metric"] = "median"
+            elif "average" in question or "avg" in question:
+                params["metric"] = "average"
+            elif "range" in question:
+                params["metric"] = "range"
+            elif "highest" in question or "max" in question:
+                params["metric"] = "max"
+            elif "lowest" in question or "min" in question:
+                params["metric"] = "min"
+        
+        # Extract count-related parameters
+        if "count" in question or "how many" in question:
+            if "companies" in question:
+                params["entity"] = "companies"
+            elif "roles" in question:
+                params["entity"] = "roles"
+            elif "offers" in question:
+                params["entity"] = "offers"
+        
+        return params
+
+    def llm_extract_structured_intent(self, question: str) -> Dict[str, Any]:
+        """Use the LLM to extract normalized structured intent safely (JSON-only).
+        Returns a dict with possible keys: entity, specialization, year, metric.
+        Falls back to pattern extraction if LLM unavailable or invalid.
+        """
+        try:
+            from .config import get_settings
+            settings = get_settings()
+            if not settings.OPENROUTER_API_KEY:
+                return self._extract_structured_params(question)
+
+            prompt = (
+                "Extract intent for a SQL lookup over a placement database. "
+                "Return STRICT JSON only, no prose, matching this schema: {\n"
+                "  \"entity\": one of [\"companies\", \"roles\", \"offers\", \"salaries\", \"stats\"] or null,\n"
+                "  \"specialization\": one of [\"Marketing\", \"Finance\", \"HR\", \"Operations\", \"Strategy\", \"IT\", \"Analytics\"] or null,\n"
+                "  \"year\": string like \"2024-2025\" or null,\n"
+                "  \"metric\": one of [\"count\", \"average\", \"median\", \"min\", \"max\"] or null\n"
+                "}\n"
+                "Normalize casing and synonyms (e.g., hr -> HR, biz analytics -> Analytics).\n"
+                f"User query: {question}\n"
+                "JSON:"
+            )
+
+            payload = {
+                "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free",
+                "messages": [
+                    {"role": "system", "content": "You output STRICT JSON only. No explanations."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.0,
+                "max_tokens": 120,
+            }
+            headers = {
+                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+            }
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=12,
+            )
+            if resp.status_code != 200:
+                logging.warning(f"LLM intent extraction failed: {resp.status_code}")
+                return self._extract_structured_params(question)
+
+            content = resp.json()["choices"][0]["message"]["content"].strip()
+            try:
+                data = json.loads(content)
+            except Exception:
+                # Try to extract JSON substring if model wrapped it
+                start = content.find('{')
+                end = content.rfind('}')
+                if start != -1 and end != -1:
+                    data = json.loads(content[start:end+1])
+                else:
+                    return self._extract_structured_params(question)
+
+            # Validate and normalize
+            valid_entities = {"companies", "roles", "offers", "salaries", "stats"}
+            valid_specs = {"Marketing", "Finance", "HR", "Operations", "Strategy", "IT", "Analytics"}
+            valid_metrics = {"count", "average", "median", "min", "max"}
+
+            out: Dict[str, Any] = {"query": question}
+            ent = (data.get("entity") or "").lower()
+            if ent in valid_entities:
+                out["entity"] = ent
+            spec = data.get("specialization")
+            if spec in valid_specs:
+                out["specialization"] = spec
+            yr = data.get("year")
+            if isinstance(yr, str) and re.match(r"^\d{4}-\d{4}$", yr):
+                out["year"] = yr
+            met = (data.get("metric") or "").lower()
+            if met in valid_metrics:
+                out["metric"] = met
+
+            # If nothing validated, fallback
+            if len(out.keys()) == 1:
+                return self._extract_structured_params(question)
+            return out
+        except Exception as e:
+            logging.warning(f"LLM structured intent exception: {e}")
+            return self._extract_structured_params(question)
+    
+    def _extract_unstructured_params(self, question: str) -> Dict[str, Any]:
+        """Extract parameters for unstructured queries"""
+        params = {"query": question}
+        
+        # Extract skill-related parameters
+        if "skill" in question:
+            params["focus"] = "skills"
+            # Extract specific skill mentions
+            skill_match = re.search(r"(\w+)\s+skills?", question)
+            if skill_match:
+                params["skill_type"] = skill_match.group(1)
+        
+        # Extract role-related parameters
+        if "role" in question:
+            params["focus"] = "role_description"
+        
+        # Extract company-related parameters
+        if "culture" in question or "environment" in question:
+            params["focus"] = "company_culture"
+        
+        return params
+    
+    def _extract_hybrid_params(self, question: str) -> Dict[str, Any]:
+        """Extract parameters for hybrid queries"""
+        params = {"query": question}
+        
+        # Extract comparison entities
+        if "compare" in question:
+            # Look for company names or role types
+            companies = re.findall(r"(\w+(?:\s+\w+)*)", question)
+            params["compare_entities"] = [c for c in companies if len(c.split()) <= 3]
+        
+        # Extract comparison aspects
+        if "salary" in question:
+            params["compare_salary"] = True
+        if "skill" in question:
+            params["compare_skills"] = True
+        
+        return params
+    
+    def _extract_multi_hop_params(self, question: str) -> Dict[str, Any]:
+        """Extract parameters for multi-hop queries"""
+        params = {"query": question}
+        
+        # Extract filter conditions
+        if "salary" in question:
+            salary_match = re.search(r"salary\s*(?:>|>=|less than|more than)\s*(\d+(?:\.\d+)?)", question)
+            if salary_match:
+                params["salary_threshold"] = float(salary_match.group(1))
+                params["salary_operator"] = ">" if ">" in question else "<"
+        
+        # Extract target information
+        if "skills" in question:
+            params["target_info"] = "skills"
+        elif "requirements" in question:
+            params["target_info"] = "requirements"
+        
+        return params
+    
+    def get_routing_strategy(self, query_type: QueryType, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Get the routing strategy for the query type"""
+        if query_type == QueryType.STRUCTURED:
+            return {
+                "primary": "sql",
+                "fallback": "rag",
+                "description": "Use SQL database for fast, accurate statistics and filtered data"
+            }
+        
+        elif query_type == QueryType.UNSTRUCTURED:
+            return {
+                "primary": "rag",
+                "fallback": "sql",
+                "description": "Use RAG for detailed, contextual answers from job descriptions"
+            }
+        
+        elif query_type == QueryType.HYBRID:
+            return {
+                "primary": "hybrid",
+                "components": ["sql", "rag"],
+                "description": "Combine SQL for structured data and RAG for context"
+            }
+        
+        elif query_type == QueryType.MULTI_HOP:
+            return {
+                "primary": "multi_step",
+                "steps": ["sql_filter", "rag_analysis"],
+                "description": "Multi-step approach: filter then analyze"
+            }
+        
+        return {"primary": "rag", "description": "Default to RAG for safety"}
+    
+    def format_query_for_llm(self, query_type: QueryType, params: Dict[str, Any]) -> str:
+        """Format the query with context for LLM processing"""
+        if query_type == QueryType.STRUCTURED:
+            return f"""
+You are analyzing a STRUCTURED QUERY about placement data.
+Query: {params.get('query', '')}
+Focus on providing precise statistics, counts, and numerical data.
+Use the structured database information for accurate results.
+"""
+        
+        elif query_type == QueryType.UNSTRUCTURED:
+            return f"""
+You are analyzing an UNSTRUCTURED QUERY about job descriptions and company information.
+Query: {params.get('query', '')}
+Focus on providing detailed insights, skills analysis, and contextual information.
+Use the PDF content and RAG results for comprehensive answers.
+"""
+        
+        elif query_type == QueryType.HYBRID:
+            return f"""
+You are analyzing a HYBRID QUERY that requires both structured and unstructured data.
+Query: {params.get('query', '')}
+Combine numerical data (salaries, counts) with detailed analysis (skills, culture).
+Provide both quantitative and qualitative insights.
+"""
+        
+        elif query_type == QueryType.MULTI_HOP:
+            return f"""
+You are analyzing a MULTI-HOP QUERY that requires filtering then analysis.
+Query: {params.get('query', '')}
+Step 1: Apply filters (salary, company, etc.)
+Step 2: Analyze the filtered results for detailed insights.
+Provide both the filtered dataset and comprehensive analysis.
+"""
+        
+        return f"Query: {params.get('query', '')}"
+
+    def _handle_hybrid_query(self, question: str, params: Dict[str, Any], db: PlacementDatabase, snippets: List[Dict[str, Any]]) -> str:
+        """Handle hybrid queries combining SQL and RAG"""
+        try:
+            # Step 1: Get structured data using LlamaIndex
+            from .final_sql_tool import run_llama_index_sql_query
+            structured_answer = run_llama_index_sql_query(question)
+
+            # Step 2: Get RAG insights for additional context
+            from .rag import synthesize_answer
+            rag_answer = synthesize_answer(question, snippets, {})
+
+            # Step 3: Combine and format the response
+            if structured_answer and rag_answer:
+                combined_answer = f"""
+**Data Analysis & Statistics:**
+{structured_answer}
+
+**Additional Context & Insights:**
+{rag_answer}
+"""
+                return combined_answer
+            elif structured_answer:
+                return f"{structured_answer}\n\n*Note: Additional context could not be retrieved.*"
+            elif rag_answer:
+                return f"{rag_answer}\n\n*Note: Structured data could not be retrieved.*"
+            else:
+                return "I couldn't retrieve either structured data or contextual information for this query."
+
+        except Exception as e:
+            logging.error(f"Hybrid query failed: {e}")
+            return f"Error processing hybrid query: {e}"
+
+    def _handle_multi_hop_query(self, question: str, params: Dict[str, Any], db: PlacementDatabase, snippets: List[Dict[str, Any]]) -> str:
+        """Handle multi-hop queries requiring sequential reasoning"""
+        try:
+            # Step 1: Use LlamaIndex for structured data extraction
+            from .final_sql_tool import run_llama_index_sql_query
+            first_results = run_llama_index_sql_query(question)
+
+            if not first_results or "Structured query engine not available" in first_results:
+                return "I couldn't process the first step of this multi-hop query. The structured data engine is not available."
+
+            # Step 2: Use results to constrain second query (RAG analysis)
+            # Extract key information from first results for filtering
+            filtered_params = self._extract_filtered_params(first_results, params)
+
+            # Step 3: Execute second query with filtered context
+            from .rag import synthesize_answer
+            second_results = synthesize_answer(question, snippets, filtered_params)
+
+            # Step 4: Combine results
+            if second_results:
+                return f"""
+**Step 1 - Data Filtering & Analysis:**
+{first_results}
+
+**Step 2 - Detailed Insights (Based on Filtered Results):**
+{second_results}
+"""
+            else:
+                return f"""
+**Data Analysis:**
+{first_results}
+
+*Note: Additional contextual analysis could not be retrieved.*
+"""
+
+        except Exception as e:
+            logging.error(f"Multi-hop query failed: {e}")
+            return f"Error processing multi-hop query: {e}"
+
+    def _handle_structured_query(self, question: str, params: Dict[str, Any], db: PlacementDatabase, snippets: List[Dict[str, Any]]) -> str:
+        """Handle structured queries using SQL database"""
+        try:
+            from .final_sql_tool import run_llama_index_sql_query
+            result = run_llama_index_sql_query(question)
+            return result or "No structured data found for this query."
+        except Exception as e:
+            logging.error(f"Structured query failed: {e}")
+            return f"Error processing structured query: {e}"
+
+    def _extract_filtered_params(self, first_results: str, original_params: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract parameters from first query results to constrain second query"""
+        filtered_params = original_params.copy()
+        
+        # Extract company names if mentioned in results
+        import re
+        company_matches = re.findall(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', first_results)
+        if company_matches:
+            filtered_params["company_filter"] = company_matches[0]  # Use first company found
+        
+        # Extract salary information if mentioned
+        salary_match = re.search(r'(\d+(?:\.\d+)?)\s*LPA', first_results)
+        if salary_match:
+            filtered_params["salary_threshold"] = float(salary_match.group(1))
+        
+        # Extract specialization if mentioned
+        specializations = ["Marketing", "Finance", "HR", "Operations", "Strategy", "IT", "Analytics"]
+        for spec in specializations:
+            if spec in first_results:
+                filtered_params["specialization_filter"] = spec
+                break
+        
+        return filtered_params
+
+    def route_query(self, question: str) -> str:
+        """Main method to route and execute queries with safety measures and monitoring"""
+        start_time = time.time()
+
+        try:
+            # Step 1: Classify the query
+            query_type, params = self.classify_query(question)
+
+            # Step 2: Validate query safety (prevent hallucination)
+            safety_check = self._validate_query_safety(question, query_type)
+            if not safety_check["safe"]:
+                self._update_query_stats(query_type, False, time.time() - start_time)
+                return safety_check["message"]
+
+            # Step 3: Get routing strategy
+            strategy = self.get_routing_strategy(query_type, params)
+
+            # Step 4: Execute based on query type
+            result = None
+
+            if query_type == QueryType.STRUCTURED:
+                result = self._handle_structured_query(question, params, None, [])
+
+            elif query_type == QueryType.UNSTRUCTURED:
+                from .rag import retrieve_snippets, synthesize_answer
+                snippets = retrieve_snippets(question, top_k=5, filters={})
+                result = synthesize_answer(question, snippets, {}) or "No relevant information found."
+
+            elif query_type == QueryType.HYBRID:
+                from .rag import retrieve_snippets
+                snippets = retrieve_snippets(question, top_k=5, filters={})
+                result = self._handle_hybrid_query(question, params, None, snippets)
+
+            elif query_type == QueryType.MULTI_HOP:
+                from .rag import retrieve_snippets
+                snippets = retrieve_snippets(question, top_k=5, filters={})
+                result = self._handle_multi_hop_query(question, params, None, snippets)
+
+            else:
+                result = "I couldn't determine how to process this query."
+
+            # Step 5: Validate result safety
+            if result and not result.startswith("Error") and not result.startswith("I couldn't"):
+                final_result = self._validate_result_safety(result, question)
+                self._update_query_stats(query_type, True, time.time() - start_time)
+                return final_result
+            else:
+                # Attempt recovery
+                recovery_result = self._attempt_recovery(question, query_type, result or "Unknown error")
+                self._update_query_stats(query_type, bool(recovery_result), time.time() - start_time)
+                return recovery_result or "I couldn't generate a response for this query."
+
+        except Exception as e:
+            self.logger.error(f"Query routing failed: {e}")
+            recovery_result = self._attempt_recovery(question, QueryType.UNSTRUCTURED, str(e))
+            self._update_query_stats(QueryType.UNSTRUCTURED, bool(recovery_result), time.time() - start_time)
+            return recovery_result or f"I encountered an error processing your query. Please try rephrasing it."
+
+    def _validate_query_safety(self, question: str, query_type: QueryType) -> Dict[str, Any]:
+        """Validate query safety to prevent hallucination and inappropriate requests"""
+        question_lower = question.lower()
+
+        # Check for potentially problematic queries
+        unsafe_patterns = [
+            r"\b(hack|exploit|attack|malware|virus)\b",
+            r"\b(password|credential|login|admin)\b.*\b(access|steal|get)\b",
+            r"\b(illegal|unlawful|criminal)\b",
+            r"\b(drug|weapon|nuclear|bomb)\b",
+            r"\b(suicide|self-harm|kill)\b"
+        ]
+
+        for pattern in unsafe_patterns:
+            if re.search(pattern, question_lower):
+                return {
+                    "safe": False,
+                    "message": "I'm sorry, but I can't assist with that type of query. Please ask about placement opportunities, companies, or career advice."
+                }
+
+        # Check for queries that might lead to hallucination
+        if len(question.split()) > 50:
+            return {
+                "safe": False,
+                "message": "Your query is quite long. Please try breaking it down into smaller, more specific questions."
+            }
+
+        # Check for queries asking for external information
+        external_patterns = [
+            r"\b(current|today|now|latest|recent)\b.*\b(news|market|industry|trend)\b",
+            r"\b(what.*happening|what.*going on)\b",
+            r"\b(predict|forecast|future)\b"
+        ]
+
+        for pattern in external_patterns:
+            if re.search(pattern, question_lower):
+                return {
+                    "safe": False,
+                    "message": "I can only provide information based on our placement database. I don't have access to current news or external market data."
+                }
+
+        return {"safe": True, "message": "Query is safe to process"}
+
+    def _update_query_stats(self, query_type: QueryType, success: bool, response_time: float):
+        """Update query statistics for monitoring"""
+        self.query_stats["total_queries"] += 1
+
+        if success:
+            self.query_stats["successful_queries"] += 1
+        else:
+            self.query_stats["failed_queries"] += 1
+
+        # Update query type counts
+        type_name = query_type.value
+        if type_name not in self.query_stats["query_types"]:
+            self.query_stats["query_types"][type_name] = 0
+        self.query_stats["query_types"][type_name] += 1
+
+        # Update average response time
+        total_time = self.query_stats["average_response_time"] * (self.query_stats["total_queries"] - 1)
+        self.query_stats["average_response_time"] = (total_time + response_time) / self.query_stats["total_queries"]
+
+    def get_query_stats(self) -> Dict[str, Any]:
+        """Get query statistics for monitoring"""
+        return {
+            **self.query_stats,
+            "success_rate": (self.query_stats["successful_queries"] / max(1, self.query_stats["total_queries"])) * 100,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    def _attempt_recovery(self, question: str, query_type: QueryType, original_error: str) -> Optional[str]:
+        """Attempt to recover from query processing errors"""
+        self.logger.warning(f"Attempting recovery for query: {question}, Error: {original_error}")
+
+        try:
+            # Recovery strategy 1: Try with simplified query
+            if len(question.split()) > 20:
+                simplified_question = " ".join(question.split()[:15]) + "..."
+                self.logger.info(f"Trying simplified query: {simplified_question}")
+                # This would recursively call route_query with simplified version
+
+            # Recovery strategy 2: Fallback to basic RAG
+            from .rag import retrieve_snippets, synthesize_answer
+            snippets = retrieve_snippets(question, top_k=3, filters={})
+            if snippets:
+                fallback_result = synthesize_answer(question, snippets, {})
+                if fallback_result:
+                    self.logger.info("Recovery successful using RAG fallback")
+                    return f"Based on available information:\n\n{fallback_result}"
+
+            # Recovery strategy 3: Provide helpful error message
+            return f"I encountered an issue processing your query. The error was: {original_error}. Please try rephrasing your question or ask about specific companies, roles, or skills."
+
+        except Exception as recovery_error:
+            self.logger.error(f"Recovery also failed: {recovery_error}")
+            return f"I'm having trouble processing this query. Please try a simpler question about companies, roles, or skills."
+
+    def _validate_result_safety(self, result: str, original_question: str) -> str:
+        """Validate result safety and add disclaimers if needed"""
+        result_lower = result.lower()
+        question_lower = original_question.lower()
+
+        # Add disclaimer for speculative content
+        speculative_indicators = ["might", "could", "possibly", "likely", "probably", "seems", "appears"]
+        if any(word in result_lower for word in speculative_indicators):
+            result += "\n\n*Note: This analysis is based on available placement data and may not reflect current market conditions.*"
+
+        # Add disclaimer for salary information
+        if "salary" in question_lower and "salary" in result_lower:
+            result += "\n\n*Disclaimer: Salary information is based on historical placement data and may vary based on individual performance, location, and market conditions.*"
+
+        # Add disclaimer for advice
+        if any(word in question_lower for word in ["advice", "strategy", "prepare", "how to"]):
+            result += "\n\n*This is general career guidance based on placement data. Please consult with placement counselors for personalized advice.*"
+
+        return result

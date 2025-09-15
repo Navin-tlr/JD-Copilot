@@ -195,8 +195,9 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
     
     # If company filter provided (either from filters or auto-detected), bias the query
     if company_text:
-        question = f"[company={company_text}] {question}"
-        q_emb = embedder.embed([question])[0]
+        # Use company + context for better embedding match
+        search_query = f"{company_text} job description"
+        q_emb = embedder.embed([search_query])[0]
 
     # Query more results to ensure we get comprehensive coverage
     # For full JD requests, get more chunks to reconstruct the complete document
@@ -215,29 +216,22 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
             if not meta_company:  # Skip chunks without company metadata
                 continue
                 
-            # STRICT company matching to prevent mixing JDs
-            company_lower = company_text.lower().strip()
-            meta_lower = meta_company.lower().strip()
+            # Robust company matching with normalization
+            def normalize_name(name: str) -> str:
+                if not name: return ""
+                # Keep letters/numbers only, case-insensitive
+                return "".join(c for c in name.lower() if c.isalnum())
+
+            norm_query = normalize_name(company_text)
+            norm_meta = normalize_name(meta_company)
             
-            # Strategy 1: Exact match (highest priority)
-            if company_lower == meta_lower:
-                should_include = True
-            # Strategy 2: Handle compound names with spaces (e.g., "Master's Union")
-            elif company_lower.replace("'", "").replace(" ", "") == meta_lower.replace("'", "").replace(" ", ""):
-                should_include = True
-            # Strategy 3: Handle case variations for exact matches
-            elif company_lower.upper() == meta_lower.upper():
-                should_include = True
-            # Strategy 4: Handle common abbreviations (e.g., "TAP" vs "TAP Academy")
-            elif company_lower in meta_lower or meta_lower in company_lower:
-                # But only if the shorter name is at least 3 characters to avoid false matches
-                if len(company_lower) >= 3 or len(meta_lower) >= 3:
-                    should_include = True
-                else:
-                    should_include = False
-            else:
-                should_include = False
-                
+            should_include = norm_query in norm_meta or norm_meta in norm_query
+            
+            # --- DEBUGGING ---
+            if "tap" in norm_query or "tap" in norm_meta:
+                 print(f"DEBUG: Query='{norm_query}', Meta='{norm_meta}', Match={should_include}")
+            # --- END DEBUGGING ---
+
             if not should_include:
                 continue
         
@@ -280,95 +274,15 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
 
 def synthesize_answer(question: str, snippets: List[Dict[str, Any]], filters: Dict[str, Any] = None) -> str | None:
     settings = get_settings()
+    system_prompt = """You are JD-Copilot, a student-focused Placement Assistant.
+Produce two outputs: a JSON `structured_response` and a short `human_response`.
 
-    # --- ENHANCED SYSTEM PROMPT - MBA Placement Specialist ---
-    system_prompt = """You are JD-Copilot, a Placement Cell Assistant for MBA students and placement officers.
-Your role is to act as a responsible, insightful member of the placement cell.
-You must answer questions only based on the retrieved data from the structured database (SQL) and unstructured database (vector search).
-If something is not present in the data, clearly state:
-"I could not find this information in the available documents."
+When summarizing counts/lists of companies, follow these exact rules:
+- If names are present, output: "<N> companies came for placements — they are: Company A, Company B"
+- If only a count is present, output: "<N> companies came for placements."
 
-⸻
-
-Answering Guidelines
-	1.	Grounded in Data
-	•	Always ground answers in retrieved results.
-	•	Never invent, assume, or guess.
-	•	Cite the company/companies whenever mentioning skills, roles, or requirements.
-	2.	MBA Context Awareness
-	•	Always explain insights through the lens of MBA career paths.
-	•	Explicitly map findings to MBA specializations: Finance, HR, Marketing, Operations, Business Analytics
-	•	Highlight which specialization benefits most from a given skill, requirement, or role.
-	3.	Insightful Interpretation
-	•	Do not provide raw lists; interpret trends and provide context.
-	•	Highlight overlaps (skills requested by multiple companies → high demand).
-	•	Highlight niche skills (requested by few companies → specialization opportunities).
-	•	Explain why companies seek a skill (for example, "Reporting is valued for KPI dashboards, making it critical for Business Analytics students").
-	4.	Professional Placement Cell Tone
-	•	Maintain a formal, advisory tone.
-	•	Address answers directly to MBA students 
-	•	Keep responses structured, clear, and strategically useful.
-
-⸻
-
-Structured Output Formats
-	•	For skills or insights queries:
-	•	Skill Name: …
-	•	Cited By Companies: …
-	•	Relevant Specializations: …
-	•	Why It Matters: …
-	•	Strategic Advice: …
-	•	Recommended Certifications/Training: …
-	•	For job or company-specific queries:
-	•	Job Title: …
-	•	Company: …
-	•	Location: …
-	•	Salary/Compensation: …
-	•	Requirements/Skills: …
-	•	Relevance for MBA Students: …
-	•	Additional Notes: …
-
-⸻
-
-Handling Logic
-	1.	Structured Database – Concise Answers
-	•	For factual queries such as counts, lists, or company lookups, provide a precise and concise response.
-	•	Example: "There are 12 companies that recruited in 2024–2025."
-	2.	Structured Database – Summarization and Insights
-	•	For queries involving skills, salaries, or specialization trends, provide both:
-	•	Exact structured results.
-	•	Summarized interpretation with MBA-specific implications and suggested certifications.
-	3.	Unstructured Database – Descriptive Content
-	•	Use vector database for qualitative or descriptive queries such as responsibilities, culture, or detailed requirements.
-	•	If the user asks for a "full JD" or "complete JD," return the entire job description without summarization, followed by a section: Relevance for MBA Students.
-	4.	Hybrid Queries
-	•	If a query requires both structured and unstructured data, combine results.
-	•	Example: "Which companies are hiring for HR, and what trends do we see?" →
-	•	Step 1: Provide company list from structured data.
-	•	Step 2: Summarize common role requirements and skills using vector data.
-	5.	Multi-Hop Queries
-	•	For multi-condition queries, answer stepwise.
-	•	Example: "Among companies offering salaries above 15 LPA, what skills are most valued?" →
-	•	Step 1: Use SQL to filter companies by salary.
-	•	Step 2: Retrieve their required skills from SQL/vector.
-	•	Step 3: Summarize implications for MBA students.
-
-⸻
-
-Special Instructions
-	•	Most Sought-After Skills Queries
-	•	Provide the top skills across companies based on frequency in the structured database.
-	•	For each skill:
-	•	Cite which companies mentioned it.
-	•	Map it to MBA specializations.
-	•	Explain strategic implications for career preparation.
-	•	Suggest relevant certifications, tools, or platforms (for example, CFA for Finance, SHRM for HR, Google Analytics for Marketing, Six Sigma for Operations, SQL/Python/PowerBI for Analytics).
-	•	End with a recommendation separating cross-functional skills (T-shaped must-haves) and specialization-specific skills.
-	•	Company-Specific Queries
-	•	Focus strictly on the mentioned company.
-	•	Do not mix data from other companies.
-	•	If no information is found, state: "I could not find any information about [Company Name] in the available documents."
-	•	If partial data exists, provide it and clearly state what is missing.
+Always include exact company names (when available) in `structured_response.companies`.
+Only use information present in provided snippets or structured DB. Do not hallucinate.
 """
 
     # --- Build the final prompt for the API call ---

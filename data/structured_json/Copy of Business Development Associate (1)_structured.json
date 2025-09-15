@@ -1,5 +1,5 @@
 {
-  "company_name": "TAP Academy",
+  "company_name": "Tap Academy",
   "year": 2024,
   "roles": [
     {
@@ -9,37 +9,41 @@
       "salary_min_lpa": null,
       "salary_max_lpa": null,
       "skills": [
-        "cold calling",
-        "cold emailing",
-        "LinkedIn",
-        "social media platforms",
-        "communication skills",
-        "CRM tools"
+        "Cold calling",
+        "Cold emailing",
+        "LinkedIn outreach",
+        "Lead generation",
+        "Partnership development",
+        "Market research",
+        "Networking",
+        "CRM tools (plus)",
+        "Communication (written & verbal)",
+        "Independent task management"
       ],
       "requirements": [
-        "0 - 3 Years Experience (Edtech is a plus)",
-        "Strong interest in cold calling and cold emailing, with the desire to engage professionally with clients or recruiters",
-        "Freshers with excellent communication skills are encouraged to apply",
-        "Proficiency (or willingness to learn) in LinkedIn and other social media platforms for professional networking",
-        "Exceptional communication skills, both written and verbal, with the ability to represent student profiles clearly and professionally",
-        "Ability to work independently, manage multiple tasks, and meet placement and performance targets",
-        "Familiarity with CRM tools is a plus",
-        "Experience in student placements or recruitment is a plus",
-        "Bachelor’s degree in Business, Marketing, Human Resources, or a related field"
+        "0-3 years of experience (EdTech is a plus)",
+        "Bachelor’s degree in Business, Marketing, Human Resources, or related field",
+        "Strong interest in cold calling and cold emailing",
+        "Proficiency (or willingness to learn) in LinkedIn and social media for networking",
+        "Exceptional written and verbal communication skills",
+        "Ability to work independently and manage multiple tasks",
+        "Familiarity with CRM tools (preferred)",
+        "Experience in student placements or recruitment (preferred)"
       ],
       "responsibilities": [
-        "Lead Generation for Placements: Identify and target companies with potential hiring needs through cold calling, cold emailing, and LinkedIn outreach",
-        "Partnership Development: Establish and nurture relationships with HR managers, recruiters, and decision-makers to facilitate placements of TAP Academy students",
-        "LinkedIn & Social Media Outreach: Use LinkedIn and other social media platforms to connect with industry professionals and recruiters, promoting the skills and expertise of TAP Academy students",
-        "Placement Strategy: Develop and execute strategies to place students in companies by understanding industry needs and aligning them with student qualifications",
-        "Market Research & Networking: Stay updated on industry hiring trends, skill requirements, and competitor activities to identify new opportunities for placements",
-        "Reporting & Pipeline Management: Track and report on outreach activities, lead generation efforts, and placement successes"
+        "Generate leads for placements via cold calling, emailing, and LinkedIn outreach",
+        "Develop and maintain relationships with HR managers, recruiters, and decision-makers",
+        "Promote TAP Academy students’ skills to potential employers via LinkedIn and social media",
+        "Design and implement placement strategies aligned with industry needs and student qualifications",
+        "Conduct market research on hiring trends, skill demands, and networking opportunities",
+        "Track and report outreach activities, lead generation, and placement outcomes",
+        "Meet placement and performance targets"
       ]
     }
   ],
-  "company_type": "Ed-Tech company",
-  "industry": "Information and Technology",
-  "location": null,
+  "company_type": null,
+  "industry": "Ed-Tech",
+  "location": "BTM Layout, Bangalore",
   "source_file": "Copy of Business Development Associate (1).pdf",
-  "extraction_timestamp": "2025-09-06 21:12:08.779274"
+  "extraction_timestamp": "2025-09-13 16:35:32.829185"
 }

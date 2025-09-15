@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { NotionStyleResponse } from './NotionStyleResponse';
+import CitationIcon from '../src/components/CitationIcon';
 // Placeholder for avatar image
 
 interface Message {
@@ -79,6 +80,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           }`}>
             {isUser ? 'You' : 'y²'}
           </span>
+          {!isUser && <CitationIcon companies={['Google', 'Meta', 'Amazon']} />}
           <div className={`w-1.5 h-1.5 rounded-full ${
             isUser 
               ? 'bg-foreground/60' 

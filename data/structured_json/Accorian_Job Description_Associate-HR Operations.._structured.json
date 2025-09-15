@@ -8,29 +8,17 @@
       "location": null,
       "salary_min_lpa": null,
       "salary_max_lpa": null,
-      "skills": [
-        "Strong analytical and problem-solving skills",
-        "MS Office Suite",
-        "HRMS",
-        "Good understanding of HR Technologies",
-        "Experience on HR processes from hire to retire",
-        "Good understanding of labor laws and other compliance requirements pertaining to people",
-        "Proven expertise in streamlining HR processes whereby enhancing efficiency",
-        "Proven expertise in strategizing, designing and deploying employee engagement initiative"
-      ],
+      "skills": [],
       "requirements": [
-        "Bachelor's Degree/MBA",
-        "Fresher"
+        "Fresher",
+        "Bachelor's Degree/MBA"
       ],
-      "responsibilities": [
-        "Responsible for all operational activities pertaining to an employee life cycle",
-        "Work closely with the Head of People on key people initiatives such as Employee Engagement, Performance Management, Process Optimization and Capability Building"
-      ]
+      "responsibilities": []
     }
   ],
   "company_type": null,
-  "industry": "cybersecurity advisory and consulting",
-  "location": "New Jersey",
+  "industry": "Cybersecurity Advisory and Consulting",
+  "location": "Headquartered in New Jersey, with regional offices in India, Canada, and UAE",
   "source_file": "Accorian_Job Description_Associate-HR Operations...pdf",
-  "extraction_timestamp": "2025-09-06 21:08:10.266442"
+  "extraction_timestamp": "2025-09-13 16:34:08.462245"
 }

@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     PINECONE_REGION: str = "us-east-1"
 
     # Embeddings
-    EMBED_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    EMBED_MODEL: str = "all-MiniLM-L6-v2"
 
     # Chunking
     CHUNK_SIZE: int = 700

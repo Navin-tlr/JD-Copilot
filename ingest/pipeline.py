@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
+from datetime import datetime
 
 import certifi
 import ssl
@@ -254,9 +255,9 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
             "text": chunk_text,
             "source": path.name,
             "chunk_index": idx,
+            "company": company_name or path.stem.replace("_", " ").title(),
+            "year": datetime.now().year,
         }
-        if company_name:
-            meta["company"] = company_name
         chunks.append({"_id": chunk_id, **meta})
 
     n = upsert_chunks_pinecone(chunks, str(path))

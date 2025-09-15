@@ -1,6 +1,6 @@
 {
   "company_name": "Madison PR",
-  "year": 2025,
+  "year": null,
   "roles": [
     {
       "title": "Account Executive",
@@ -9,38 +9,44 @@
       "salary_min_lpa": null,
       "salary_max_lpa": 5.5,
       "skills": [
-        "storytelling",
-        "media engagement",
-        "building media relationships",
-        "managing end-to-end campaigns",
-        "PR tools",
-        "software",
-        "Microsoft Office Suite"
+        "Public Relations",
+        "Media Engagement",
+        "Storytelling",
+        "Content Creation",
+        "Press Release Writing",
+        "Media Event Coordination",
+        "Strategic Communication",
+        "Microsoft Office Suite",
+        "PR Tools and Software"
       ],
       "requirements": [
-        "A Post graduate degree in Public Relations, Communications, Marketing, or a related field",
-        "Previous internship experience in public relations, with a solid understanding of the media landscape",
-        "A natural flair for storytelling and a strong network of industry contacts",
-        "Exceptional written and verbal communication skills that make an impact",
-        "The ability to multitask, manage projects seamlessly, and meet tight deadlines",
-        "A proactive mindset, ready to take initiative and think on your feet",
-        "Familiarity with PR tools, software, and Microsoft Office Suite",
-        "A creative and strategic approach to problem-solving"
+        "Postgraduate degree in Public Relations, Communications, Marketing, or a related field",
+        "Previous internship experience in public relations",
+        "Solid understanding of the media landscape",
+        "Strong network of industry contacts (preferred)",
+        "Exceptional written and verbal communication skills",
+        "Ability to multitask and manage projects seamlessly",
+        "Proactive mindset with initiative-taking ability",
+        "Creative and strategic problem-solving skills"
       ],
       "responsibilities": [
-        "Develop and execute powerful PR strategies that align with business objectives across various industries",
-        "Cultivate and maintain strong relationships with key media professionals, influencers, and industry thought leaders",
-        "Craft compelling press releases, media kits, and engaging content that grabs attention",
-        "Manage and respond to media inquiries while proactively fostering influencer relations",
-        "Monitor, analyze, and report on media coverage and PR campaign performance, turning insights into action",
-        "Organize and coordinate media events, press conferences, and product launches that create buzz",
-        "Stay ahead of industry trends and leverage emerging opportunities to enhance PR efforts"
+        "Develop and execute PR strategies aligned with business objectives across industries (Consumer, Corporate, FMCG, Luxury, Retail, Lifestyle, Beauty, Real Estate)",
+        "Cultivate and maintain relationships with media professionals, influencers, and industry leaders",
+        "Craft press releases, media kits, and engaging content",
+        "Manage and respond to media inquiries and foster influencer relations",
+        "Monitor, analyze, and report on media coverage and PR campaign performance",
+        "Organize media events, press conferences, and product launches",
+        "Stay updated on industry trends and leverage emerging PR opportunities"
       ]
     }
   ],
   "company_type": null,
-  "industry": "Public Relations",
-  "location": "Mumbai",
+  "industry": "Public Relations / Communications / Marketing",
+  "location": [
+    "Mumbai",
+    "Gurgaon",
+    "Bangalore"
+  ],
   "source_file": "Account Executive - Madison PR Campus JD.pdf",
-  "extraction_timestamp": "2025-09-06 21:08:49.792422"
+  "extraction_timestamp": "2025-09-13 16:34:32.694898"
 }
