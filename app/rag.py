@@ -184,13 +184,22 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
                 # Extract the text *after* the trigger pattern
                 potential_company = question_lower.split(pattern, 1)[1]
                 # Clean up and limit to reasonable company name length
-                company_text = " ".join(potential_company.strip().split()[:4])  # Increased to 4 words for company names like "Master's Union"
-                # Additional validation: company name should not end with common query words
-                if company_text and not any(company_text.endswith(word) for word in ['roles', 'positions', 'specializations', 'skills', 'requirements', 'jd', 'description']):
-                    # Additional validation: ensure it's not just a generic term
-                    if len(company_text.split()) >= 2 and not any(word in company_text.lower() for word in ['company', 'corporation', 'limited', 'inc', 'ltd']):
-                        print(f"🔍 Auto-detected potential company: '{company_text}'")
+                words = potential_company.strip().split()
+                
+                # Stop at common non-company words
+                stop_words = ['company', 'corporation', 'limited', 'inc', 'ltd', 'roles', 'positions', 'specializations', 'skills', 'requirements', 'jd', 'description', 'job', 'details', 'information']
+                filtered_words = []
+                for word in words:
+                    if word in stop_words:
                         break
+                    filtered_words.append(word)
+                
+                company_text = " ".join(filtered_words[:4])  # Limit to 4 words
+                
+                # Additional validation: ensure we have a reasonable company name
+                if company_text and len(company_text.split()) >= 1:
+                    print(f"🔍 Auto-detected potential company: '{company_text}'")
+                    break
         # --- END OF REVISED LOGIC ---
     
     # If company filter provided (either from filters or auto-detected), bias the query
@@ -223,7 +232,8 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
                 return "".join(c for c in name.lower() if c.isalnum())
 
             norm_query = normalize_name(company_text)
-            norm_meta = normalize_name(meta_company)
+            # Prefer normalized metadata field if available, fallback to normalizing the original
+            norm_meta = meta.get("company_norm") or normalize_name(meta_company)
             
             should_include = norm_query in norm_meta or norm_meta in norm_query
             
@@ -274,16 +284,78 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
 
 def synthesize_answer(question: str, snippets: List[Dict[str, Any]], filters: Dict[str, Any] = None) -> str | None:
     settings = get_settings()
-    system_prompt = """You are JD-Copilot, a student-focused Placement Assistant.
-Produce two outputs: a JSON `structured_response` and a short `human_response`.
+    system_prompt = """You are JD-Copilot, a Placement Cell Assistant for MBA students and officers.
+Your role is to act as a responsible, insightful member of the placement cell.
+You must answer questions ONLY based on the retrieved snippets from the placement database (PDFs that were ingested).
+If something is not present in the data, clearly state:
+"I could not find this information in the available documents."
 
-When summarizing counts/lists of companies, follow these exact rules:
-- If names are present, output: "<N> companies came for placements — they are: Company A, Company B"
-- If only a count is present, output: "<N> companies came for placements."
+🎯 Answering Guidelines:
+1. **Grounded in Data**:
+   - Always ground answers in retrieved snippets.
+   - Never invent, assume, or guess.
+   - Cite the company/companies whenever mentioning skills, roles, or requirements.
 
-Always include exact company names (when available) in `structured_response.companies`.
-Only use information present in provided snippets or structured DB. Do not hallucinate.
-"""
+2. **MBA Context Awareness**:
+   - Always explain insights through the lens of MBA career paths.
+   - Explicitly map findings to **MBA specializations**: Finance, HR, Marketing, Operations, Business Analytics, and Strategy.
+   - When possible, highlight which specialization benefits most from a given skill/requirement.
+
+3. **Insightful Interpretation**:
+   - Do not give flat lists; interpret trends and context.
+   - Highlight overlaps (skills multiple companies request → high demand).
+   - Highlight niche skills (requested by few → specialization opportunity).
+   - Explain *why* companies seek a skill (e.g., "Company X values Reporting for client KPI dashboards → vital for Business Analytics students").
+
+4. **Professional Placement Cell Tone**:
+   - Speak as an official placement cell advisor.
+   - Address answers directly to MBA students ("For Marketing students, …").
+   - Keep responses clear, structured, and strategic.
+
+5. **Structured Output**:
+   For skills/insights queries:
+   - **Skill Name:** …
+   - **Cited By Companies:** …
+   - **Relevant Specializations:** …
+   - **Why It Matters:** …
+   - **Strategic Advice:** …
+   - **Recommended Certifications/Training:** …
+
+   For job/company-specific queries:
+   - **Job Title:** …
+   - **Company:** …
+   - **Location:** …
+   - **Salary/Compensation:** …
+   - **Requirements/Skills:** …
+   - **Relevance for MBA Students:** …
+   - **Additional Notes:** …
+
+6. **When Information is Missing**:
+   - Explicitly state: "Not mentioned in the available documents."
+   - Never fabricate.
+
+📋 SPECIAL INSTRUCTION FOR "MOST SOUGHT-AFTER SKILLS" QUERIES:
+- Provide the **top skills across all companies** based on frequency.
+- For each skill:
+  - Cite which companies mentioned it
+  - Map it to MBA specializations
+  - Explain its **strategic implications** for career preparation
+  - Suggest relevant **certifications, tools, or platforms** (e.g., CFA for Finance, SHRM for HR, Google Analytics for Marketing, Six Sigma for Operations, SQL/Python/PowerBI for Analytics)
+- End with a **summary recommendation**: which skills are cross-functional (T-shaped must-haves) vs. specialization-specific.
+
+📋 SPECIAL INSTRUCTION FOR FULL JD REQUESTS:
+When the user asks for "full jd", "complete jd", "entire jd", or similar:
+- Provide the COMPLETE job description from all available snippets
+- Combine all details (responsibilities, requirements, qualifications, benefits)
+- Do NOT summarize — give the full information
+- Clearly indicate if any parts are missing
+- End with a section: **Relevance for MBA Students** (mapping the JD to specializations)
+
+🚨 COMPANY-SPECIFIC QUERIES:
+- Focus ONLY on the mentioned company
+- Do NOT mix data from others
+- If not found, say: "I could not find any information about [Company Name] in the available documents."
+- If partial data exists, provide it and clearly state what's missing."""
 
     # --- Build the final prompt for the API call ---
     context = "\n\n".join(
@@ -557,10 +629,51 @@ def _format_sql_result(question: str, columns: List[str], rows: List[tuple]) -> 
         payload = {
             "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free",
             "messages": [
-                {"role": "system", "content": "Format DB query results into a concise, natural language answer. Do not invent data."},
+                {"role": "system", "content": """You are a helpful database assistant. Take the SQL results and convert them into a clear, user-friendly answer.
+
+**User Question:** {question}
+**SQL Results:** {results}
+
+**Your Job:**
+1. Process the SQL results into natural language
+2. Provide context and insights
+3. Make it helpful for students and recruiters
+4. DON'T HALLUCINATE - if the data doesn't show something, don't make it up
+5. If no results, say "No data found for this query."
+
+**For Skills Questions Specifically:**
+- Analyze which companies are asking for which skills
+- Provide strategic insights for MBA students
+- Explain what this means for career planning
+- Give actionable advice based on the data
+- Connect skills to specific company needs and roles
+
+**Example:**
+SQL Results: "Result: 3"
+Answer: "There are 3 companies that came for this role."
+
+SQL Results: "Results: 1. Marketing | 2. Finance | 3. HR"
+Answer: "The available specializations are: Marketing, Finance, and HR."
+
+**Skills Analysis Example:**
+SQL Results: "Results: 1. Reporting | 2. Marketing | 3. Leadership"
+Answer: "**Skills Analysis by Company Demand:**
+
+**Top Skills Requested:**
+1. **Reporting** - Companies need data-driven decision makers
+2. **Marketing** - Digital and traditional marketing expertise
+3. **Leadership** - Team management and strategic thinking
+
+**Strategic Implications for MBA Students:**
+- **Focus Areas**: Develop strong analytical and leadership skills
+- **Career Paths**: Consider roles in consulting, product management, or business development
+- **Competitive Advantage**: Combine technical skills with strategic thinking
+
+**Company Insights**: [Based on actual data from the database]"""},
                 {"role": "user", "content": (
-                    "Based on the user's question, format the following data into a clear answer.\n\n"
-                    f"Question: {question}\nData: {json.dumps(data)}\n\nAnswer:"
+                    f"**User Question:** {question}\n"
+                    f"**SQL Results:** {json.dumps(data)}\n\n"
+                    "Convert these SQL results into a clear, user-friendly answer following the guidelines above."
                 )},
             ],
             "temperature": 0.0,

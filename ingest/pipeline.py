@@ -20,7 +20,15 @@ from app.database import PlacementDatabase
 from app.utils import stable_chunk_id
 from ingest.company_extractor import extract_company
 from ingest.structured_extractor import StructuredExtractor
+from ingest.metadata_normalize import canonicalize_company
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+
+def normalize_company_name(name: str) -> str:
+    """Normalize company name for consistent matching: lowercase, alphanumeric only."""
+    if not name:
+        return ""
+    return "".join(c for c in name.lower() if c.isalnum())
 
 
 def _read_text_from_path(path: Path) -> str:
@@ -115,7 +123,20 @@ def upsert_chunks_pinecone(chunks: List[Dict[str, Any]], source_file: str) -> in
         {"id": id_, "values": vec.tolist(), "metadata": meta}
         for id_, vec, meta in zip(ids, embeddings, metadatas)
     ]
-    index.upsert(vectors=vectors)
+    try:
+        index.upsert(vectors=vectors)
+    except Exception as e:
+        # Pinecone may return 403 Forbidden if API key or project is not authorized; don't abort ingestion
+        try:
+            from pinecone.core.openapi.shared.exceptions import ForbiddenException
+            if isinstance(e, ForbiddenException):
+                print("⚠️ Pinecone upsert forbidden (403). Continuing without vector upsert.")
+                return len(ids)
+        except Exception:
+            pass
+        # For other exceptions, log and re-raise so caller can decide
+        print(f"❌ Pinecone upsert failed: {e}")
+        raise
     return len(ids)
 
 
@@ -235,6 +256,14 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
     else:
         print(f"⚠️ Structured extraction failed for {path.name}")
 
+    # Determine the best company name to use
+    final_company_name = company_name  # Start with initial extraction
+    if extraction and extraction.company_name:
+        final_company_name = extraction.company_name  # Override with structured extraction if available
+    
+    if not final_company_name:
+        final_company_name = path.stem.replace("_", " ").title()  # Fallback to filename
+
     # Chunk using RecursiveCharacterTextSplitter
     chunk_size = int(os.getenv("CHUNK_SIZE", "700"))
     chunk_overlap = int(os.getenv("CHUNK_OVERLAP", "150"))
@@ -255,13 +284,14 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
             "text": chunk_text,
             "source": path.name,
             "chunk_index": idx,
-            "company": company_name or path.stem.replace("_", " ").title(),
+            "company": final_company_name,
+            "company_norm": normalize_company_name(final_company_name),
             "year": datetime.now().year,
         }
         chunks.append({"_id": chunk_id, **meta})
 
     n = upsert_chunks_pinecone(chunks, str(path))
-    return n, company_name
+    return n, final_company_name
 
 
 def main() -> None:

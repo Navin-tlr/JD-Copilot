@@ -39,7 +39,8 @@ class StructuredExtractor:
         # Import here to avoid circular imports
         from app.config import get_settings
         self.settings = get_settings()
-        
+        # Debug: Print the loaded model at init
+        print(f"[DEBUG] StructuredExtractor loaded OPENROUTER_MODEL: {self.settings.OPENROUTER_MODEL}")
         self.extraction_prompt = """You are an expert MBA Placement Analyst. Extract structured information from this job description PDF.
 
 EXTRACT ONLY the following information in valid JSON format:
@@ -90,16 +91,19 @@ PDF TEXT:
 
 EXTRACTED JSON:"""
 
+
     def extract_structured_data(self, text: str) -> Optional[CompanyExtraction]:
         """Extract structured data using OpenRouter LLM"""
         try:
             if not self.settings.OPENROUTER_API_KEY:
                 print("❌ No OpenRouter API key available for structured extraction")
                 return None
+            if not self.settings.OPENROUTER_MODEL:
+                raise RuntimeError("OPENROUTER_MODEL must be set in the environment. No fallback allowed.")
 
             # Optimize text length for cost efficiency
             text_preview = text[:3000]  # Reduced from 4000 to save tokens
-            
+
             # Enhanced prompt for better JSON extraction
             enhanced_prompt = f"""
 {self.extraction_prompt.replace('{text}', text_preview)}
@@ -111,9 +115,11 @@ IMPORTANT:
 - Ensure all JSON syntax is correct
 - Use proper escaping for quotes and special characters
 """
-            
+
+            model_used = self.settings.OPENROUTER_MODEL
+            print(f"🔎 [DEBUG] Model used for OpenRouter API call: {model_used}")
             payload = {
-                "model": self.settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free",
+                "model": model_used,
                 "messages": [
                     {"role": "system", "content": "You are a precise HR data extractor. You MUST return ONLY valid JSON with no additional text, explanations, or formatting."},
                     {"role": "user", "content": enhanced_prompt}

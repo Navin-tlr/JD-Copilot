@@ -46,6 +46,7 @@ class PlacementDatabase:
                     specialization TEXT NOT NULL,
                     location TEXT,
                     role_description TEXT,
+                    source_chunk_id TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (company_id) REFERENCES companies (id)
                 )
@@ -121,27 +122,59 @@ class PlacementDatabase:
             """)
             
             conn.commit()
+            # Run simple schema migration: ensure roles.source_chunk_id exists (older DBs may lack this column)
+            try:
+                cursor.execute("PRAGMA table_info(roles)")
+                cols = [r[1] for r in cursor.fetchall()]
+                if "source_chunk_id" not in cols:
+                    cursor.execute("ALTER TABLE roles ADD COLUMN source_chunk_id TEXT")
+                    logging.info("Migrated DB: added roles.source_chunk_id column")
+                    conn.commit()
+            except Exception:
+                # If ALTER TABLE fails for any reason, continue; insert_company_extraction will still try to insert
+                # and report any errors. We don't want DB migration failures to crash the whole app.
+                logging.debug("Could not run migration to add roles.source_chunk_id (maybe already present)")
     
-    def insert_company_extraction(self, extraction_data: Dict[str, Any]) -> bool:
+    def insert_company_extraction(self, extraction_data: Dict[str, Any], source_chunk_id: Optional[str] = None) -> bool:
         """Insert structured extraction data into database"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 
+                # Normalize year fields
+                batch_year = extraction_data.get("batch_year")
+                if not batch_year and extraction_data.get("year") is not None:
+                    # Accept year as int or string
+                    by = extraction_data.get("year")
+                    batch_year = str(by)
+
                 # Insert company
                 company_name = extraction_data.get("company_name", "")
                 if not company_name:
                     return False
                 
-                cursor.execute("""
-                    INSERT OR REPLACE INTO companies (company_name, company_type, industry, location)
-                    VALUES (?, ?, ?, ?)
-                """, (
-                    company_name,
-                    extraction_data.get("company_type"),
-                    extraction_data.get("industry"),
-                    extraction_data.get("location")
-                ))
+                # If batch_year available, store it on company row too for reference
+                if batch_year:
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO companies (company_name, company_type, industry, location, batch_year)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (
+                        company_name,
+                        extraction_data.get("company_type"),
+                        extraction_data.get("industry"),
+                        extraction_data.get("location"),
+                        batch_year
+                    ))
+                else:
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO companies (company_name, company_type, industry, location)
+                        VALUES (?, ?, ?, ?)
+                    """, (
+                        company_name,
+                        extraction_data.get("company_type"),
+                        extraction_data.get("industry"),
+                        extraction_data.get("location")
+                    ))
                 
                 company_id = cursor.lastrowid
                 
@@ -150,26 +183,27 @@ class PlacementDatabase:
                 for role_data in roles:
                     # Insert role with specialization
                     cursor.execute("""
-                        INSERT INTO roles (company_id, title, specialization, location, role_description)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO roles (company_id, title, specialization, location, role_description, source_chunk_id)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     """, (
                         company_id, 
                         role_data.get("title", ""), 
                         role_data.get("specialization", "General"),
                         role_data.get("location"),
-                        role_data.get("role_description", "")
+                        role_data.get("role_description", ""),
+                        source_chunk_id
                     ))
                     
                     role_id = cursor.lastrowid
                     
                     # Insert offer data with batch year
-                    if role_data.get("salary_min_lpa") or role_data.get("salary_max_lpa"):
+                    if role_data.get("salary_min_lpa") is not None or role_data.get("salary_max_lpa") is not None:
                         cursor.execute("""
                             INSERT INTO offers (role_id, batch_year, salary_min_lpa, salary_max_lpa, expected_hires)
                             VALUES (?, ?, ?, ?, ?)
                         """, (
                             role_id,
-                            extraction_data.get("batch_year", "2024-2025"),
+                            batch_year or extraction_data.get("batch_year", "2024-2025"),
                             role_data.get("salary_min_lpa"),
                             role_data.get("salary_max_lpa"),
                             role_data.get("expected_hires")
@@ -192,6 +226,15 @@ class PlacementDatabase:
                                 INSERT INTO requirements (role_id, requirement_text, requirement_priority)
                                 VALUES (?, ?, ?)
                             """, (role_id, req, i + 1))
+
+                    # Optional: map responsibilities as requirement_type='responsibility'
+                    responsibilities = role_data.get("responsibilities", [])
+                    for i, resp in enumerate(responsibilities):
+                        if resp:
+                            cursor.execute("""
+                                INSERT INTO requirements (role_id, requirement_text, requirement_type, requirement_priority)
+                                VALUES (?, ?, 'responsibility', ?)
+                            """, (role_id, resp, i + 1))
                 
                 conn.commit()
                 return True
