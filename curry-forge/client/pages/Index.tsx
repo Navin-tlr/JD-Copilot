@@ -428,6 +428,9 @@ export default function Index() {
   const paletteRef = useRef<HTMLDivElement | null>(null);
   const currentFrameRef = useRef<number | null>(null);
   const abortStreamingRef = useRef<{aborted:boolean}>({aborted:false});
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const placeholderAssistantIdRef = useRef<string | null>(null);
+  const [generating, setGenerating] = useState(false);
 
   // Load persisted history
   useEffect(() => {
@@ -537,51 +540,71 @@ export default function Index() {
   const sendMessage = async () => {
     if (mode !== 'rag') return; // Only active in RAG mode
     const text = message.trim();
-    if (!text || isSending) return;
+    if (!text || isSending || generating) return;
     setIsSending(true);
+    setGenerating(true);
     const userEntry = { id: crypto.randomUUID(), role: 'user' as const, content: text };
     setMessages((m) => [...m, userEntry]);
+    // create placeholder assistant message immediately so Stop icon appears instantly
+    abortStreamingRef.current.aborted = false;
+    const placeholderId = crypto.randomUUID();
+    placeholderAssistantIdRef.current = placeholderId;
+    setMessages((m) => [...m, { id: placeholderId, role: 'assistant', content: '', streaming: true }]);
+    setMessage("");
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    let answer: string | null = null;
     try {
       const res = await fetch('http://localhost:8000/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: text, session_id: 'default' })
+        body: JSON.stringify({ question: text, session_id: 'default' }),
+        signal: controller.signal
       });
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const answer: string = data.answer || '...';
-      const id = crypto.randomUUID();
-      // create streaming placeholder
-      abortStreamingRef.current.aborted = false;
-      setMessages((m) => [...m, { id, role: 'assistant', content: '', streaming: true }]);
-      const chars = Array.from(answer);
-      let idx = 0;
-      const step = () => {
-        if (abortStreamingRef.current.aborted) {
-          // finalize current content and stop
-          setMessages((m) => m.map(msg => msg.id === id ? { ...msg, streaming: false } : msg));
-          currentFrameRef.current = null;
-          setIsSending(false);
-          return;
-        }
-        idx = Math.min(idx + 1, chars.length);
-        const done = idx >= chars.length;
-        setMessages((m) => m.map(msg => msg.id === id ? { ...msg, content: chars.slice(0, idx).join(''), streaming: !done } : msg));
-        if (!done) {
-          currentFrameRef.current = requestAnimationFrame(step);
-        } else {
-          currentFrameRef.current = null;
-          setIsSending(false);
-        }
-      };
-      currentFrameRef.current = requestAnimationFrame(step);
-    } catch (e) {
-      setMessages((m) => [...m, { id: crypto.randomUUID(), role: 'assistant', content: 'Error processing your request.' }]);
-    } finally {
-      setMessage("");
+      answer = data.answer || '...';
+    } catch (err) {
+      if ((err as any).name === 'AbortError' || abortStreamingRef.current.aborted) {
+        // aborted: finalize placeholder
+        setMessages(m => m.map(msg => msg.id === placeholderId ? { ...msg, streaming: false, content: msg.content || '(stopped)' } : msg));
+        setIsSending(false);
+        setGenerating(false);
+        return;
+      }
+      // network error
+      setMessages(m => m.map(msg => msg.id === placeholderId ? { ...msg, streaming: false, content: 'Error processing your request.' } : msg));
+      setIsSending(false);
+      setGenerating(false);
+      return;
     }
+    if (abortStreamingRef.current.aborted) {
+      setMessages(m => m.map(msg => msg.id === placeholderId ? { ...msg, streaming: false, content: msg.content || '(stopped)' } : msg));
+      setIsSending(false); setGenerating(false); return;
+    }
+    // simulate character streaming now that we have answer
+    if (answer == null) answer = '';
+    const chars = Array.from(answer);
+    let idx = 0;
+    const step = () => {
+      if (abortStreamingRef.current.aborted) {
+        setMessages(m => m.map(msg => msg.id === placeholderId ? { ...msg, streaming: false, content: msg.content || '(stopped)' } : msg));
+        currentFrameRef.current = null;
+        setIsSending(false); setGenerating(false);
+        return;
+      }
+      idx = Math.min(idx + 1, chars.length);
+      const done = idx >= chars.length;
+      setMessages(m => m.map(msg => msg.id === placeholderId ? { ...msg, content: chars.slice(0, idx).join(''), streaming: !done } : msg));
+      if (!done) {
+        currentFrameRef.current = requestAnimationFrame(step);
+      } else {
+        currentFrameRef.current = null;
+        setIsSending(false);
+        setGenerating(false);
+      }
+    };
+    currentFrameRef.current = requestAnimationFrame(step);
   };
   // Removed explicit reset button per request; keeping helper for potential internal uses
   const clearHistory = () => { setMessages([]); try { localStorage.removeItem(STORAGE_KEY); } catch {/* ignore */} };
@@ -632,12 +655,56 @@ export default function Index() {
     setShowCompanyPalette(false);
   };
 
+  // Formatting utilities for assistant answers
+  const cleanMarkdown = (text: string) => text.replace(/\*\*(.*?)\*\*/g, '$1');
+  const formatBlocks = (text: string) => {
+    const lines = cleanMarkdown(text).split(/\r?\n/);
+    return lines.map((ln, i) => {
+      const t = ln.trim();
+      if (!t) return <div key={i} className="h-1"/>; // spacer
+      // Heading heuristic: all caps words or ends with ':' and short
+      if ((/^[-A-Z0-9 &()\/]{3,40}:?$/.test(t) && t.split(' ').length <= 8 && /[A-Z]/.test(t)) || /^#{1,3}\s/.test(t)) {
+        return <div key={i} className="font-hack font-bold text-[11px] tracking-wide text-white/90 mt-2 first:mt-0">{t.replace(/^#{1,3}\s/, '')}</div>;
+      }
+      // Bullet list
+      if (/^[-*•]\s+/.test(t)) {
+        return <div key={i} className="pl-3 relative font-hack text-[11px] text-white/75 leading-snug"><span className="absolute left-0 text-white/50">•</span>{t.replace(/^[-*•]\s+/, '')}</div>;
+      }
+      // Numbered list
+      if (/^\d+\./.test(t)) {
+        return <div key={i} className="pl-4 font-hack text-[11px] text-white/75 leading-snug">{t}</div>;
+      }
+      // Body paragraph
+      return <div key={i} className="font-hack text-[11px] text-white/70 leading-relaxed">{t}</div>;
+    });
+  };
+
+  const MessageBubble = ({ msg }: { msg: { id: string; role: 'user' | 'assistant'; content: string; streaming?: boolean } }) => {
+    const base = 'font-hack text-[11px] whitespace-pre-wrap rounded-[5px] px-3 py-1.5 transition-colors';
+    if (msg.role === 'user') {
+      return (
+        <div className={cn(base, 'bg-[#3f3f3f] border border-[#F69F1C]/15 text-rag-text-primary/85')}>{msg.content}</div>
+      );
+    }
+    return (
+      <div className={cn(base, 'bg-[#3a3a3a] border border-[#F69F1C]/40 text-rag-text-primary/75 shadow-sm')}>
+        <div className="flex items-start gap-2">
+          <AnswerIcon className="mt-0.5 text-white/80 flex-shrink-0" />
+          <div className="flex-1 space-y-0.5">
+            {msg.streaming && !msg.content ? <span className="opacity-60">...</span> : formatBlocks(msg.content)}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={cn(
-      "min-h-screen flex flex-col items-center justify-between p-4 transition-all duration-500 relative overflow-hidden",
+      "h-screen flex flex-col items-center p-4 transition-all duration-500 relative overflow-hidden",
       getBackgroundClass()
     )}>
-  <div ref={convoRef} className="flex-1 flex flex-col items-center relative w-full pt-6 overflow-y-auto">
+      <div className="w-full max-w-sm flex flex-col h-full">
+        <div ref={convoRef} className="flex-1 flex flex-col items-center relative w-full pt-6 overflow-y-auto min-h-0">
         {mode === 'rag' && showWelcome && (
           <div
             className={cn(
@@ -649,26 +716,9 @@ export default function Index() {
           </div>
         )}
         {mode === 'rag' && (
-          <div className="w-full max-w-sm flex flex-col gap-2 pb-4">
+          <div className="w-full flex flex-col gap-2 pb-4">
             {messages.map(m => (
-              <div
-                key={m.id}
-                className={cn(
-                  'font-hack text-[11px] leading-relaxed whitespace-pre-wrap rounded-[5px] px-3 py-1.5 transition-colors',
-                  m.role === 'user'
-                    ? 'text-rag-text-primary/85 bg-[#3f3f3f] border border-[#F69F1C]/15'
-                    : 'text-rag-text-primary/75 bg-[#3a3a3a] border border-[#F69F1C]/40 shadow-sm'
-                )}
-              >
-                {m.role === 'assistant' ? (
-                  <div className="flex items-start gap-2">
-                    <AnswerIcon className="mt-0.5 text-white/80" />
-                    <div className="flex-1">{m.content || (m.streaming ? '...' : '')}</div>
-                  </div>
-                ) : (
-                  m.content || (m.streaming ? '...' : '')
-                )}
-              </div>
+              <MessageBubble key={m.id} msg={m} />
             ))}
             {mode === 'rag' && isSending && !messages.some(m => m.streaming) && (
               <div className="px-1 py-1">
@@ -678,7 +728,7 @@ export default function Index() {
           </div>
         )}
       </div>
-      <div className="w-full max-w-sm space-y-4 flex flex-col items-center z-10 flex-shrink-0">
+      <div className="w-full space-y-4 flex flex-col items-center z-10 flex-shrink-0">
         {/* Original ChatComponent before backend connection */}
         <div className={cn(
           'w-full max-w-sm h-20 rounded-md border shadow-sm flex flex-col justify-between p-3 relative',
@@ -692,7 +742,8 @@ export default function Index() {
             onKeyDown={handleKeyDown}
             onFocus={handleInputEngagement}
             onInput={handleInputEngagement}
-            disabled={isSending || mode !== 'rag'}
+            // Allow input in all modes so '/' trigger + stop icon can be tested universally
+            disabled={isSending}
             className={cn(
               'bg-transparent outline-none border-none p-0 m-0 font-hack text-xs w-full',
               mode !== 'rag' ? 'opacity-30 cursor-not-allowed text-rag-text-primary/40 placeholder:text-rag-text-primary/30' : 'opacity-70 text-rag-text-primary placeholder:text-rag-text-primary'
@@ -700,20 +751,23 @@ export default function Index() {
           />
           <div className="flex items-center justify-between">
             <AttachmentIcon mode={mode} />
-            {messages.some(m => m.streaming) ? (
+            {(messages.some(m => m.streaming) || generating) ? (
               <StopIcon onClick={() => {
                 // Abort streaming and finalize current assistant message
                 abortStreamingRef.current.aborted = true;
                 if (currentFrameRef.current) cancelAnimationFrame(currentFrameRef.current);
-                // Mark any streaming assistant message as complete
+                if (abortControllerRef.current) {
+                  try { abortControllerRef.current.abort(); } catch {/* ignore */}
+                }
+                // Mark any streaming assistant message as complete (unless already filled)
                 setMessages(m => m.map(msg => msg.streaming ? { ...msg, streaming: false, content: msg.content || '(stopped)' } : msg));
-                setIsSending(false);
+                setIsSending(false); setGenerating(false);
               }} />
             ) : (
-              <SendArrowIcon mode={mode} onClick={sendMessage} disabled={mode !== 'rag' || !message.trim() || isSending} />
+              <SendArrowIcon mode={mode} onClick={sendMessage} disabled={!message.trim() || isSending} />
             )}
           </div>
-          {showCompanyPalette && mode === 'rag' && (
+          {showCompanyPalette && (
             <div
               ref={paletteRef}
               className="absolute bottom-full mb-2 left-0 w-full bg-rag-chat-dark border border-[#F69F1C]/30 rounded-md shadow-lg max-h-60 overflow-y-auto z-50"
@@ -746,7 +800,7 @@ export default function Index() {
             <ChatHistoryIcon mode={mode} />
           </button>
         </div>
-      </div>
+  </div>
       {showHistory && mode === 'rag' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowHistory(false)} aria-hidden />
@@ -773,6 +827,7 @@ export default function Index() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

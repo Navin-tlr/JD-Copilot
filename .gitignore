@@ -81,6 +81,7 @@ mobile-app/node_modules/
 mobile-app/npm-debug.log*
 mobile-app/yarn-debug.log*
 mobile-app/yarn-error.log*
+node_modules/
 
 # Temporary files
 *.tmp

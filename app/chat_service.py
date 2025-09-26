@@ -207,7 +207,11 @@ class ChatService:
             snippets = retrieve_snippets(user_message, top_k=15, filters={})
             if snippets:
                 answer = synthesize_answer(user_message, snippets, {})
-                return answer or "I couldn't generate a comprehensive answer from the available information."
+                # CRITICAL FIX: Don't fallback to generic message - use the actual answer
+                if answer:
+                    return answer
+                else:
+                    return "I could not find relevant information to answer your question based on the available documents."
             else:
                 return "I couldn't find any relevant information in the available documents."
                 

@@ -110,13 +110,16 @@ if __name__ == '__main__':
     run_verification()
 
 import re
-from typing import Dict, List, Any, Optional
+import sqlite3
+from typing import Dict, List, Any, Optional, Tuple
 import sqlite3
 import requests
 
 from .config import get_settings
 from .rag import retrieve_snippets, synthesize_answer
 from .final_sql_tool import run_llama_index_sql_query
+from .normalizer import hybrid_normalizer, NormalizationResult
+from .database import PlacementDatabase
 
 
 class QueryRouter:
@@ -124,86 +127,104 @@ class QueryRouter:
 
     def __init__(self):
         self.settings = get_settings()
+    # Caching disabled per user request
+
+    # ---------------------- Public Entry ----------------------
 
     def route_query(self, question: str) -> str:
-        """
-        Route query to appropriate backend system using LLM classification.
-        """
+        """Route query end-to-end with hybrid normalization and classification."""
         print(f"🔍 Processing query: '{question}'")
 
-        # Classify the query using LLM
-        classification = self._classify_query(question)
+        norm: NormalizationResult = hybrid_normalizer.normalize(question)
+        if norm.method != "none":
+            print(
+                "🧪 Normalization applied (method={}): {}".format(
+                    norm.method,
+                    {k: list(v) for k, v in norm.expansions.items() if v},
+                )
+            )
+        else:
+            print("🧪 No normalization expansions identified.")
+
+        # 1. Validate that normalized tokens actually exist in the structured DB; prune non-existent ones
+        try:
+            self._validate_expansions(norm)
+        except Exception as e:
+            print(f"⚠️ Expansion validation failed (continuing without pruning): {e}")
+
+        effective_question = norm.enhanced_question
+
+        classification = self._classify_query(effective_question)
         print(f"🎯 Query Classification: {classification}")
 
         if classification == "STRUCTURED":
-            return self._handle_structured_query(question)
+            return self._handle_structured_query(effective_question, norm)
         elif classification == "UNSTRUCTURED":
-            return self._handle_unstructured_query(question)
+            return self._handle_unstructured_query(effective_question, norm)
         elif classification == "HYBRID":
-            return self._handle_hybrid_query(question)
+            return self._handle_hybrid_query(effective_question, norm)
         elif classification == "MULTI_HOP":
-            return self._handle_multi_hop_query(question)
+            return self._handle_multi_hop_query(effective_question, norm)
         else:
-            # Default to unstructured search
-            return self._handle_unstructured_query(question)
+            return self._handle_unstructured_query(effective_question, norm)
 
     def _classify_query(self, question: str) -> str:
         """
         Classify query into STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP using LLM.
         """
+        # No caching – always classify fresh
         schema_info = self._get_database_schema()
 
         classification_prompt = f"""
-        You are a query router for a placement database. Your task is to classify queries into one of these categories:
+You are a query router for a placement database. Your task is to classify queries into one of these categories:
 
-        **Database Schema:**
-        {schema_info}
+**Database Schema:**
+{schema_info}
 
-        **Routing Rules:**
+**Routing Rules:**
 
-        1. **STRUCTURED**: Queries that need numerical data, counts, statistics, comparisons, or filtered lists.
-           Examples:
-           - "How many companies came for marketing roles?"
-           - "What's the average salary for finance positions?"
-           - "Which companies recruited in 2023?"
-           - "Count of roles by specialization"
-           - "List all companies in finance"
+1. **STRUCTURED**: Queries that need numerical data, counts, statistics, comparisons, or filtered lists.
+   Examples:
+   - "How many companies came for marketing roles?"
+   - "What's the average salary for finance positions?"
+   - "Which companies recruited in 2023?"
+   - "Count of roles by specialization"
+   - "List all companies in finance"
 
-        2. **UNSTRUCTURED**: Queries that need detailed descriptions, skills analysis, or contextual information.
-           Examples:
-           - "What skills are required for this role?"
-           - "Tell me about the company culture"
-           - "Show me the complete job description"
-           - "What are the responsibilities?"
-           - "Explain the daily tasks for this position"
+2. **UNSTRUCTURED**: Queries that need detailed descriptions, skills analysis, or contextual information.
+   Examples:
+   - "What skills are required for this role?"
+   - "Tell me about the company culture"
+   - "Show me the complete job description"
+   - "What are the responsibilities?"
+   - "Explain the daily tasks for this position"
 
-        3. **HYBRID**: Queries that need both structured data AND detailed analysis.
-           Examples:
-           - "Compare salaries and skills across companies"
-           - "Which companies pay well and what skills do they need?"
-           - "Show me companies with high salaries and their required skills"
+3. **HYBRID**: Queries that need both structured data AND detailed analysis.
+   Examples:
+   - "Compare salaries and skills across companies"
+   - "Which companies pay well and what skills do they need?"
+   - "Show me companies with high salaries and their required skills"
 
-        4. **MULTI_HOP**: Complex queries requiring multiple steps or reasoning.
-           Examples:
-           - "Among high-paying companies, what skills are most valued?"
-           - "Find companies in Bangalore, then compare their salary ranges"
-           - "Get marketing roles, then analyze the required skills"
+4. **MULTI_HOP**: Complex queries requiring multiple steps or reasoning.
+   Examples:
+   - "Among high-paying companies, what skills are most valued?"
+   - "Find companies in Bangalore, then compare their salary ranges"
+   - "Get marketing roles, then analyze the required skills"
 
-        **CRITICAL RULES:**
-        - If query asks for counts, numbers, or filtered lists → STRUCTURED
-        - If query asks for descriptions, skills, or detailed info → UNSTRUCTURED
-        - If query needs both structured data AND analysis → HYBRID
-        - If query is complex with multiple conditions/steps → MULTI_HOP
-        - When in doubt, choose UNSTRUCTURED for safety
+**CRITICAL RULES:**
+- If query asks for counts, numbers, or filtered lists → STRUCTURED
+- If query asks for descriptions, skills, or detailed info → UNSTRUCTURED
+- If query needs both structured data AND analysis → HYBRID
+- If query is complex with multiple conditions/steps → MULTI_HOP
+- When in doubt, choose UNSTRUCTURED for safety
 
-        **Response Format:**
-        Respond with ONLY one word: STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP
+Respond with ONLY one word: STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP
 
-        User Query: "{question}"
-        """
+User Query: "{question}"
+"""
 
-        try:
-            if self.settings.OPENROUTER_API_KEY:
+        if self.settings.OPENROUTER_API_KEY:
+            try:
                 payload = {
                     "model": "moonshotai/kimi-k2",
                     "messages": [
@@ -223,18 +244,17 @@ class QueryRouter:
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers=headers,
                     json=payload,
-                    timeout=10
+                    timeout=10,
                 )
 
                 if response.status_code == 200:
                     result = response.json()["choices"][0]["message"]["content"].strip().upper()
                     if result in ["STRUCTURED", "UNSTRUCTURED", "HYBRID", "MULTI_HOP"]:
                         return result
+            except Exception as e:
+                print(f"❌ LLM classification failed: {e}")
 
-        except Exception as e:
-            print(f"❌ LLM classification failed: {e}")
-
-        # Fallback classification
+        # Fallback classification if LLM not available or failed
         return self._fallback_classification(question)
 
     def _get_database_schema(self) -> str:
@@ -313,42 +333,102 @@ class QueryRouter:
         except Exception:
             return "Database schema information not available"
 
-    def _handle_structured_query(self, question: str) -> str:
+    def _handle_structured_query(self, question: str, norm: NormalizationResult | None = None) -> str:
         """
         Handle STRUCTURED queries using SQL database.
         """
         print("🔧 Routing to structured database query")
 
         try:
-            # Use LlamaIndex for SQL generation
             result = run_llama_index_sql_query(question)
             if result and not result.startswith("Structured query engine not available"):
-                return self._format_structured_response(result, question)
+                formatted = self._format_structured_response(result, question)
+                if norm and norm.method != "none" and norm.has_expansions():
+                    formatted += "\n\n(Normalized intents applied)"
+                return formatted
             else:
                 return "I couldn't find the structured data you're looking for."
         except Exception as e:
             print(f"❌ Structured query failed: {e}")
             return "I encountered an error while processing your structured query."
 
-    def _handle_unstructured_query(self, question: str) -> str:
+    def _handle_unstructured_query(self, question: str, norm: NormalizationResult | None = None) -> str:
         """
         Handle UNSTRUCTURED queries using vector search.
         """
         print("🔍 Routing to unstructured vector search")
 
         try:
-            snippets = retrieve_snippets(question, top_k=20, filters={})
-            if snippets:
-                rag_result = synthesize_answer(question, snippets, {})
+            # Progressive multi-signal retrieval strategy
+            attempts: List[Tuple[str, Dict[str, Any]]] = []
+            collected: List[Dict[str, Any]] = []
+            seen_ids = set()
+            max_needed = 50  # INCREASED for comprehensive JD analysis
+
+            # Build attempts ordered by likely specificity
+            if norm and norm.has_expansions():
+                # Roles first (most specific), then specialization, industry, company_type
+                for role in sorted(norm.expansions.get("role", [])):
+                    attempts.append((f"{question} role:{role}", {"role_contains": role}))
+                for spec in sorted(norm.expansions.get("specialization", [])):
+                    attempts.append((f"{question} specialization:{spec}", {"role_contains": spec}))
+                for ind in sorted(norm.expansions.get("industry", [])):
+                    attempts.append((f"{question} industry:{ind}", {}))
+                for ctype in sorted(norm.expansions.get("company_type", [])):
+                    attempts.append((f"{question} company_type:{ctype}", {}))
+
+            # Always include the raw question as final fallback attempt
+            attempts.append((question, {}))
+
+            diagnostics: List[str] = []
+            for aug_q, filt in attempts:
+                if len(collected) >= max_needed:
+                    break
+                try:
+                    snippets = retrieve_snippets(aug_q, top_k=25, filters=filt)  # INCREASED from 8 to 25
+                except Exception as e:
+                    diagnostics.append(f"Attempt '{aug_q}' failed: {e}")
+                    continue
+                except Exception as e:
+                    diagnostics.append(f"Attempt '{aug_q}' failed: {e}")
+                    continue
+                added_now = 0
+                for s in snippets:
+                    sid = s.get("id") or id(s)
+                    if sid in seen_ids:
+                        continue
+                    seen_ids.add(sid)
+                    collected.append(s)
+                    added_now += 1
+                diagnostics.append(f"Attempt '{aug_q}' -> {added_now} new snippets (filters={filt or 'none'})")
+
+            if collected:
+                rag_result = synthesize_answer(question, collected[:max_needed], {})
                 if rag_result:
-                    return f"Based on available placement information:\n\n{rag_result}\n\n" \
-                           "Note: This is general guidance based on our database."
+                    note = "Note: This is general guidance based on our database."
+                    if norm and norm.method != "none" and norm.has_expansions():
+                        note += " (Normalization applied)"
+                    if len(collected) < 5:
+                        note += " Limited evidence: results are based on very few source snippets."
+                    return f"Based on available placement information:\n\n{rag_result}\n\n{note}"
+
+            # Zero-snippet diagnostic feedback
+            diag_text = "\n".join(diagnostics) if diagnostics else "No retrieval attempts recorded."
+            expansion_summary = ", ".join(
+                f"{k}={list(v)}" for k, v in (norm.expansions.items() if norm else {}).items() if v
+            ) or "none"
+            return (
+                "I could not retrieve any grounded snippets for your question after trying multiple strategies.\n"
+                f"Normalized expansions considered: {expansion_summary}.\n"
+                f"Diagnostics:\n{diag_text}\n"
+                "You can try: (1) Rephrasing the question with more explicit role/company names, (2) Asking for a broader overview without filters."
+            )
         except Exception as e:
             print(f"❌ Unstructured search failed: {e}")
 
         return "I need to search through our knowledge base for this information."
 
-    def _handle_hybrid_query(self, question: str) -> str:
+    def _handle_hybrid_query(self, question: str, norm: NormalizationResult | None = None) -> str:
         """
         Handle HYBRID queries requiring both structured data and analysis.
         """
@@ -358,8 +438,8 @@ class QueryRouter:
             # First try structured query
             structured_result = run_llama_index_sql_query(question)
             if structured_result and not structured_result.startswith("Structured query engine not available"):
-                # Then get unstructured analysis
-                snippets = retrieve_snippets(question, top_k=15, filters={})
+                # Then get unstructured analysis with MORE snippets for comprehensive coverage
+                snippets = retrieve_snippets(question, top_k=30, filters={})  # INCREASED from 15
                 if snippets:
                     analysis_result = synthesize_answer(question, snippets, {})
                     if analysis_result:
@@ -369,12 +449,12 @@ class QueryRouter:
                     return self._format_structured_response(structured_result, question)
             else:
                 # Fallback to unstructured
-                return self._handle_unstructured_query(question)
+                return self._handle_unstructured_query(question, norm)
         except Exception as e:
             print(f"❌ Hybrid query failed: {e}")
             return self._handle_unstructured_query(question)
 
-    def _handle_multi_hop_query(self, question: str) -> str:
+    def _handle_multi_hop_query(self, question: str, norm: NormalizationResult | None = None) -> str:
         """
         Handle MULTI_HOP queries requiring sequential reasoning.
         """
@@ -384,7 +464,7 @@ class QueryRouter:
         sub_questions = self._decompose_multi_hop_query(question)
 
         if len(sub_questions) <= 1:
-            return self._handle_hybrid_query(question)
+            return self._handle_hybrid_query(question, norm)
 
         results = []
         for i, sub_q in enumerate(sub_questions[:3], 1):  # Limit to 3 steps
@@ -454,6 +534,50 @@ class QueryRouter:
             return "HYBRID"
         else:
             return "UNSTRUCTURED"
+
+    # ---------------------- Expansion Validation ----------------------
+    def _validate_expansions(self, norm: NormalizationResult) -> None:
+        """Prune normalization expansions that don't exist in structured DB to prevent over-filtering.
+
+        We check existence counts in appropriate tables:
+          - industry/company_type -> companies table
+          - specialization -> roles.specialization
+          - role -> roles.title (substring match, case-insensitive)
+        """
+        if not norm.has_expansions():
+            return
+        db = PlacementDatabase()
+        pruned: Dict[str, List[str]] = {}
+        with sqlite3.connect(db.db_path) as conn:  # type: ignore
+            cur = conn.cursor()
+            for cat, tokens in norm.expansions.items():
+                if not tokens:
+                    continue
+                kept = set()
+                for token in list(tokens):
+                    try:
+                        if cat in ("industry", "company_type"):
+                            cur.execute(f"SELECT 1 FROM companies WHERE {cat} = ? LIMIT 1", (token,))
+                            exists = cur.fetchone() is not None
+                        elif cat == "specialization":
+                            cur.execute("SELECT 1 FROM roles WHERE LOWER(specialization) = LOWER(?) LIMIT 1", (token,))
+                            exists = cur.fetchone() is not None
+                        elif cat == "role":
+                            cur.execute("SELECT 1 FROM roles WHERE LOWER(title) LIKE LOWER(?) LIMIT 1", (f"%{token}%",))
+                            exists = cur.fetchone() is not None
+                        else:
+                            exists = True
+                        if exists:
+                            kept.add(token)
+                        else:
+                            pruned.setdefault(cat, []).append(token)
+                    except Exception:
+                        kept.add(token)  # Fail-open on SQL error
+                norm.expansions[cat] = kept
+        if pruned:
+            print(f"🧹 Pruned nonexistent normalized tokens: {pruned}")
+
+    # Cache helpers removed (caching disabled)
 
 
 # Global instance for easy access

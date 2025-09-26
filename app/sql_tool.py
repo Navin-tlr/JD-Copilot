@@ -81,6 +81,72 @@ CANONICAL_QUERIES = {
             "WHERE LOWER(r.specialization) = 'operations' ORDER BY c.company_name;"
         ),
     },
+    # Generic sales / business development role queries (covers B2B, BD, inside, field)
+    "count_sales_related_companies": {
+        "keywords": [
+            "sales companies count",
+            "count sales companies",
+            "how many sales companies",
+            "business development companies",
+            "count business development companies",
+            "how many business development companies",
+            "b2b sales companies",
+            "b2b sales roles count",
+            "inside sales companies",
+            "field sales companies",
+        ],
+        "query": (
+            "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE (LOWER(r.title) LIKE '%sales%' OR LOWER(r.title) LIKE '%business development%' );"
+        ),
+    },
+    "list_sales_related_companies": {
+        "keywords": [
+            "list sales companies",
+            "sales companies list",
+            "list companies for sales",
+            "business development companies list",
+            "list companies for business development",
+            "b2b sales companies list",
+            "inside sales companies list",
+            "field sales companies list",
+        ],
+        "query": (
+            "SELECT DISTINCT c.company_name FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE (LOWER(r.title) LIKE '%sales%' OR LOWER(r.title) LIKE '%business development%') "
+            "ORDER BY c.company_name;"
+        ),
+    },
+    # Generic B2B company_type queries (independent of role titles)
+    "count_b2b_companies": {
+        "keywords": [
+            "count b2b companies",
+            "how many b2b companies",
+            "b2b companies came",
+            "companies came for b2b",
+        ],
+        "query": (
+            "SELECT COUNT(DISTINCT company_name) FROM companies "
+            "WHERE LOWER(company_type) = 'b2b';"
+        ),
+    },
+    "list_b2b_companies": {
+        "keywords": [
+            "list b2b companies",
+            "b2b companies list",
+            "give me list of b2b companies",
+            "list of b2b companies",
+            "b2b companies came for placements",
+            "b2b companies came for campus",
+            "show b2b companies",
+        ],
+        "query": (
+            "SELECT DISTINCT company_name FROM companies "
+            "WHERE LOWER(company_type) = 'b2b' ORDER BY company_name;"
+        ),
+    },
     # PR/Communications
     "count_pr_companies": {
         "keywords": ["companies came for pr", "pr role", "count companies for pr", "for pr", "communications", "public relations"],
@@ -212,6 +278,20 @@ def get_canonical_query(question: str) -> Optional[str]:
             return CANONICAL_QUERIES["count_operations_companies"]["query"]
         if ("list" in q or "distinct" in q) and "operations" in q:
             return CANONICAL_QUERIES["list_operations_companies"]["query"]
+
+        # Sales / business development heuristic (title pattern)
+        sales_terms = ["sales", "business development", "inside sales", "field sales"]
+        if any(t in q for t in sales_terms):
+            if ("count" in q or "how many" in q):
+                return CANONICAL_QUERIES["count_sales_related_companies"]["query"]
+            if ("list" in q or "list down" in q or "distinct" in q or "give me list" in q):
+                return CANONICAL_QUERIES["list_sales_related_companies"]["query"]
+
+        # Plain B2B company_type queries when 'sales' not mentioned
+        if ("count" in q or "how many" in q) and "b2b" in q and "sales" not in q:
+            return CANONICAL_QUERIES["count_b2b_companies"]["query"]
+        if ("list" in q or "list down" in q or "distinct" in q or "give me list" in q) and "b2b" in q and "sales" not in q:
+            return CANONICAL_QUERIES["list_b2b_companies"]["query"]
 
         if ("list" in q and "companies" in q) or ("select" in q and " from companies" in q):
             return CANONICAL_QUERIES["list_all_companies"]["query"]

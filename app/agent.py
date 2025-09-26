@@ -349,12 +349,17 @@ def get_vector_index():
         def query(self, question: str):
             # Use existing retrieve_snippets + synthesize_answer to produce a response
             try:
-                snippets = retrieve_snippets(question, top_k=15, filters={})
+                # INCREASED TOP_K for comprehensive JD analysis - get more snippets for complete information
+                snippets = retrieve_snippets(question, top_k=50, filters={})
                 answer = synthesize_answer(question, snippets, {})
                 class Resp:
                     def __init__(self, text: str):
                         self.response = text
-                return Resp(answer or "I couldn't generate a comprehensive answer.")
+                # CRITICAL FIX: Don't fallback to generic message - use the actual answer
+                if answer:
+                    return Resp(answer)
+                else:
+                    return Resp("I could not find relevant information to answer your question based on the available documents.")
             except Exception as e:
                 class RespErr:
                     def __init__(self, text: str):
@@ -504,7 +509,11 @@ def execute_unstructured_query(user_question: str) -> str:
         snippets = retrieve_snippets(user_question, top_k=15, filters={})
         if snippets:
             answer = synthesize_answer(user_question, snippets, {})
-            return answer or "I couldn't generate a comprehensive answer."
+            # CRITICAL FIX: Don't fallback to generic message - use the actual answer
+            if answer:
+                return answer
+            else:
+                return "I could not find relevant information to answer your question based on the available documents."
         else:
             return "I couldn't find relevant information."
 

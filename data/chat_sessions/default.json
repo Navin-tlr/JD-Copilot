@@ -2,294 +2,6 @@
   "session_id": "default",
   "messages": [
     {
-      "role": "assistant",
-      "content": "{'input': 'What are most sought after skills?', 'output': ''}",
-      "timestamp": "2025-08-27T23:02:14.596363",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies are there?",
-      "timestamp": "2025-08-27T23:02:38.306586",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "{'input': 'How many companies are there?', 'output': ''}",
-      "timestamp": "2025-08-27T23:03:01.476968",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "what are most sought after skills?",
-      "timestamp": "2025-08-27T23:08:19.634702",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "what are the most sought after skills?",
-      "timestamp": "2025-08-27T23:09:21.417437",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "What are most sought after skills?",
-      "timestamp": "2025-08-27T23:14:18.481749",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "## Strategic Market Analysis: Most Sought-After Skills Across Companies\n\nBased on comprehensive analysis of all available placement documents, here are the **most critical and frequently demanded skills** across the current market landscape:\n\n### \ud83c\udfaf **Tier 1: Universal High-Demand Skills**\n**Communication Excellence** (Appears in 100% of companies)\n- Exceptional written and verbal communication skills\n- Strong presentation and negotiation capabilities\n- Professional client engagement abilities\n\n**Sales & Business Development Acumen** (Dominant across Masters' Union & TAP Academy)\n- Inside sales expertise\n- B2C sales environment experience\n- Cold calling and cold emailing proficiency\n- CRM system management\n- Track record of meeting/exceeding sales targets\n\n### \ud83c\udfaf **Tier 2: Operational Excellence Skills**\n**Time Management & Multitasking** (Masters' Union emphasis)\n- Ability to work in fast-paced, dynamic environments\n- Strong prioritization capabilities\n- Six-day work week adaptability\n\n**Analytical & Problem-Solving** (Accorian focus)\n- Strong analytical mindset\n- Process optimization expertise\n- Strategic thinking capabilities\n\n### \ud83c\udfaf **Tier 3: Technical & Domain Expertise**\n**Digital Proficiency**\n- MS Office Suite mastery\n- LinkedIn and social media networking for business\n- HRMS systems knowledge\n- CRM tools expertise\n\n**HR Domain Knowledge** (Accorian specific)\n- End-to-end HR process understanding (hire to retire)\n- Labor laws and compliance expertise\n- HR technology implementation\n\n### \ud83d\udcca **Strategic Recommendations for MBA Students:**\n\n**Immediate Skill Development Priorities:**\n1. **Master Communication**: Focus on both written and verbal excellence - this is non-negotiable across all roles\n2. **Build Sales DNA**: Even non-sales roles require business development mindset\n3. **Get CRM Certified**: Practical knowledge of sales tools is becoming table stakes\n4. **Develop Digital Networking Skills**: LinkedIn proficiency is explicitly mentioned as a key differentiator\n\n**Market Gap Opportunity:**\n- **HR Tech Specialization**: Accorian's demand for HR process streamlining expertise indicates a growing market need for MBA graduates who understand both business and HR technology implementation\n\n**Compensation Insight:**\n- TAP Academy offers \"Best in Industry\" salary for roles requiring these skills, suggesting premium compensation for candidates who demonstrate this skill combination\n\n**Career Trajectory Note:**\n- The convergence of sales, communication, and digital skills appears to be the fastest path to leadership roles, as evidenced by the emphasis on \"professional development and career advancement\" opportunities.",
-      "timestamp": "2025-08-27T23:14:44.792705",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "what the most sought after skills?",
-      "timestamp": "2025-08-27T23:23:07.478860",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "Based on the analysis of the job placement database, the most sought-after skills are:\n\n1. **Reporting** (2 occurrences)\n2. **Proficiency** (2 occurrences)\n3. **Partnership development** (2 occurrences)\n4. **Operations** (2 occurrences)\n5. **Networking** (2 occurrences)\n6. **Media** (2 occurrences)\n7. **Marketing** (2 occurrences)\n8. **Market research** (2 occurrences)\n9. **Leaders** (2 occurrences)\n10. **Lead generation** (2 occurrences)\n\nThese skills appear most frequently across different job roles in the database, indicating they are highly valued by employers across various industries and positions.",
-      "timestamp": "2025-08-27T23:23:26.933060",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "how many companies came last year",
-      "timestamp": "2025-08-27T23:25:14.681348",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "{'input': 'how many companies came last year', 'output': ''}",
-      "timestamp": "2025-08-27T23:25:30.480012",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies came for Finance roles?",
-      "timestamp": "2025-08-27T23:29:03.427335",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "<|tool_call_end|><|tool_call_begin|>functions.structured_database_query:0<|tool_call_argument_begin|>{\"generated_sql\": \"SELECT COUNT(DISTINCT company_name) FROM placements WHERE role LIKE '%Finance%' OR role LIKE '%finance%' OR role LIKE '%FINANCE%'\"}<|tool_call_end|><|tool_calls_section_end|>",
-      "timestamp": "2025-08-27T23:29:24.529065",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies came for Finance roles?",
-      "timestamp": "2025-08-27T23:30:24.387688",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "{'input': 'How many companies came for Finance roles?', 'output': ''}",
-      "timestamp": "2025-08-27T23:30:39.353187",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies came for Finance roles?",
-      "timestamp": "2025-08-27T23:37:50.434820",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies came for Finance roles?",
-      "timestamp": "2025-08-27T23:40:05.114355",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "**Answer:**  \nOnly **1 company** came to campus specifically for **Finance roles**.  \n\n**Insight for students:** This is a relatively low number, so if you're targeting Finance, consider broadening your search to include roles in consulting, analytics, or general management that may also value finance skills.  \n\n**Insight for recruiters:** With just one finance-focused company visiting, there\u2019s a clear opportunity for more finance firms to engage\u2014students interested in finance may be under-served.",
-      "timestamp": "2025-08-27T23:40:33.227220",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "List all companies",
-      "timestamp": "2025-08-27T23:40:42.471533",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "Here are all the companies that have participated in campus placements:\n\n**Complete Company List:**\n1. **Accorian** - Technology/Consulting firm\n2. **Madison PR** - Public Relations & Communications agency\n3. **Masters' Union** - Educational institution/Business school\n4. **Mill Story** - Media/Content creation company\n5. **Tap Academy** - EdTech platform for skill development\n6. **Target** - Retail corporation (Fortune 50 company)\n\n**Key Insights for Students:**\n- The list shows a diverse mix of industries including technology, education, retail, media, and PR\n- Both established corporations (Target) and growing startups (Tap Academy, Mill Story) are represented\n- Students from various specializations (marketing, tech, business) can find relevant opportunities here\n\n**For Recruiters:**\nThese companies have successfully hired from our campus, indicating our students' profiles match their requirements across different sectors.",
-      "timestamp": "2025-08-27T23:41:00.752672",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "What is the company culture like at Mill Story?",
-      "timestamp": "2025-08-27T23:41:07.584628",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "Based on the available placement documents, I could not find any specific information about Mill Story's company culture in the retrieved snippets. The documents only provide details about the Finance & Accounting Internship role, including location, duration, and a brief company description focused on their mission to provide healthy flours, but no insights into their workplace culture, values, or employee environment are mentioned.",
-      "timestamp": "2025-08-27T23:41:24.543504",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "how many companies came last year?",
-      "timestamp": "2025-08-27T23:45:28.655179",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "**Answer:** No companies visited the campus for recruitment last year. This could indicate either no companies were invited, no data was recorded, or the placement drive was inactive. Students and recruiters should verify with the placement cell for updated information.",
-      "timestamp": "2025-08-27T23:45:46.852636",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "how many companies came for placements?",
-      "timestamp": "2025-08-27T23:48:52.971221",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "A total of **6 companies** participated in the campus placement drive this season.",
-      "timestamp": "2025-08-27T23:49:02.537712",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "what are the most sought after skills?",
-      "timestamp": "2025-08-27T23:49:23.312137",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "Based on the current data, here are the **most sought-after skills** by employers:\n\n1. **Reporting** \u2013 ability to create and analyze reports\n2. **Proficiency** \u2013 general expertise in relevant tools/areas\n3. **Partnership Development** \u2013 building strategic relationships\n4. **Operations** \u2013 managing day-to-day business processes\n5. **Networking** \u2013 professional relationship building\n6. **Media** \u2013 digital/traditional media skills\n7. **Marketing** \u2013 promoting products/services\n8. **Market Research** \u2013 analyzing market trends and customer needs\n9. **Leadership** \u2013 guiding teams and projects\n10. **Lead Generation** \u2013 identifying potential customers\n\n**Key Insight:** All these skills are equally in-demand (each mentioned 2 times), showing employers value a balanced mix of technical, analytical, and interpersonal abilities. Students should focus on developing a combination of these skills rather than specializing in just one area.",
-      "timestamp": "2025-08-27T23:49:36.588583",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "What are most sought after skills?",
-      "timestamp": "2025-08-27T23:53:25.484664",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "Based on the data, here are the **most sought-after skills** that appear most frequently in job postings:\n\n**Top Skills (all equally in-demand):**\n- **Reporting** - Creating and analyzing reports\n- **Proficiency** - General expertise and competency\n- **Partnership Development** - Building strategic relationships\n- **Operations** - Managing business processes\n- **Networking** - Building professional connections\n- **Media** - Understanding media platforms and strategies\n- **Marketing** - Promoting products/services\n- **Market Research** - Analyzing market trends and customer needs\n- **Leadership** - Leading teams and initiatives\n- **Lead Generation** - Identifying and cultivating potential customers\n\n**Key Insights for Students & Job Seekers:**\n- These skills are **equally valued** - each appears 2 times in the dataset\n- Focus on developing a **well-rounded skill set** rather than specializing in just one area\n- **Business acumen** (reporting, operations, market research) is just as important as **relationship-building** (networking, partnership development)\n- **Marketing and media skills** are clearly in demand across industries\n\n**For Recruiters:**\n- Consider candidates who demonstrate competency across multiple areas from this list\n- These skills suggest companies are looking for professionals who can both **execute** (operations, reporting) and **grow** (marketing, lead generation, partnerships) the business",
-      "timestamp": "2025-08-27T23:53:40.756399",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies came for Finance roles?",
-      "timestamp": "2025-08-27T23:53:49.158450",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "**Answer:**  \nOnly **1 company** came for **Finance roles** this season.  \n\n**Insight for students:** With just one recruiter for Finance, competition will be tight\u2014make sure your resume and interview prep stand out.  \n**Insight for recruiters:** If you\u2019re hiring for Finance, you\u2019ll have a small but focused pool of candidates; consider expanding outreach to attract more talent.",
-      "timestamp": "2025-08-27T23:53:59.292576",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
       "role": "user",
       "content": "List all companies",
       "timestamp": "2025-08-27T23:54:07.059889",
@@ -900,12 +612,303 @@
       "query_type": null,
       "specialization": null,
       "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "GIVE ME JD OF CompanyStoreio",
+      "timestamp": "2025-09-26T17:52:43.869873",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "I could not find any information about CompanyStoreio in the available documents.",
+      "timestamp": "2025-09-26T17:53:28.524900",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "GIVE ME jd OF Masters' Union",
+      "timestamp": "2025-09-26T17:55:11.313713",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "Here is the job description for the Admission Counselor position at Masters' Union:\n\n**Job Title:** Admission Counselor\n**Company:** Masters' Union\n**Employment Type:** Full Time\n**Location:** Gurgaon, Haryana\n\n**About Masters\u2019 Union:**\nMasters\u2019 Union (www.mastersunion.org) is a new-age business school offering industry-immersive business education where the classes are led by top industry leaders and practitioners. It is a first-of-its-kind institute where distinguished leaders from different walks of life. In its 3 years of run, Our flagship Post Graduate Program in Technology and Business management has already surpassed the placement records of IIM Ahmedabad and ISB with top-notch recruiters (including Amazon, CitiBank, Microsoft, Unacademy, Razorpay, BCG, Bain) hiring our graduates. Post our stellar success in the post-graduate program, we are now launching the undergraduate program on similar lines. The institute is strategically located in the very heart of Gurugram's business district, flanked by several Fortune 500 companies, in order to provide the ultimate industry immersive and hands-on learning experience from day one. The most ground-breaking feature of its Programme is that the courses are taught by CXOs, MDs, Eminent Public Leaders, and even Members of Parliament, apart from distinguished academicians.\n\n**Position Overview:**\nWe are seeking an Admission Counselor professional to join our team, who will be responsible for engaging with working professionals for our specialized programs in MasterCamp. The ideal candidate will have proven experience in inside sales and will be instrumental in helping working professionals enhance their careers by enrolling in our high-impact programs.\n\n**Responsibilities:**\n- Engage with working professionals to identify their career needs and how the program can enhance their skills in capital markets.\n- Conduct online and offline product demonstrations, providing detailed insights into the program\u2019s features, benefits, and career opportunities.\n- Schedule and conduct consultations and follow-up sessions with prospective students, addressing their concerns and queries.\n- Handle objections, provide solutions, and negotiate program fees to close sales and generate revenue.\n- Consistently achieve weekly and monthly sales targets while maintaining a high level of customer satisfaction.\n- Build and nurture a strong sales pipeline, managing prospects effectively through the entire sales cycle.\n- Stay up-to-date with the program\u2019s developments and sales techniques to continuously improve sales performance.\n\n**Requirements:**\n- Proven experience in inside sales, Admission Counselor particularly in a B2C environment.\n- Strong track record of meeting or exceeding sales targets.\n- Experience working with professionals, with an understanding of their learning needs and career aspirations.\n- Knowledge of sales tools (CRM systems) to track leads and manage the sales pipeline.\n- Excellent communication skills, both verbal and written.\n- Ability to work in a fast-paced, dynamic, and results-oriented environment.\n- Confident with strong presentation and negotiation skills.\n- Strong time management skills and the ability to multitask and prioritize effectively.\n- Willingness to work six days a week.\n\n**Relevance for MBA Students:**\n\n*   **For Marketing students:** This role provides direct experience in sales, product demonstration, and customer engagement, which are crucial for understanding market needs and promoting educational programs.\n*   **For students interested in Strategy and Leadership:** Working at Masters' Union, known for its innovative approach to business education and high placement records, offers insights into the education sector and strategic program development.\n*   **For all MBA specializations:** The role requires strong communication, negotiation, and sales skills, which are valuable in any business context. The experience of working in a fast-paced environment and achieving sales targets is beneficial for developing a results-oriented mindset.",
+      "timestamp": "2025-09-26T17:55:41.824173",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "Im looking for Fmcg companies to get placed, is there any scope for me. give me strategic advice",
+      "timestamp": "2025-09-26T18:01:42.985645",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "\n**Structured Data:**\nThe query returned an error and no placement data was retrieved. Try again later or check your access.\n\n**Additional Context:**\nI could not find any information about FMCG companies in the available documents.\n",
+      "timestamp": "2025-09-26T18:02:04.100146",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "is there any b2b sales roles available?",
+      "timestamp": "2025-09-26T18:02:34.982607",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "\n**Structured Data:**\nI couldn\u2019t fetch the latest data due to a payment error. Please try again later or check another source for B2B sales roles.\n\n**Additional Context:**\n```json\n{\n \"answer\": \"I could not find any B2B sales roles in the available documents.\"\n}\n```\n",
+      "timestamp": "2025-09-26T18:02:57.343600",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "GIVE ME LIST OF B2B SALES COMPANIES CAME FOR PLACCEMENTS",
+      "timestamp": "2025-09-26T18:28:07.245942",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "I couldn\u2019t retrieve the list of B2B sales companies due to a system error. Please try again later.",
+      "timestamp": "2025-09-26T18:28:22.321418",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "GIVE ME LIST OF B2B COMPANIES CAME FOR PLACEMENTS",
+      "timestamp": "2025-09-26T18:53:02.305414",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "I couldn\u2019t retrieve the list of B2B companies due to an access error. Please try again or check your connection.",
+      "timestamp": "2025-09-26T18:53:16.212265",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "GIVE ME LIST OF B2B COMPANIES CAME FOR PLACEMENTS",
+      "timestamp": "2025-09-26T19:00:01.279189",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "I couldn\u2019t retrieve the list due to a system error. Please try again later or check your access.",
+      "timestamp": "2025-09-26T19:00:16.529979",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "Mill Story GIVE ME STRATEGIC ADVISE",
+      "timestamp": "2025-09-26T19:01:57.591753",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "I can provide strategic advice based on the available information about Mill Story.\n\nBased on the provided snippet, Mill Story is a fast-growing D2C food brand focused on bringing healthy, freshly milled, chemical-free flours to Indian kitchens and is preparing to raise its first round of funding. They are offering a Finance & Accounting Internship in Sarjapur Road, Bengaluru, for 2 months, starting immediately, and it is a paid internship.\n\n**Strategic Advice for MBA Students:**\n\n1.  **For Finance Specialization:** This internship is directly relevant. Focus on demonstrating your understanding of financial analysis, accounting principles, and the ability to contribute to a company preparing for its first funding round.\n2.  **For Marketing Specialization:** Research the D2C food market and Mill Story's competitors. Understanding their marketing strategies and how Mill Story differentiates itself will be valuable.\n3.  **For Operations Specialization:** Analyze Mill Story's supply chain and production processes. Identifying areas for improvement in efficiency and cost-effectiveness could be a valuable contribution.\n4.  **For Strategy Specialization:** Consider how Mill Story can scale its operations and expand its market reach. Develop strategic recommendations for growth and competitive advantage.",
+      "timestamp": "2025-09-26T19:02:27.198611",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "GIVE ME STRATEGIC ADVISE FOR Mill Story",
+      "timestamp": "2025-09-26T19:07:23.542830",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "I am sorry, I cannot provide strategic advice for Mill Story. The available document only contains information about a Finance & Accounting Internship at Mill Story, including location, duration, start date, and that it is a paid internship. It also mentions that Mill Story is a fast-growing D2C food brand preparing to raise its first round of funding. More information is needed to provide strategic advice.",
+      "timestamp": "2025-09-26T19:07:48.515425",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "GIVE ME STRATEGIC ADVISE FOR Mill Story",
+      "timestamp": "2025-09-26T19:13:30.698240",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "I could not find enough information about Mill Story in the available documents to provide strategic advice.",
+      "timestamp": "2025-09-26T19:14:00.706163",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "GIVE ME STRATEGIC ADVISE FOR Mill Story",
+      "timestamp": "2025-09-26T19:21:14.321895",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "MILL STORY STRATEGIC ADVICE\n\n**KEY INSIGHT**\n\u2022 Mill Story is a fast-growing D2C food brand focused on healthy, freshly milled, chemical-free flours, preparing to raise its first funding round (Mill Story document).\n\u2022 They are offering a 2-month paid Finance & Accounting Internship in Sarjapur Road, Bengaluru, with an immediate start date (Mill Story document).\n\n**STRATEGIC IMPLICATIONS**\n\u2022 **Early-Stage Advantage:** Joining a company pre-funding offers high-risk, high-reward potential. If Mill Story secures funding and scales, early employees can gain significant equity value and rapid career advancement.\n\u2022 **D2C Food Focus:** This internship provides direct exposure to the rapidly growing D2C food sector, valuable for MBAs interested in entrepreneurship, marketing, or supply chain management.\n\u2022 **Finance & Accounting Specialization:** This role is directly relevant for MBA students specializing in Finance and Accounting, providing hands-on experience in financial analysis and reporting within a startup environment.\n\n**IMMEDIATE ACTION ITEMS**\n\n1.  **Assess Risk Tolerance:** Evaluate your comfort level with the uncertainty of a pre-funded startup. High risk can mean high reward, but also potential instability.\n2.  **Network Actively:** During the internship, build relationships with key team members and understand the company's growth strategy. This will increase your chances of a full-time offer and potential equity participation.\n3.  **Focus on Impact:** Document your contributions and quantify the impact you make during the internship. This will be critical for negotiating a full-time role and compensation package.",
+      "timestamp": "2025-09-26T19:21:38.372971",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "GIVE ME ADVISE TO GET PLACED AT Accorian",
+      "timestamp": "2025-09-26T19:22:32.066546",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "## KEY INSIGHTS FOR ACCORIAN PLACEMENT\n\nAccorian is a cybersecurity advisory and consulting firm that values its employees as partners in growth. To get placed at Accorian, focus on cybersecurity expertise and people skills.\n\n**Accorian Facts:**\n\n*   **Industry:** Cybersecurity advisory and consulting.\n*   **Services:** HITRUST, PCI, Penetration Testing, Security Compliance.\n*   **Locations:** New Jersey (HQ), India, Canada, UAE.\n*   **Employee Value:** Strong mentorship, growth opportunities, and global client exposure.\n\n**SKILLS TO MASTER**\n\n*   **Cybersecurity Knowledge:** Accorian specializes in cybersecurity initiatives, risk identification, and solution development.\n    *   **Relevant Specializations:** MBA in Technology Management, MBA in Operations (focus on IT).\n    *   **Why It Matters:** Non-negotiable for a cybersecurity firm.\n    *   **Strategic Advice:** Obtain certifications like Certified Ethical Hacker (CEH), Certified Information Systems Security Professional (CISSP), or similar.\n*   **Compliance Expertise:** Accorian provides services related to HITRUST and PCI compliance.\n    *   **Relevant Specializations:** MBA in Finance (focus on regulatory compliance), MBA in Operations.\n    *   **Why It Matters:** Compliance is a major revenue driver for Accorian.\n    *   **Strategic Advice:** Get certified in HITRUST or PCI standards.\n*   **People Skills:** Accorian emphasizes employee experience and collaboration.\n    *   **Relevant Specializations:** MBA in HR, MBA in Leadership.\n    *   **Why It Matters:** Accorian values employees and needs people to manage them.\n    *   **Strategic Advice:** Develop strong communication, stakeholder management, and employee engagement skills.\n\n**IMMEDIATE ACTION ITEMS**\n\n1.  **Targeted Certifications:** Obtain cybersecurity and compliance certifications (CEH, CISSP, HITRUST, PCI).\n2.  **Networking:** Connect with Accorian employees on LinkedIn.\n3.  **Resume Optimization:** Highlight relevant skills and experience in cybersecurity, compliance, and people management.",
+      "timestamp": "2025-09-26T19:22:57.929295",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "WHAT YOU THINK ABOUT Tap Academy",
+      "timestamp": "2025-09-26T19:48:09.404912",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "ROLE ANALYSIS\n\u2022 Position: Business Development Associate\n\u2022 Department: Not specified\n\u2022 Key Responsibilities:\n    \u2022 Generate leads.\n    \u2022 Initiate conversations with potential clients.\n    \u2022 Drive business growth.\n    \u2022 Lead generation for placements: Identify and target companies with potential hiring needs through cold calling, cold emailing, and LinkedIn outreach.\n    \u2022 Partnership Development: Establish and nurture relationships with HR managers, recruiters, and decision-makers to facilitate placements of TAP Academy students.\n    \u2022 LinkedIn & Social Media Outreach: Use LinkedIn and other social media platforms.\n    \u2022 Identify competitor activities to identify new opportunities for placements.\n    \u2022 Track and report on outreach activities, lead generation efforts, and placement successes.\n    \u2022 Market Research & Networking: Stay updated on industry hiring trends, skill requirements, and networking opportunities.\n\u2022 Work Environment: Not specified\n\u2022 Experience Required: 0-3 Years (Edtech is a plus)\n\nCOMPREHENSIVE SKILL REQUIREMENTS\n\u2022 Technical Skills: Proficiency (or willingness to learn) in LinkedIn and other social media platforms for professional networking.\n\u2022 Soft Skills:\n    \u2022 Dynamic and results-driven.\n    \u2022 Strong interest in cold calling and cold emailing, with the desire to engage professionally with clients or recruiters.\n    \u2022 Exceptional communication skills, both written and verbal.\n\u2022 Industry Knowledge: Knowledge of the Information and Technology industry; Edtech experience is a plus.\n\u2022 Certifications: Not specified\n\u2022 Educational Requirements: Not specified\n\nTOOLS & TECHNOLOGIES\n\u2022 Primary Tools: LinkedIn and other social media platforms.\n\u2022 Secondary Tools: Not specified\n\u2022 Industry-Specific Platforms: Not specified\n\nWORK CONDITIONS & REQUIREMENTS\n\u2022 Schedule: Not specified\n\u2022 Environment: Not specified\n\u2022 Travel: Not specified\n\u2022 Special Requirements: Not specified\n\nCOMPANY INTELLIGENCE\n\u2022 About Company: TAP Academy is an Ed-Tech company that helps individuals build their technical skills in the Information and Technology industry. They provide excellent training, coaching, and mentoring to their students, enriching them.\n\u2022 Location Benefits: BTM Layout, Bangalore\n\u2022 Growth Opportunities: Not specified\n\u2022 Company Culture: Not specified\n\nMBA SPECIALIZATION MAPPING\n\u2022 Primary: Marketing\n\u2022 Secondary: Sales, Strategy\n\u2022 Skills Crossover: Marketing provides the foundation for lead generation and client communication. Sales is crucial for converting leads into partnerships. Strategy helps in identifying market opportunities and planning outreach.\n\u2022 Career Impact: This role allows you to apply marketing and sales strategies to drive business growth in the education sector.\n\nSTRATEGIC PREPARATION ROADMAP\n1. Must-Have Skills:\n    \u2022 Communication (written and verbal)\n    \u2022 Cold calling and emailing\n    \u2022 LinkedIn and social media proficiency\n2. Competitive Advantage Skills:\n    \u2022 Edtech experience\n    \u2022 Networking skills\n    \u2022 Market research\n3. Immediate Certifications: Not applicable\n4. Experience Building:\n    \u2022 Gain experience in lead generation through cold outreach.\n    \u2022 Develop partnerships with HR managers and recruiters.\n    \u2022 Stay updated on industry trends and networking opportunities.\n5. Company-Role Alignment:\n    \u2022 Highlight your communication and networking skills.\n    \u2022 Show your interest in the Edtech industry.\n    \u2022 Demonstrate your ability to drive business growth through lead generation and partnership development.",
+      "timestamp": "2025-09-26T19:48:41.361103",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "im looking to get placed in sales roles, is there any company which offeres b2b sales, if so give me informations abou that company",
+      "timestamp": "2025-09-26T19:54:49.692460",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "\n**Structured Data:**\nI couldn\u2019t fetch the details due to a system error. Try again later or check with your placement cell for B2B sales opportunities.\n\n**Additional Context:**\nBased on the provided documents, here's a breakdown of companies offering sales roles, focusing on B2B opportunities:\n\nROLE ANALYSIS\n\u2022 Position: Admission Counselor\n\u2022 Department: MasterCamp (specialized programs)\n\u2022 Key Responsibilities:\n    \u2022 Engage with working professionals to identify their career needs and how the program can enhance their skills in capital markets.\n    \u2022 Conduct online and offline product demonstrations, providing detailed insights into the program\u2019s features, benefits, and career opportunities.\n    \u2022 Schedule and conduct consultations and follow-up sessions with prospective students, addressing their concerns and queries.\n    \u2022 Handle objections, provide solutions, and negotiate program fees to close sales and generate revenue.\n    \u2022 Consistently achieve weekly and monthly sales targets while maintaining a high level of customer satisfaction.\n    \u2022 Build and nurture a strong sales pipeline, managing prospects effectively through the entire sales cycle.\n    \u2022 Stay up-to-date with the program\u2019s developments and sales techniques.\n\u2022 Work Environment: Fast-paced, dynamic, and results-oriented environment. Willingness to work six days a week.\n\u2022 Experience Required: Proven experience in inside sales, particularly in a B2C environment.\n\nCOMPREHENSIVE SKILL REQUIREMENTS\n\u2022 Technical Skills: Knowledge of sales tools (CRM systems) to track leads and manage the sales pipeline.\n\u2022 Soft Skills: Excellent communication skills (both verbal and written), strong presentation and negotiation skills, strong time management skills, ability to multitask and prioritize effectively.\n\u2022 Industry Knowledge: Understanding of the learning needs and career aspirations of working professionals.\n\u2022 Educational Requirements: Not explicitly mentioned, but a relevant degree is likely preferred.\n\nTOOLS & TECHNOLOGIES\n\u2022 Primary Tools: CRM systems.\n\nWORK CONDITIONS & REQUIREMENTS\n\u2022 Schedule: Full-time, six days a week.\n\u2022 Environment: Fast-paced, dynamic, results-oriented.\n\u2022 Location: Gurgaon, Haryana.\n\nCOMPANY INTELLIGENCE\n\u2022 About Company: Masters\u2019 Union is a new-age business school offering industry-immersive business education where classes are led by top industry leaders and practitioners. The institute is strategically located in the heart of Gurugram's business district. Their flagship Post Graduate Program in Technology and Business management has surpassed the placement records of IIM Ahmedabad and ISB.\n\nMBA SPECIALIZATION MAPPING\n\u2022 Primary: Marketing, Sales\n\u2022 Secondary: Strategy, Leadership\n\u2022 Skills Crossover: Marketing provides the foundation for understanding customer needs, while strategy and leadership are crucial for managing sales teams and driving growth.\n\u2022 Career Impact: This role offers significant opportunities to apply sales and marketing principles in a dynamic educational environment.\n\nSTRATEGIC PREPARATION ROADMAP\n1. Must-Have Skills: Proven experience in inside sales, excellent communication skills, and knowledge of CRM systems.\n2. Competitive Advantage Skills: Strong negotiation skills, ability to handle objections, and a deep understanding of the needs of working professionals.\n3. Experience Building: Focus on demonstrating a track record of meeting or exceeding sales targets in previous roles.\n4. Company-Role Alignment: Highlight your passion for education and your ability to connect with professionals seeking to enhance their careers.\n\n\u26a0\ufe0f CRITICAL CONCERNS & RED FLAGS\n\u2022 Work Challenges: The role requires working six days a week, which may be demanding.\n\n\u2e3b\n\n**Masters' Union: Admission Counselor**\n*   **B2C Focus**: While the role involves selling educational programs to working professionals, it's primarily a B2C sales role.\n*   **Skills**: Requires inside sales experience, strong communication, and CRM proficiency.\n*   **MBA Fit**: Ideal for MBA graduates specializing in Marketing or Sales.\n*   **Strategic Advice**: Emphasize your ability to meet sales targets and understand customer needs.\n\n**Tap Academy: Business Development Associate**\n*   **B2B Focus**: This role is heavily focused on B2B sales, involving lead generation and partnership development with companies for student placements.\n*   **Skills**: Requires cold calling, cold emailing, LinkedIn outreach, and relationship building with HR managers and recruiters.\n*   **MBA Fit**: Suitable for MBA graduates specializing in Marketing or General Management.\n*   **Strategic Advice**: Highlight your networking abilities and experience in building relationships with corporate clients.\n\n**Strategic Recommendation:**\n\n*   **For B2B Sales**: Target Tap Academy due to its explicit focus on developing partnerships with companies for student placements. This aligns directly with B2B sales objectives.\n*   **For B2C Sales**: Consider Masters' Union if you prefer selling directly to individual professionals, focusing on the benefits of their educational programs.\n\n**Overall Market Insight:**\n\n*   Both companies offer valuable sales experience, but Tap Academy provides a clearer path for MBA graduates seeking B2B sales roles.\n*   Masters' Union offers a strong brand and a focus on high-impact educational programs, which may appeal to candidates interested in the education sector.\n",
+      "timestamp": "2025-09-26T19:55:53.989735",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "give me information about Target",
+      "timestamp": "2025-09-26T20:39:51.216356",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "\n**Structured Data:**\nI couldn\u2019t retrieve information about **Target** due to a payment requirement error. Please try again later or check your access.\n\n**Additional Context:**\nOpenRouter generation failed after retries.\n",
+      "timestamp": "2025-09-26T20:40:20.075068",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "give me information about Target",
+      "timestamp": "2025-09-26T20:42:29.513117",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "\n**Structured Data:**\nError: 402 Client Error: Payment Required for url: https://openrouter.ai/api/v1/chat/completions\n\n**Additional Context:**\nOpenRouter generation failed after retries.\n",
+      "timestamp": "2025-09-26T20:42:56.140740",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
     }
   ],
   "current_context": {
     "last_query_type": "unstructured",
-    "last_company_query": "list down number of companies came for placement",
-    "company_query_timestamp": "2025-09-26 17:45:20.365175"
+    "last_company_query": "GIVE ME LIST OF B2B COMPANIES CAME FOR PLACEMENTS",
+    "last_companies_mentioned": [
+      "Masters\u2019 Union is a new-age business school offering industry-immersive business education where classes are led by top industry leaders and practitioners. The institute is strategically located in the heart of Gurugram's business district. Their flagship Post Graduate Program in Technology and Business management has surpassed the placement records of IIM Ahmedabad and ISB."
+    ],
+    "companies_mentioned_timestamp": "2025-09-26 19:55:53.989735"
   },
-  "last_updated": "2025-09-26T17:45:36.212208"
+  "last_updated": "2025-09-26T20:42:56.142429"
 }

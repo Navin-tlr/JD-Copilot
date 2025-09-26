@@ -16,14 +16,6 @@ import os
 import certifi
 import requests
 
-# Add Gemini import
-try:
-    import google.generativeai as genai
-    from google.generativeai.types import HarmCategory, HarmBlockThreshold
-    GEMINI_AVAILABLE = True
-except ImportError:
-    GEMINI_AVAILABLE = False
-
 # Add OpenRouter import
 try:
     import requests
@@ -284,78 +276,71 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
 
 def synthesize_answer(question: str, snippets: List[Dict[str, Any]], filters: Dict[str, Any] = None) -> str | None:
     settings = get_settings()
-    system_prompt = """You are JD-Copilot, a Placement Cell Assistant for MBA students and officers.
-Your role is to act as a responsible, insightful member of the placement cell.
-You must answer questions ONLY based on the retrieved snippets from the placement database (PDFs that were ingested).
-If something is not present in the data, clearly state:
+    # Aristotelian strategist system prompt (replaces earlier role-specific only prompt)
+    system_prompt = """You are JD-Copilot — The Aristotelian Placement Strategist.
+Role: act as a ruthless, wise mentor and strategic advisor for MBA students and placement officers. Interpret intent first, answer whatever the user asks, and always distinguish hard evidence (retrieved from the system) from strategic reasoning (external knowledge, frameworks, or creative strategy).
+
+PRINCIPLES (non-negotiable)
+1. Evidence first — Any factual claim about a JD, company, requirement, or compensation must be supported by retrieved data (SQL rows or vector snippets). If the retrieval contains no supporting text, reply exactly:
 "I could not find this information in the available documents."
+2. No hallucinations about source data — Never invent or alter JD contents. If you infer, label it (INFERENCE) and show the data used to infer.
+3. Strategic roaming allowed — You MAY draw on external domain knowledge (HBR, academic papers, best‑practice frameworks, market intelligence) for strategy, certifications, frameworks, or comparative context. Clearly label these as STRATEGIC; cite source when possible or note established practice.
+4. Distinguish evidence types — Use explicit tags:
+   (EVID:SQL:table:row) or (EVID:VEC:docID[:loc]) for retrieved facts.
+   (STRAT:EXT:Source:year:label) for external knowledge.
+5. Aristotelian tone — Wise, merciless, precise. Imperatives for actions. Explain reasoning concisely.
+6. MBA lens mandatory — Map implications to Finance, Marketing, Operations, HR, Business Analytics. Clarify long‑term career impact + immediate tactics.
 
-🎯 Answering Guidelines:
-1. **Grounded in Data**:
-   - Always ground answers in retrieved snippets.
-   - Never invent, assume, or guess.
-   - Cite the company/companies whenever mentioning skills, roles, or requirements.
+OPERATION PROCESS
+1. Parse intent — State detected intent (e.g., role analysis, skill demand, comparative query, strategic prep, resume shaping, compensation benchmarking, multi-company contrast).
+2. Retrieve & anchor — Quote only what retrieval provides. If a requested fact is missing output the exact missing phrase.
+3. Analyze strategically — Build recommendations, roadmaps, certifications, competitive positioning. Tag non‑evidence parts STRATEGIC.
+4. Mark inferences — Any deduction beyond literal text is (INFERENCE) with minimal reasoning chain.
+5. Provide certifications only if tied to evidence or widely accepted (CFA, SHRM‑CP, PMP, CEH, Google Analytics, Six Sigma). Otherwise mark (SUGGESTION).
+6. Evidence block mandatory — List all used snippet IDs / row tags with ≤25 word quotes supporting claims.
 
-2. **MBA Context Awareness**:
-   - Always explain insights through the lens of MBA career paths.
-   - Explicitly map findings to **MBA specializations**: Finance, HR, Marketing, Operations, Business Analytics, and Strategy.
-   - When possible, highlight which specialization benefits most from a given skill/requirement.
+STYLE
+- Flexible structure: choose bullets, sections, or narrative fit for intent.
+- No fluff. Each sentence must carry data, inference, or directive value.
+- For numeric derivations show arithmetic.
+- End every response with: Data-grounded. No assumptions left unstated.
 
-3. **Insightful Interpretation**:
-   - Do not give flat lists; interpret trends and context.
-   - Highlight overlaps (skills multiple companies request → high demand).
-   - Highlight niche skills (requested by few → specialization opportunity).
-   - Explain *why* companies seek a skill (e.g., "Company X values Reporting for client KPI dashboards → vital for Business Analytics students").
+TAGS EXAMPLES
+(EVID:SQL:roles:row_12)
+(EVID:VEC:JD_doc45:p2)
+(STRAT:EXT:HBR:2019:Leadership-Transition)
+(INFERENCE)
+(SUGGESTION)
 
-4. **Professional Placement Cell Tone**:
-   - Speak as an official placement cell advisor.
-   - Address answers directly to MBA students ("For Marketing students, …").
-   - Keep responses clear, structured, and strategic.
+ETHICS
+- If asked to fabricate: "I cannot fabricate information. Provide data or permit a data lookup."
+- Never misrepresent authority beyond being JD-Copilot.
 
-5. **Structured Output**:
-   For skills/insights queries:
-   - **Skill Name:** …
-   - **Cited By Companies:** …
-   - **Relevant Specializations:** …
-   - **Why It Matters:** …
-   - **Strategic Advice:** …
-   - **Recommended Certifications/Training:** …
+FINISH
+Always end with: Data-grounded. No assumptions left unstated.
 
-   For job/company-specific queries:
-   - **Job Title:** …
-   - **Company:** …
-   - **Location:** …
-   - **Salary/Compensation:** …
-   - **Requirements/Skills:** …
-   - **Relevance for MBA Students:** …
-   - **Additional Notes:** …
+Role-Focused Output Formats (reference – adapt structure as needed)
+For role/position queries:
+    - Position Title: [Exact role from JD]
+    - Department/Function: [Specific area]
+    - Role-Critical Skills: [Skills for THIS job]
+    - MBA Specialization Fit: [Which specializations match THIS role]
+    - Role-Specific Strategic Advice: [How to win THIS position]
+    - Position-Relevant Certifications: [Certs that help]
+For company queries about specific roles:
+    - Company: [Name]
+    - Recruiting For: [Specific position/department]
+    - Role Requirements: [Position-specific needs]
+    - Position Compensation: [If available]
+    - Role Relevance for MBA Students: [Why THIS job matters]
 
-6. **When Information is Missing**:
-   - Explicitly state: "Not mentioned in the available documents."
-   - Never fabricate.
-
-📋 SPECIAL INSTRUCTION FOR "MOST SOUGHT-AFTER SKILLS" QUERIES:
-- Provide the **top skills across all companies** based on frequency.
-- For each skill:
-  - Cite which companies mentioned it
-  - Map it to MBA specializations
-  - Explain its **strategic implications** for career preparation
-  - Suggest relevant **certifications, tools, or platforms** (e.g., CFA for Finance, SHRM for HR, Google Analytics for Marketing, Six Sigma for Operations, SQL/Python/PowerBI for Analytics)
-- End with a **summary recommendation**: which skills are cross-functional (T-shaped must-haves) vs. specialization-specific.
-
-📋 SPECIAL INSTRUCTION FOR FULL JD REQUESTS:
-When the user asks for "full jd", "complete jd", "entire jd", or similar:
-- Provide the COMPLETE job description from all available snippets
-- Combine all details (responsibilities, requirements, qualifications, benefits)
-- Do NOT summarize — give the full information
-- Clearly indicate if any parts are missing
-- End with a section: **Relevance for MBA Students** (mapping the JD to specializations)
-
-🚨 COMPANY-SPECIFIC QUERIES:
-- Focus ONLY on the mentioned company
-- Do NOT mix data from others
-- If not found, say: "I could not find any information about [Company Name] in the available documents."
-- If partial data exists, provide it and clearly state what's missing."""
+Special Instructions (condensed)
+    - ALWAYS identify exact job title first.
+    - Tie every requirement to business impact for THAT role.
+    - Map to MBA specializations via concrete responsibilities, not industry stereotypes.
+    - If role missing: output missing data phrase.
+    - Never drift into generic industry commentary.
+"""
 
     # --- Build the final prompt for the API call ---
     context = "\n\n".join(
@@ -363,6 +348,14 @@ When the user asks for "full jd", "complete jd", "entire jd", or similar:
         for s in snippets
     )
     
+    # Detect if user explicitly asks for strategic advice for a single company (avoid generic multi-specialization spill)
+    question_lower = question.lower()
+    single_company_mode = False
+    if len({s.get('metadata', {}).get('company') for s in snippets if s.get('metadata', {}).get('company')}) == 1:
+        # Heuristic: if query contains words like 'strategy', 'strategic advice', 'advise', limit advice to directly inferable specialization(s)
+        if any(tok in question_lower for tok in ["strategic", "strategy", "advise", "advice"]):
+            single_company_mode = True
+
     # Dynamic instruction based on company filter
     company_text = filters.get("company") if filters else None
     if company_text:
@@ -393,6 +386,12 @@ Provide comprehensive market insights, trends, and cross-company recommendations
 Act as a placement consultant who understands the entire landscape.
 """
 
+    if single_company_mode and not company_text:
+        # Override to a focused specialization mode using actual snippet roles/specializations only
+        specializations_present = sorted({(s.get('metadata', {}) or {}).get('specialization') for s in snippets if (s.get('metadata', {}) or {}).get('specialization')})
+        spec_list = ", ".join(sp for sp in specializations_present if sp) or "(none detected)"
+        mode_instruction += f"\nFOCUS OVERRIDE: Provide strategic advice ONLY for the specializations explicitly present in the retrieved snippets: {spec_list}. Do NOT fabricate advice for absent specializations. If only one specialization exists, restrict advice strictly to that specialization.\n"
+
     final_prompt = (
         f"{mode_instruction}\n\n"
         "CONTEXT:\n"
@@ -402,67 +401,11 @@ Act as a placement consultant who understands the entire landscape.
         f"QUESTION: {question}"
     )
 
-    # Prefer Gemini (explicit user request) and fall back to OpenRouter
-    if settings.GEMINI_API_KEY and GEMINI_AVAILABLE:
-        print(f"🟢 Attempting synthesis with Gemini model: {settings.GEMINI_MODEL or 'gemini-2.0-flash-exp'}")
-        try:
-            # Configure Gemini
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            
-            # Use the specified model or default to a reliable one
-            gemini_model = settings.GEMINI_MODEL or "gemini-2.0-flash-exp"
-            
-            # Create the model instance
-            model = genai.GenerativeModel(gemini_model)
-            
-            # Combine system prompt and user prompt for Gemini
-            combined_prompt = f"{system_prompt}\n\n{final_prompt}"
-            
-            # Generate content with safety settings disabled for professional documents
-            response = model.generate_content(
-                combined_prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.0,
-                    max_output_tokens=2048,  # Increased from 1024 for full JD requests
-                ),
-                safety_settings=[
-                    {
-                        "category": HarmCategory.HARM_CATEGORY_HARASSMENT,
-                        "threshold": HarmBlockThreshold.BLOCK_NONE,
-                    },
-                    {
-                        "category": HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                        "threshold": HarmBlockThreshold.BLOCK_NONE,
-                    },
-                    {
-                        "category": HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                        "threshold": HarmBlockThreshold.BLOCK_NONE,
-                    },
-                    {
-                        "category": HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                        "threshold": HarmBlockThreshold.BLOCK_NONE,
-                    },
-                ]
-            )
-            
-            if response and response.text:
-                print("✅ Successfully received answer from Gemini.")
-                return response.text.strip()
-            else:
-                return "The model generated an empty response. Please try rephrasing your question."
-                
-        except Exception as e:
-            print(f"❌ Error while calling Gemini: {e}")
-            import traceback
-            traceback.print_exc()
-            # Fall through to OpenRouter fallback
-
-    # OpenRouter fallback (only if Gemini missing or failed)
+    # OpenRouter only (Gemini removed per user request)
     if settings.OPENROUTER_API_KEY and OPENROUTER_AVAILABLE:
         print(f"🟡 Attempting synthesis with OpenRouter model: moonshotai/kimi-k2 (fallback)")
         try:
             openrouter_model = settings.OPENROUTER_MODEL or "moonshotai/kimi-k2"
-
             payload = {
                 "model": openrouter_model,
                 "messages": [
@@ -472,12 +415,10 @@ Act as a placement consultant who understands the entire landscape.
                 "temperature": 0.0,
                 "max_tokens": 2048,
             }
-
             headers = {
                 "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
                 "Content-Type": "application/json",
             }
-
             for attempt in range(1, 3):
                 try:
                     resp = requests.post(
@@ -494,7 +435,7 @@ Act as a placement consultant who understands the entire landscape.
                         if choice:
                             text = choice.get("message", {}).get("content") or choice.get("text")
                             if text:
-                                print("✅ Successfully received answer from OpenRouter (fallback).")
+                                print("✅ Successfully received answer from OpenRouter.")
                                 return text.strip()
                         return "The model generated an empty response. Please try rephrasing your question."
                     else:
@@ -510,8 +451,6 @@ Act as a placement consultant who understands the entire landscape.
             traceback.print_exc()
             return f"Error calling OpenRouter: {e}"
 
-    # If we reach here, both OpenRouter and Gemini failed or were not configured.
-    # Skip synthesis and return None so the API returns retrieved snippets only.
     print("🔴 No LLM API keys configured or all LLM generation failed. Skipping synthesis.")
     return None
 

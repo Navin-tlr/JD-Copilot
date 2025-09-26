@@ -12,12 +12,11 @@ from langextract import extract as lx_extract, data as lx_data
 
 def extract_company_with_langextract(text: str) -> Optional[str]:
     """Extract company name using LangExtract with current API."""
-    api_key = os.getenv("GEMINI_API_KEY")
+    # Gemini removed; if later replaced with OpenRouter-based extractor, hook here.
+    api_key = os.getenv("LANGEXTRACT_API_KEY")
     if not api_key:
         return None
-
-    # Use the working model IDs (remove models/ prefix if present)
-    model_id = (os.getenv("GEMINI_MODEL") or "gemini-2.5-flash").replace("models/", "")
+    model_id = "openrouter-default"
     
     # Create few-shot examples using the correct LangExtract data structures
     examples = [
