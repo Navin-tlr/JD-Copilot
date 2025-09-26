@@ -1,0 +1,46 @@
+/* Minimal animations matching original project */
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-98 {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(0.98);
+  }
+}
+
+/* Minimal utility classes */
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.active\:scale-98:active {
+  transform: scale(0.98);
+}
+
+/* Minimal interaction styles */
+.transition-all {
+  transition: all 0.2s ease-out;
+}
+
+.hover\:scale-105:hover {
+  transform: scale(1.05);
+}
+
+/* Minimal responsive utilities */
+@media (max-width: 640px) {
+  .mobile-optimized {
+    padding: 0.75rem;
+  }
+}

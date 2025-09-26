@@ -110,7 +110,7 @@ async def query_endpoint(request: ChatRequest = Body(...)):
             snippets = []
             try:
                 # Try to get relevant snippets for citations
-                temp_snippets = retrieve_snippets(request.query, top_k=3, filters={})
+                temp_snippets = retrieve_snippets(request.query, top_k=15, filters={})
                 if temp_snippets:
                     snippets = temp_snippets
             except Exception as e:
@@ -119,7 +119,7 @@ async def query_endpoint(request: ChatRequest = Body(...)):
         else:
             print("⚠️ AI agent not available, falling back to basic RAG")
             # Fallback to basic RAG if agent fails
-            snippets = retrieve_snippets(request.query, top_k=8, filters={})
+            snippets = retrieve_snippets(request.query, top_k=15, filters={})
             if snippets:
                 answer = synthesize_answer(request.query, snippets, {})
             else:
@@ -201,7 +201,7 @@ async def chat_endpoint(request: QueryRequest):
         snippets = []
         try:
             # Try to get relevant snippets for citations
-            temp_snippets = retrieve_snippets(question, top_k=3, filters={})
+            temp_snippets = retrieve_snippets(question, top_k=15, filters={})
             if temp_snippets:
                 snippets = temp_snippets
         except Exception as e:
@@ -285,7 +285,7 @@ async def enhanced_chat_endpoint(request: QueryRequest):
         snippets = []
         try:
             # Try to get relevant snippets for citations
-            temp_snippets = retrieve_snippets(question, top_k=3, filters={})
+            temp_snippets = retrieve_snippets(question, top_k=15, filters={})
             if temp_snippets:
                 snippets = temp_snippets
         except Exception as e:

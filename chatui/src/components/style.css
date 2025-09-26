@@ -1,0 +1,69 @@
+.iphone {
+  position: relative;
+  width: 390px;
+  height: 844px;
+  background: #313131;
+  color: white;
+}
+
+.CHAT-COMPONENT {
+  position: absolute;
+  left: 39px;
+  top: 667px;
+  width: 312px;
+  height: 85px;
+  background: #464646;
+  border-radius: 5px;
+  box-shadow: 0px 4px 4px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.text-wrapper {
+  position: absolute;
+  left: 13px;
+  top: 13px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.SEND-ARROW {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 40px;
+  height: 40px;
+}
+
+.SEND-ARROW .vector {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.ATTACHMENT-ICON {
+  position: absolute;
+  left: 13px;
+  bottom: 12px;
+  width: 14px;
+  height: 14px;
+}
+
+.tool-box {
+  position: absolute;
+  left: 117px;
+  top: 764px;
+  width: 155px;
+  height: 40px;
+}
+
+.chat-history-arrow {
+  position: absolute;
+  left: 315px;
+  top: 773px;
+  width: 21px;
+  height: 21px;
+}
+
+.group img { display: block; width: 100%; height: auto; }

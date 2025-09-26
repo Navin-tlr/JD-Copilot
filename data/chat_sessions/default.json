@@ -2,186 +2,6 @@
   "session_id": "default",
   "messages": [
     {
-      "role": "user",
-      "content": "How many companies came for HR roles?",
-      "timestamp": "2025-08-27T19:11:37.553749",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "",
-      "timestamp": "2025-08-27T19:12:33.803481",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies came for HR ROLES?",
-      "timestamp": "2025-08-27T19:43:55.947433",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "hOW MANY COMPANIES CAME FOR FINANCE ROLES",
-      "timestamp": "2025-08-27T19:55:34.856238",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "\n\nThe SQL query first joins the `companies` and `roles` tables on the `company_id` foreign key, and then counts the distinct company names where the role specialization is 'Finance'. This gives us the number of unique companies that have come for finance roles.",
-      "timestamp": "2025-08-27T19:55:50.090620",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies came for finance role",
-      "timestamp": "2025-08-27T20:00:51.805842",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "\n\nThe SQL query first joins the `companies` and `roles` tables on the `company_id` column. It then counts the distinct company names where the `specialization` column in the `roles` table is 'Finance'. This gives us the number of unique companies that have a finance role.",
-      "timestamp": "2025-08-27T20:01:01.444444",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies came for FINANCE roles",
-      "timestamp": "2025-08-27T20:02:48.232327",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "\n\nThe SQL query first joins the `companies` and `roles` tables on the `company_id` column. It then counts the distinct `company_name` values where the `specialization` column in the `roles` table is 'Finance'. This gives us the number of unique companies that have come for finance roles.",
-      "timestamp": "2025-08-27T20:02:57.685964",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies came for FINANCE roles?",
-      "timestamp": "2025-08-27T20:06:38.854426",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "\n\nThere is 1 company that came for FINANCE roles.",
-      "timestamp": "2025-08-27T20:06:53.531455",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "HOW MANY COMPANIES CAME FOR FINANCE ROLES?",
-      "timestamp": "2025-08-27T20:09:58.017737",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "\n\nThere is 1 company that came for Finance roles.",
-      "timestamp": "2025-08-27T20:10:06.677637",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "\"How many companies came for Finance roles?",
-      "timestamp": "2025-08-27T20:18:12.369465",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "\n\nThe SQL query first joins the companies and roles tables to connect the company information with the role specializations. It then counts the distinct company names where the role specialization contains 'FINANCE' (using the UPPER() function to make the search case-insensitive).\n\nThe result [[1]] indicates that there is 1 company that came for Finance roles.",
-      "timestamp": "2025-08-27T20:18:28.022071",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "how many companies came for finance roles?",
-      "timestamp": "2025-08-27T22:02:11.901773",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "Based on the database query, **1 company** came for finance roles.",
-      "timestamp": "2025-08-27T22:02:38.367558",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies came for finance roles?",
-      "timestamp": "2025-08-27T22:09:58.333292",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "There is **1 company** that came for finance roles.",
-      "timestamp": "2025-08-27T22:10:21.414797",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "how many companies came last year?",
-      "timestamp": "2025-08-27T22:17:37.810598",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
       "role": "assistant",
       "content": "Based on the database, **6 companies** came for placements in the last year (2024-2025 batch).",
       "timestamp": "2025-08-27T22:18:07.057455",
@@ -900,11 +720,192 @@
       "query_type": null,
       "specialization": null,
       "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "Give me list of companies",
+      "timestamp": "2025-09-24T18:36:13.296618",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "Based on the available placement database snippets, here are the companies mentioned:\n\n**Companies Identified:**\n1. **Accorian** - Cybersecurity advisory and consulting firm\n2. **Masters' Union** - New-age business school offering industry-immersive business education\n3. **Tap Academy** - Appears to be involved in market research and networking\n4. **Mill Story** - D2C food brand focusing on healthy flours\n5. **Target** - Fortune 50 retail company\n\n**Note:** Some entries reference \"ORGANISATION\" without a specific company name, so these have been excluded from the list as the company identity is not clearly mentioned in the available documents.\n\n**Strategic Insight for MBA Students:**\n- **Accorian** represents the growing cybersecurity consulting sector - particularly relevant for Strategy and Operations specializations\n- **Masters' Union** is itself an educational institution but mentions top recruiters like Amazon, CitiBank, Microsoft, BCG, Bain\n- **Target** being Fortune 50 offers structured MBA programs and diverse retail opportunities across all specializations\n- **Mill Story** as a D2C startup represents emerging opportunities in entrepreneurial ventures and growth-stage companies",
+      "timestamp": "2025-09-24T18:36:41.209642",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "Give me list of companies",
+      "timestamp": "2025-09-24T18:36:41.236992",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "Based on the available placement database documents, here are the companies mentioned:\n\n## **List of Companies**\n\n### **Technology & Cybersecurity**\n- **Accorian** - Cybersecurity advisory and consulting firm (HQ: New Jersey, with offices in India, Canada, UAE)\n\n### **Education & Business Schools**\n- **Masters' Union** - New-age business school located in Gurugram's business district\n- **Tap Academy** - Training/education organization\n\n### **Retail & E-commerce**\n- **Target** - Fortune 50 retail company with 400,000+ team members worldwide\n\n### **Food & D2C Brands**\n- **Mill Story** - D2C food brand specializing in chemical-free flours (Bengaluru-based)\n\n### **Others**\n- **CitiBank** - Mentioned as a recruiter at Masters' Union\n- **Amazon** - Mentioned as a recruiter at Masters' Union\n- **Microsoft** - Mentioned as a recruiter at Masters' Union\n- **BCG** - Mentioned as a recruiter at Masters' Union\n- **Bain** - Mentioned as a recruiter at Masters' Union\n- **Unacademy** - Mentioned as a recruiter at Masters' Union\n- **Razorpay** - Mentioned as a recruiter at Masters' Union\n\n**Note:** The primary companies with detailed information in the documents are **Accorian**, **Masters' Union**, **Target**, and **Mill Story**. Other companies like CitiBank, Amazon, Microsoft, etc. are mentioned primarily as recruiters at Masters' Union rather than having standalone company profiles in the available documents.",
+      "timestamp": "2025-09-24T18:37:04.002596",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "Give me list of companies",
+      "timestamp": "2025-09-24T18:37:04.032157",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "Based on the available documents, here are the companies mentioned:\n\n**Companies Found in Documents:**\n\n1. **Accorian** - Cybersecurity advisory and consulting firm\n   - Headquarters: New Jersey\n   - Regional offices: India, Canada, UAE\n   - Specializes in: Penetration testing, HITRUST, PCI compliance, SOC, NIST, Red teaming\n\n2. **Masters' Union** - New-age business school\n   - Location: Gurgaon, Haryana\n   - Offers: Post Graduate Program in Technology and Business Management\n   - Also launching undergraduate programs\n\n3. **Tap Academy** - Training/education platform\n   - Focus: Market research, networking, skill development\n\n4. **Mill Story** - D2C food brand\n   - Location: Sarjapur Road, Bengaluru\n   - Mission: Healthy, freshly milled, chemical-free flours\n\n5. **Target** - Fortune 50 retail company\n   - Global presence: 400,000+ team members worldwide\n   - Industry: Retail\n\n**Note:** There is also mention of \"ORGANISATION\" with a Management Trainee position, but the company name is not specified in the available documents.",
+      "timestamp": "2025-09-24T18:37:25.595660",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "Give me list of companies",
+      "timestamp": "2025-09-24T18:37:25.607201",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "Based on the available placement database, here are the companies mentioned:\n\n## **Companies Identified in Placement Database:**\n\n1. **Accorian** - Cybersecurity advisory and consulting firm\n   - Headquarters: New Jersey, USA\n   - Regional offices: India, Canada, UAE\n   - Specializes in: Penetration testing, HITRUST, PCI compliance, SOC, NIST, Red teaming\n\n2. **Masters' Union** - New-age business school\n   - Location: Gurgaon, Haryana (heart of Gurugram's business district)\n   - Offers: Post Graduate Program in Technology and Business Management, Undergraduate program\n   - Notable: Classes taught by CXOs, MDs, Public Leaders, and Members of Parliament\n\n3. **Tap Academy** - (Limited information available)\n   - Focus: Market research, networking, industry hiring trends\n\n4. **Mill Story** - D2C food brand\n   - Location: Sarjapur Road, Bengaluru\n   - Mission: Healthy, chemical-free flours\n   - Stage: Preparing for first round of funding\n\n5. **Target** - Fortune 50 retail company\n   - Scale: 400,000+ team members worldwide\n   - Sector: Retail (America's leading retailers)\n\n6. **Unnamed Organization** - Management Trainee position\n   - Role: Management Trainee - IS&T (Information Systems & Technology)\n   - Focus: Project management, delivery, transformation support\n\n**Note:** Some companies appear in the context without explicit job postings (like CitiBank, Amazon, Microsoft, BCG, Bain) - these are mentioned as recruiters of Masters' Union graduates rather than as direct placement opportunities in the current database.",
+      "timestamp": "2025-09-24T18:37:51.913791",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "Give me list of companies",
+      "timestamp": "2025-09-24T18:37:51.935992",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "OpenRouter generation failed after retries.",
+      "timestamp": "2025-09-24T18:38:11.181349",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "Give me list of companies",
+      "timestamp": "2025-09-24T18:38:11.208887",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "OpenRouter generation failed after retries.",
+      "timestamp": "2025-09-24T18:38:27.974183",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "Give me list of companies",
+      "timestamp": "2025-09-24T18:38:27.986684",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "OpenRouter generation failed after retries.",
+      "timestamp": "2025-09-24T18:38:44.405329",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "How many companies came for placements?",
+      "timestamp": "2025-09-24T18:38:56.304502",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "OpenRouter generation failed after retries.",
+      "timestamp": "2025-09-24T18:39:14.875531",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "hhuhuh",
+      "timestamp": "2025-09-24T19:13:42.672912",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "OpenRouter generation failed after retries.",
+      "timestamp": "2025-09-24T19:14:14.182135",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "How many companies in total came for placements",
+      "timestamp": "2025-09-24T19:27:48.632283",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "OpenRouter generation failed after retries.",
+      "timestamp": "2025-09-24T19:28:06.063764",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
     }
   ],
   "current_context": {
     "last_query_type": "unstructured",
-    "last_company_query": "How many companies came for placements"
+    "last_company_query": "How many companies in total came for placements",
+    "company_query_timestamp": "2025-09-24 19:27:48.632283"
   },
-  "last_updated": "2025-08-28T02:07:38.994464"
+  "last_updated": "2025-09-24T19:28:06.066985"
 }

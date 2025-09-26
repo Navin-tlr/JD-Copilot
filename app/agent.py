@@ -349,7 +349,7 @@ def get_vector_index():
         def query(self, question: str):
             # Use existing retrieve_snippets + synthesize_answer to produce a response
             try:
-                snippets = retrieve_snippets(question, top_k=5, filters={})
+                snippets = retrieve_snippets(question, top_k=15, filters={})
                 answer = synthesize_answer(question, snippets, {})
                 class Resp:
                     def __init__(self, text: str):
@@ -501,7 +501,7 @@ def execute_unstructured_query(user_question: str) -> str:
             return f"I encountered an error processing this query: {str(e)}"
     else:
         # Fallback to existing RAG system
-        snippets = retrieve_snippets(user_question, top_k=5, filters={})
+        snippets = retrieve_snippets(user_question, top_k=15, filters={})
         if snippets:
             answer = synthesize_answer(user_question, snippets, {})
             return answer or "I couldn't generate a comprehensive answer."

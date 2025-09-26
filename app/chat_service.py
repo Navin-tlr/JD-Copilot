@@ -204,7 +204,7 @@ class ChatService:
             from .rag import retrieve_snippets, synthesize_answer
             
             # Use existing RAG system
-            snippets = retrieve_snippets(user_message, top_k=5, filters={})
+            snippets = retrieve_snippets(user_message, top_k=15, filters={})
             if snippets:
                 answer = synthesize_answer(user_message, snippets, {})
                 return answer or "I couldn't generate a comprehensive answer from the available information."
@@ -738,7 +738,7 @@ For more detailed information or specific questions, please ask follow-up questi
             from .rag import retrieve_snippets
             
             # Get more comprehensive snippets for better internal context
-            snippets = retrieve_snippets(user_message, top_k=5, filters={})
+            snippets = retrieve_snippets(user_message, top_k=15, filters={})
             
             if snippets:
                 snippet_text = "INTERNAL JOB DESCRIPTION CONTEXT (from vector database):\n"
