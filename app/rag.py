@@ -402,63 +402,9 @@ Act as a placement consultant who understands the entire landscape.
         f"QUESTION: {question}"
     )
 
-    # Use OpenRouter as the primary LLM source
-    if settings.OPENROUTER_API_KEY and OPENROUTER_AVAILABLE:
-        print(f"🟢 Attempting synthesis with OpenRouter model: moonshotai/kimi-k2")
-        try:
-            openrouter_model = "moonshotai/kimi-k2"
-            
-            payload = {
-                "model": openrouter_model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": final_prompt},
-                ],
-                "temperature": 0.0,
-                "max_tokens": 2048,  # Increased from 1024 for full JD requests
-            }
-
-            headers = {
-                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-            }
-
-            # Simple retry
-            for attempt in range(1, 3):
-                try:
-                    resp = requests.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
-                        headers=headers,
-                        json=payload,
-                        timeout=30,
-                    )
-                    if resp.status_code == 200:
-                        j = resp.json()
-                        choice = None
-                        if isinstance(j.get("choices"), list) and j["choices"]:
-                            choice = j["choices"][0]
-                        if choice:
-                            text = choice.get("message", {}).get("content") or choice.get("text")
-                            if text:
-                                print("✅ Successfully received answer from OpenRouter.")
-                                return text.strip()
-                        return "The model generated an empty response. Please try rephrasing your question."
-                    else:
-                        print(f"❌ OpenRouter API error (status {resp.status_code}): {resp.text}")
-                except requests.exceptions.Timeout:
-                    print(f"⏰ OpenRouter request timed out on attempt {attempt}")
-                except Exception as e:
-                    print(f"❌ OpenRouter request failed: {e}")
-            return "OpenRouter generation failed after retries."
-        except Exception as e:
-            print(f"❌ Error while calling OpenRouter: {e}")
-            import traceback
-            traceback.print_exc()
-            return f"Error calling OpenRouter: {e}"
-
-    # If OpenRouter failed, try Gemini as fallback
+    # Prefer Gemini (explicit user request) and fall back to OpenRouter
     if settings.GEMINI_API_KEY and GEMINI_AVAILABLE:
-        print(f"🟡 Attempting synthesis with Gemini model: {settings.GEMINI_MODEL or 'gemini-2.0-flash-exp'}")
+        print(f"🟢 Attempting synthesis with Gemini model: {settings.GEMINI_MODEL or 'gemini-2.0-flash-exp'}")
         try:
             # Configure Gemini
             genai.configure(api_key=settings.GEMINI_API_KEY)
@@ -509,7 +455,60 @@ Act as a placement consultant who understands the entire landscape.
             print(f"❌ Error while calling Gemini: {e}")
             import traceback
             traceback.print_exc()
-            return f"Error calling Gemini: {e}"
+            # Fall through to OpenRouter fallback
+
+    # OpenRouter fallback (only if Gemini missing or failed)
+    if settings.OPENROUTER_API_KEY and OPENROUTER_AVAILABLE:
+        print(f"🟡 Attempting synthesis with OpenRouter model: moonshotai/kimi-k2 (fallback)")
+        try:
+            openrouter_model = settings.OPENROUTER_MODEL or "moonshotai/kimi-k2"
+
+            payload = {
+                "model": openrouter_model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": final_prompt},
+                ],
+                "temperature": 0.0,
+                "max_tokens": 2048,
+            }
+
+            headers = {
+                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+            }
+
+            for attempt in range(1, 3):
+                try:
+                    resp = requests.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=30,
+                    )
+                    if resp.status_code == 200:
+                        j = resp.json()
+                        choice = None
+                        if isinstance(j.get("choices"), list) and j["choices"]:
+                            choice = j["choices"][0]
+                        if choice:
+                            text = choice.get("message", {}).get("content") or choice.get("text")
+                            if text:
+                                print("✅ Successfully received answer from OpenRouter (fallback).")
+                                return text.strip()
+                        return "The model generated an empty response. Please try rephrasing your question."
+                    else:
+                        print(f"❌ OpenRouter API error (status {resp.status_code}): {resp.text}")
+                except requests.exceptions.Timeout:
+                    print(f"⏰ OpenRouter request timed out on attempt {attempt}")
+                except Exception as e:
+                    print(f"❌ OpenRouter request failed: {e}")
+            return "OpenRouter generation failed after retries."
+        except Exception as e:
+            print(f"❌ Error while calling OpenRouter: {e}")
+            import traceback
+            traceback.print_exc()
+            return f"Error calling OpenRouter: {e}"
 
     # If we reach here, both OpenRouter and Gemini failed or were not configured.
     # Skip synthesis and return None so the API returns retrieved snippets only.

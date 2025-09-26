@@ -3,204 +3,6 @@
   "messages": [
     {
       "role": "assistant",
-      "content": "Based on the database, **6 companies** came for placements in the last year (2024-2025 batch).",
-      "timestamp": "2025-08-27T22:18:07.057455",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "what are the most sought after skills?",
-      "timestamp": "2025-08-27T22:22:29.643495",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "Based on the database analysis, here are the **most sought-after skills** by companies in the placement process:\n\n## Top 15 Most In-Demand Skills:\n\n1. **hands-on** (Technical) - Required by 2 companies, Priority: 1.0 (Highest)\n2. **ability** (Technical) - Required by 2 companies, Priority: 1.0 (Highest)\n3. **Strong analytical and problem-solving skills** (Technical) - Required by 2 companies, Priority: 1.0 (Highest)\n4. **CRM** (Technical) - Required by 2 companies, Priority: 1.0 (Highest)\n5. **marketing** (Technical) - Required by 2 companies, Priority: 2.0\n6. **admission** (Technical) - Required by 2 companies, Priority: 2.0\n7. **MS Office Suite** (Technical) - Required by 2 companies, Priority: 2.0\n8. **LinkedIn** (Technical) - Required by 2 companies, Priority: 2.0\n9. **media** (Technical) - Required by 2 companies, Priority: 3.0\n10. **market research** (Technical) - Required by 2 companies, Priority: 3.0\n11. **b2c** (Technical) - Required by 2 companies, Priority: 3.0\n12. **HRMS** (Technical) - Required by 2 companies, Priority: 3.0\n13. **operations** (Technical) - Required by 2 companies, Priority: 4.0\n14. **networking** (Technical) - Required by 2 companies, Priority: 4.0\n15. **business** (Technical) - Required by 2 companies, Priority: 4.0\n\n## Key Insights:\n- **Analytical and problem-solving skills** are among the most critical (highest priority)\n- **Technical skills** dominate the list, particularly in areas like CRM, marketing, and MS Office\n- **Digital skills** like LinkedIn and social media are highly valued\n- **Business operations** skills (operations, networking, business) are consistently required\n\nThese skills appear to be consistently requested across multiple companies, making them highly valuable for placement preparation.",
-      "timestamp": "2025-08-27T22:23:06.906466",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "hello",
-      "timestamp": "2025-08-27T22:33:02.679041",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "",
-      "timestamp": "2025-08-27T22:33:11.941023",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "test",
-      "timestamp": "2025-08-27T22:35:45.974991",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "",
-      "timestamp": "2025-08-27T22:35:55.471655",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies are there?",
-      "timestamp": "2025-08-27T22:36:19.996556",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "",
-      "timestamp": "2025-08-27T22:36:29.897337",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies are there?",
-      "timestamp": "2025-08-27T22:37:06.811715",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "There are **6 companies** in the database.",
-      "timestamp": "2025-08-27T22:37:29.211692",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies came last year?",
-      "timestamp": "2025-08-27T22:39:23.863174",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "{'input': 'How many companies came last year?', 'output': ''}",
-      "timestamp": "2025-08-27T22:39:36.252660",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "How many companies came last year?",
-      "timestamp": "2025-08-27T22:42:25.545371",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "I cannot answer this question with the available data.",
-      "timestamp": "2025-08-27T22:42:34.543160",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "test from curl",
-      "timestamp": "2025-08-27T22:44:11.444068",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "{'input': 'test from curl', 'output': ''}",
-      "timestamp": "2025-08-27T22:44:21.691439",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "What are most sought after skills?",
-      "timestamp": "2025-08-27T22:50:07.316952",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "{'input': 'What are most sought after skills?', 'output': ''}",
-      "timestamp": "2025-08-27T22:50:30.453313",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "What are most sought after skills?",
-      "timestamp": "2025-08-27T22:56:46.256603",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
-      "content": "Based on the database analysis, here are the **most sought-after skills** by employers:\n\n1. **Reporting** (2 occurrences)\n2. **Proficiency** (2 occurrences)\n3. **Partnership Development** (2 occurrences)\n4. **Operations** (2 occurrences)\n5. **Networking** (2 occurrences)\n6. **Media** (2 occurrences)\n7. **Marketing** (2 occurrences)\n8. **Market Research** (2 occurrences)\n9. **Leaders** (2 occurrences)\n10. **Lead Generation** (2 occurrences)\n\nThese skills appear most frequently across all job roles in the database, indicating they are in high demand by employers across various specializations and industries.",
-      "timestamp": "2025-08-27T22:57:04.935694",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "What are most sought after skills?",
-      "timestamp": "2025-08-27T23:02:00.326316",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
       "content": "{'input': 'What are most sought after skills?', 'output': ''}",
       "timestamp": "2025-08-27T23:02:14.596363",
       "metadata": {},
@@ -900,12 +702,210 @@
       "query_type": null,
       "specialization": null,
       "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "list down the total number of companies came for placements",
+      "timestamp": "2025-09-26T16:47:12.142105",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "12 companies came for placements.",
+      "timestamp": "2025-09-26T16:47:27.640307",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "how many companies came for placements?",
+      "timestamp": "2025-09-26T16:52:22.539778",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "12 companies came for placements",
+      "timestamp": "2025-09-26T16:52:39.751853",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "How many companies came for placements?",
+      "timestamp": "2025-09-26T16:56:08.327522",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "12 companies came for placements",
+      "timestamp": "2025-09-26T16:56:25.395209",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "how many companies came for placements?",
+      "timestamp": "2025-09-26T16:59:36.174962",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "12 companies came for placements.",
+      "timestamp": "2025-09-26T16:59:48.613202",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "how many companies came for placements?",
+      "timestamp": "2025-09-26T17:05:35.685276",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "12 companies came for placements",
+      "timestamp": "2025-09-26T17:05:51.908194",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "How many companies came for placements?",
+      "timestamp": "2025-09-26T17:08:54.425332",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "12 companies came for placements.",
+      "timestamp": "2025-09-26T17:09:07.414100",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "how many companies came for placements?",
+      "timestamp": "2025-09-26T17:14:42.395832",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "12 companies came for placements",
+      "timestamp": "2025-09-26T17:14:56.907656",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "give me list of companies that came for marketing",
+      "timestamp": "2025-09-26T17:32:29.142238",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "**5 companies came for marketing placements \u2014 they are: CompanyStoreio, Madison PR, TAP Academy, Tap Academy, Target**",
+      "timestamp": "2025-09-26T17:32:47.308168",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "give me JD of Madison PR and a strategic advise",
+      "timestamp": "2025-09-26T17:33:07.596486",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "\n**Structured Data:**\nNo Job Description (JD) for a **Strategy role at Madison PR** was found in the database.\n\nFor strategic advice, consider focusing on **brand positioning, media relations, digital PR, crisis management, and data-driven measurement**\u2014key areas for PR strategy roles.\n\n**Additional Context:**\nHere is the job description for Madison PR, along with strategic advice for MBA students:\n\n**Job Title:** Account Executive\n**Company:** Madison PR (Madison Specialist Communication Services Pvt. Ltd.)\n**Department:** Madison PR\n**Role Category:** Public Relations\n**Location:** Mumbai/Gurgaon/Bangalore\n**Fixed CTC:** Upto 5.5 LPA\n\n**Who They're Looking For:**\nDynamic and driven Account Executives with a keen interest in Consumer, Corporate, FMCG, Luxury, Retail, Lifestyle, Beauty, and Real Estate sectors.\n\n**Responsibilities:**\n*   Develop and execute powerful PR strategies that align with business objectives across various industries.\n*   Cultivate and maintain strong relationships with key media professionals, influencers, and industry thought leaders.\n*   Craft compelling press releases, media kits, and engaging content that grabs attention.\n*   Manage and respond to media inquiries while proactively fostering influencer relations.\n*   Organize and coordinate media events, press conferences, and product launches that create buzz.\n*   Stay ahead of industry trends and leverage emerging opportunities to enhance PR efforts.\n\n**Requirements/Skills:**\n*   A Post graduate degree in Public Relations, Communications, Marketing, or a related field.\n*   Previous internship experience in public relations, with a solid understanding of the media landscape.\n*   A natural flair for storytelling and a strong network of industry contacts.\n*   Exceptional written and verbal communication skills that make an impact.\n*   The ability to multitask, manage projects seamlessly.\n\n**Relevance for MBA Students:**\n\n*   **Marketing Specialization:** This role is highly relevant for MBA students specializing in Marketing, particularly those interested in brand management, communications, and public relations. The focus on crafting PR strategies, managing media relations, and creating engaging content aligns directly with marketing principles.\n*   **Strategy Specialization:** Students with a Strategy specialization can leverage their skills in developing and executing PR strategies that align with overall business objectives.\n*   **All Specializations:** Strong communication and relationship-building skills are valuable across all MBA specializations, making this role potentially beneficial for students looking to enhance these skills.\n\n**Strategic Advice for MBA Students:**\n\n1.  **Highlight Relevant Experience:** If you have prior internship experience in public relations or related fields, emphasize this on your resume and during interviews.\n2.  **Showcase Communication Skills:** Provide examples of your written and verbal communication skills, such as writing samples, presentations, or public speaking engagements.\n3.  **Network:** Building a network of industry contacts can be highly beneficial. Attend industry events, connect with professionals on LinkedIn, and seek out informational interviews.\n4.  **Stay Updated on Industry Trends:** Demonstrate your knowledge of current trends in public relations and the media landscape.\n5.  **Tailor Your Application:** Customize your application materials to highlight your interest and experience in the specific sectors that Madison PR focuses on (e.g., Consumer, Corporate, FMCG, Luxury, Retail, Lifestyle, Beauty, and Real Estate).\n",
+      "timestamp": "2025-09-26T17:34:01.658611",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "madisonlist /madiso",
+      "timestamp": "2025-09-26T17:39:58.755570",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "**\"1 company matches your search for 'Madison' or 'Madiso' \u2014 it is: Madison PR\"**",
+      "timestamp": "2025-09-26T17:40:17.773790",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "list down number of companies came for placement",
+      "timestamp": "2025-09-26T17:45:20.365175",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "**12 companies came for placements**",
+      "timestamp": "2025-09-26T17:45:36.210233",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
     }
   ],
   "current_context": {
     "last_query_type": "unstructured",
-    "last_company_query": "How many companies in total came for placements",
-    "company_query_timestamp": "2025-09-24 19:27:48.632283"
+    "last_company_query": "list down number of companies came for placement",
+    "company_query_timestamp": "2025-09-26 17:45:20.365175"
   },
-  "last_updated": "2025-09-24T19:28:06.066985"
+  "last_updated": "2025-09-26T17:45:36.212208"
 }

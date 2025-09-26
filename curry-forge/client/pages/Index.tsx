@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -14,88 +14,26 @@ const RagIcon = ({ isActive, className }: { isActive?: boolean; className?: stri
     className={className}
   >
     <g clipPath="url(#clip0_rag)">
-      <path
-        d="M5.50001 15.7143H1.57144C1.1375 15.7143 0.785721 16.0661 0.785721 16.5V20.4286C0.785721 20.8625 1.1375 21.2143 1.57144 21.2143H5.50001C5.93394 21.2143 6.28572 20.8625 6.28572 20.4286V16.5C6.28572 16.0661 5.93394 15.7143 5.50001 15.7143Z"
-        stroke={isActive ? "#191818" : "url(#paint0_linear_rag)"}
-        strokeWidth="1.57143"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M20.4286 15.7143H16.5C16.0661 15.7143 15.7143 16.0661 15.7143 16.5V20.4286C15.7143 20.8625 16.0661 21.2143 16.5 21.2143H20.4286C20.8625 21.2143 21.2143 20.8625 21.2143 20.4286V16.5C21.2143 16.0661 20.8625 15.7143 20.4286 15.7143Z"
-        stroke={isActive ? "#191818" : "url(#paint1_linear_rag)"}
-        strokeWidth="1.57143"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M13.3571 0.785706H8.64286C8.20892 0.785706 7.85715 1.13748 7.85715 1.57142V6.28571C7.85715 6.71964 8.20892 7.07142 8.64286 7.07142H13.3571C13.7911 7.07142 14.1429 6.71964 14.1429 6.28571V1.57142C14.1429 1.13748 13.7911 0.785706 13.3571 0.785706Z"
-        stroke={isActive ? "#191818" : "url(#paint2_linear_rag)"}
-        strokeWidth="1.57143"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M6.28572 18.8571H15.7143"
-        stroke={isActive ? "#191818" : "url(#paint3_linear_rag)"}
-        strokeWidth="1.57143"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M7.99857 6.74139L3.92857 15.7143"
-        stroke={isActive ? "#191818" : "url(#paint4_linear_rag)"}
-        strokeWidth="1.57143"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M14.0014 6.74139L18.0714 15.7143"
-        stroke={isActive ? "#191818" : "url(#paint5_linear_rag)"}
-        strokeWidth="1.57143"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M5.50001 15.7143H1.57144C1.1375 15.7143 0.785721 16.0661 0.785721 16.5V20.4286C0.785721 20.8625 1.1375 21.2143 1.57144 21.2143H5.50001C5.93394 21.2143 6.28572 20.8625 6.28572 20.4286V16.5C6.28572 16.0661 5.93394 15.7143 5.50001 15.7143Z" stroke={isActive ? '#191818' : 'url(#paint0_linear_rag)'} strokeWidth="1.57143" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M20.4286 15.7143H16.5C16.0661 15.7143 15.7143 16.0661 15.7143 16.5V20.4286C15.7143 20.8625 16.0661 21.2143 16.5 21.2143H20.4286C20.8625 21.2143 21.2143 20.8625 21.2143 20.4286V16.5C21.2143 16.0661 20.8625 15.7143 20.4286 15.7143Z" stroke={isActive ? '#191818' : 'url(#paint1_linear_rag)'} strokeWidth="1.57143" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M13.3571 0.785706H8.64286C8.20892 0.785706 7.85715 1.13748 7.85715 1.57142V6.28571C7.85715 6.71964 8.20892 7.07142 8.64286 7.07142H13.3571C13.7911 7.07142 14.1429 6.71964 14.1429 6.28571V1.57142C14.1429 1.13748 13.7911 0.785706 13.3571 0.785706Z" stroke={isActive ? '#191818' : 'url(#paint2_linear_rag)'} strokeWidth="1.57143" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6.28572 18.8571H15.7143" stroke={isActive ? '#191818' : 'url(#paint3_linear_rag)'} strokeWidth="1.57143" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7.99857 6.74139L3.92857 15.7143" stroke={isActive ? '#191818' : 'url(#paint4_linear_rag)'} strokeWidth="1.57143" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14.0014 6.74139L18.0714 15.7143" stroke={isActive ? '#191818' : 'url(#paint5_linear_rag)'} strokeWidth="1.57143" strokeLinecap="round" strokeLinejoin="round" />
     </g>
     <defs>
-      <linearGradient id="paint0_linear_rag" x1="3.53572" y1="15.7143" x2="3.53572" y2="21.2143" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#F68E51" />
-        <stop offset="0.677885" stopColor="#F68D51" />
-        <stop offset="1" stopColor="#F68D51" />
-      </linearGradient>
-      <linearGradient id="paint1_linear_rag" x1="18.4643" y1="15.7143" x2="18.4643" y2="21.2143" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#F68E51" />
-        <stop offset="0.677885" stopColor="#F68D51" />
-        <stop offset="1" stopColor="#F68D51" />
-      </linearGradient>
-      <linearGradient id="paint2_linear_rag" x1="11" y1="0.785706" x2="11" y2="7.07142" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#F68E51" />
-        <stop offset="0.677885" stopColor="#F68D51" />
-        <stop offset="1" stopColor="#F68D51" />
-      </linearGradient>
-      <linearGradient id="paint3_linear_rag" x1="11" y1="18.8571" x2="11" y2="19.8571" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#F68E51" />
-        <stop offset="0.677885" stopColor="#F68D51" />
-        <stop offset="1" stopColor="#F68D51" />
-      </linearGradient>
-      <linearGradient id="paint4_linear_rag" x1="5.96357" y1="6.74139" x2="5.96357" y2="15.7143" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#F68E51" />
-        <stop offset="0.677885" stopColor="#F68D51" />
-        <stop offset="1" stopColor="#F68D51" />
-      </linearGradient>
-      <linearGradient id="paint5_linear_rag" x1="16.0364" y1="6.74139" x2="16.0364" y2="15.7143" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#F68E51" />
-        <stop offset="0.677885" stopColor="#F68D51" />
-        <stop offset="1" stopColor="#F68D51" />
-      </linearGradient>
-      <clipPath id="clip0_rag">
-        <rect width="22" height="22" fill="white" />
-      </clipPath>
+      <linearGradient id="paint0_linear_rag" x1="3.53572" y1="15.7143" x2="3.53572" y2="21.2143" gradientUnits="userSpaceOnUse"><stop stopColor="#F68E51" /><stop offset="0.677885" stopColor="#F68D51" /><stop offset="1" stopColor="#F68D51" /></linearGradient>
+      <linearGradient id="paint1_linear_rag" x1="18.4643" y1="15.7143" x2="18.4643" y2="21.2143" gradientUnits="userSpaceOnUse"><stop stopColor="#F68E51" /><stop offset="0.677885" stopColor="#F68D51" /><stop offset="1" stopColor="#F68D51" /></linearGradient>
+      <linearGradient id="paint2_linear_rag" x1="11" y1="0.785706" x2="11" y2="7.07142" gradientUnits="userSpaceOnUse"><stop stopColor="#F68E51" /><stop offset="0.677885" stopColor="#F68D51" /><stop offset="1" stopColor="#F68D51" /></linearGradient>
+      <linearGradient id="paint3_linear_rag" x1="11" y1="18.8571" x2="11" y2="19.8571" gradientUnits="userSpaceOnUse"><stop stopColor="#F68E51" /><stop offset="0.677885" stopColor="#F68D51" /><stop offset="1" stopColor="#F68D51" /></linearGradient>
+      <linearGradient id="paint4_linear_rag" x1="5.96357" y1="6.74139" x2="5.96357" y2="15.7143" gradientUnits="userSpaceOnUse"><stop stopColor="#F68E51" /><stop offset="0.677885" stopColor="#F68D51" /><stop offset="1" stopColor="#F68D51" /></linearGradient>
+      <linearGradient id="paint5_linear_rag" x1="16.0364" y1="6.74139" x2="16.0364" y2="15.7143" gradientUnits="userSpaceOnUse"><stop stopColor="#F68E51" /><stop offset="0.677885" stopColor="#F68D51" /><stop offset="1" stopColor="#F68D51" /></linearGradient>
+      <clipPath id="clip0_rag"><rect width="22" height="22" fill="white" /></clipPath>
     </defs>
   </svg>
 );
 
-// Restored DeepResearchIcon (previously lost when gradients duplicated inside RagIcon)
+// Updated DeepResearchIcon: white by default, blue gradient only when active
 const DeepResearchIcon = ({ isActive, className }: { isActive?: boolean; className?: string }) => (
   <svg
     width="22"
@@ -105,46 +43,28 @@ const DeepResearchIcon = ({ isActive, className }: { isActive?: boolean; classNa
     xmlns="http://www.w3.org/2000/svg"
     className={className}
   >
-    <g clipPath="url(#clip0_deep)">
-      <path
-        d="M5.50001 15.7143H1.57144C1.1375 15.7143 0.785721 16.0661 0.785721 16.5V20.4286C0.785721 20.8625 1.1375 21.2143 1.57144 21.2143H5.50001C5.93394 21.2143 6.28572 20.8625 6.28572 20.4286V16.5C6.28572 16.0661 5.93394 15.7143 5.50001 15.7143Z"
-        stroke={isActive ? "#191818" : "url(#paint0_linear_deep)"}
-        strokeWidth="1.57143"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M20.4286 15.7143H16.5C16.0661 15.7143 15.7143 16.0661 15.7143 16.5V20.4286C15.7143 20.8625 16.0661 21.2143 16.5 21.2143H20.4286C20.8625 21.2143 21.2143 20.8625 21.2143 20.4286V16.5C21.2143 16.0661 20.8625 15.7143 20.4286 15.7143Z"
-        stroke={isActive ? "#191818" : "url(#paint1_linear_deep)"}
-        strokeWidth="1.57143"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M13.3571 0.785706H8.64286C8.20892 0.785706 7.85715 1.13748 7.85715 1.57142V6.28571C7.85715 6.71964 8.20892 7.07142 8.64286 7.07142H13.3571C13.7911 7.07142 14.1429 6.71964 14.1429 6.28571V1.57142C14.1429 1.13748 13.7911 0.785706 13.3571 0.785706Z"
-        stroke={isActive ? "#191818" : "url(#paint2_linear_deep)"}
-        strokeWidth="1.57143"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <g clipPath="url(#clip0_deep_new)">
+  <path d="M7.07142 20.4285C10.5429 20.4285 13.3571 17.6143 13.3571 14.1428C13.3571 10.6713 10.5429 7.85712 7.07142 7.85712C3.59992 7.85712 0.785706 10.6713 0.785706 14.1428C0.785706 17.6143 3.59992 20.4285 7.07142 20.4285Z" stroke={isActive ? 'url(#paint0_linear_deep_new)' : '#C1C1C1'} strokeWidth="1.57143" strokeLinecap="round" strokeLinejoin="round" />
+  <path d="M14.9285 20.4285C18.4 20.4285 21.2143 17.6143 21.2143 14.1428C21.2143 10.6713 18.4 7.85712 14.9285 7.85712C11.457 7.85712 8.64282 10.6713 8.64282 14.1428C8.64282 17.6143 11.457 20.4285 14.9285 20.4285Z" stroke={isActive ? 'url(#paint1_linear_deep_new)' : '#C1C1C1'} strokeWidth="1.57143" strokeLinecap="round" strokeLinejoin="round" />
+  <path d="M11 14.1428C14.4715 14.1428 17.2857 11.3286 17.2857 7.85713C17.2857 4.38562 14.4715 1.57141 11 1.57141C7.5285 1.57141 4.71429 4.38562 4.71429 7.85713C4.71429 11.3286 7.5285 14.1428 11 14.1428Z" stroke={isActive ? 'url(#paint2_linear_deep_new)' : '#C1C1C1'} strokeWidth="1.57143" strokeLinecap="round" strokeLinejoin="round" />
     </g>
     <defs>
-      <linearGradient id="paint0_linear_deep" x1="3.53572" y1="15.7143" x2="3.53572" y2="21.2143" gradientUnits="userSpaceOnUse">
+      <linearGradient id="paint0_linear_deep_new" x1="7.07142" y1="7.85712" x2="7.07142" y2="20.4285" gradientUnits="userSpaceOnUse">
         <stop stopColor="#7D94C5" />
         <stop offset="0.461538" stopColor="#8483C3" />
         <stop offset="1" stopColor="#4B649A" />
       </linearGradient>
-      <linearGradient id="paint1_linear_deep" x1="18.4643" y1="15.7143" x2="18.4643" y2="21.2143" gradientUnits="userSpaceOnUse">
+      <linearGradient id="paint1_linear_deep_new" x1="14.9285" y1="7.85712" x2="14.9285" y2="20.4285" gradientUnits="userSpaceOnUse">
         <stop stopColor="#7D94C5" />
         <stop offset="0.461538" stopColor="#8483C3" />
         <stop offset="1" stopColor="#4B649A" />
       </linearGradient>
-      <linearGradient id="paint2_linear_deep" x1="11" y1="0.785706" x2="11" y2="7.07142" gradientUnits="userSpaceOnUse">
+      <linearGradient id="paint2_linear_deep_new" x1="11" y1="1.57141" x2="11" y2="14.1428" gradientUnits="userSpaceOnUse">
         <stop stopColor="#7D94C5" />
         <stop offset="0.461538" stopColor="#8483C3" />
         <stop offset="1" stopColor="#4B649A" />
       </linearGradient>
-      <clipPath id="clip0_deep">
+      <clipPath id="clip0_deep_new">
         <rect width="22" height="22" fill="white" />
       </clipPath>
     </defs>
@@ -220,6 +140,23 @@ const SendArrowIcon = ({ mode, onClick, disabled }: { mode: AppMode; onClick?: (
   </svg>
 );
 
+const StopIcon = ({ onClick }: { onClick?: () => void }) => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 14 14"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    role="button"
+    aria-label="Stop generation"
+    onClick={() => onClick?.()}
+    className="cursor-pointer select-none"
+  >
+    <rect x="2.5" y="2.5" width="9" height="9" rx="1" stroke="#FFFFFF" strokeOpacity="0.85" />
+    <circle cx="7" cy="7" r="6.25" stroke="#FFFFFF" strokeOpacity="0.35" />
+  </svg>
+);
+
 const AttachmentIcon = ({ mode }: { mode: AppMode }) => (
   <svg 
     width="14" 
@@ -272,6 +209,30 @@ const ChatHistoryIcon = ({ mode }: { mode: AppMode }) => (
       <clipPath id="clip0_history">
         <rect width="21" height="21" fill="white"/>
       </clipPath>
+    </defs>
+  </svg>
+);
+
+// Icon used to prefix assistant answers (lightbulb / idea symbol)
+const AnswerIcon = ({ className }: { className?: string }) => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 14 14"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <g clipPath="url(#clip0_answer)" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.5 8.00001C10.5023 7.37594 10.3377 6.76259 10.0233 6.22351C9.70888 5.68443 9.25603 5.23922 8.71168 4.93402C8.16732 4.62881 7.55126 4.4747 6.92732 4.48766C6.30338 4.50062 5.69425 4.68018 5.16303 5.00772C4.63182 5.33527 4.19785 5.79889 3.90607 6.35057C3.6143 6.90224 3.47534 7.52189 3.50359 8.14533C3.53184 8.76877 3.72626 9.37331 4.06673 9.89634C4.4072 10.4194 4.88132 10.8418 5.43998 11.12V12.84C5.44258 12.9417 5.48482 13.0383 5.55768 13.1093C5.63054 13.1803 5.72825 13.22 5.82998 13.22H8.16998C8.2717 13.22 8.36941 13.1803 8.44227 13.1093C8.51513 13.0383 8.55737 12.9417 8.55998 12.84V11.09C9.13622 10.8032 9.62219 10.3629 9.96446 9.81779C10.3067 9.27264 10.492 8.64365 10.5 8.00001V8.00001Z" />
+      <path d="M7 0.809998V2.31" />
+      <path d="M10.9999 2.23999L9.93994 3.30999" />
+      <path d="M13.28 5.34H11.78" />
+      <path d="M3 2.23999L4.06 3.30999" />
+      <path d="M0.719971 5.34H2.21997" />
+    </g>
+    <defs>
+      <clipPath id="clip0_answer"><rect width="14" height="14" fill="white" /></clipPath>
     </defs>
   </svg>
 );
@@ -380,7 +341,7 @@ const WelcomeCardContent = () => (
   </div>
 );
 
-const ToolBox = ({ mode, onModeChange, onOpenWelcome }: { mode: AppMode; onModeChange: (mode: AppMode) => void; onOpenWelcome: () => void }) => {
+const ToolBox = ({ mode, onModeChange, onToggleRag }: { mode: AppMode; onModeChange: (mode: AppMode) => void; onToggleRag: () => void }) => {
   const getToolboxBg = () => {
     switch (mode) {
       case 'rag': return 'bg-rag-toolbox-dark';
@@ -421,9 +382,9 @@ const ToolBox = ({ mode, onModeChange, onOpenWelcome }: { mode: AppMode; onModeC
         <DeepResearchIcon isActive={mode === 'deep-research'} />
       </button>
 
-      {/* RAG Icon (CENTER) - opens/closes welcome modal */}
+      {/* RAG Icon (CENTER) - toggles rag mode (shows inline welcome if not dismissed) */}
       <button
-        onClick={() => onOpenWelcome()}
+        onClick={() => onToggleRag()}
         aria-label="RAG Welcome"
         className={cn(
           "w-10 h-8 rounded-md flex items-center justify-center shadow-sm transition-all duration-200 ml-1.5",
@@ -451,21 +412,106 @@ const ToolBox = ({ mode, onModeChange, onOpenWelcome }: { mode: AppMode; onModeC
 
 export default function Index() {
   const [mode, setMode] = useState<AppMode>('default');
-  const [showWelcome, setShowWelcome] = useState(false);
+  // showWelcome inline (no modal); fades away on first user interaction with input
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [welcomeFaded, setWelcomeFaded] = useState(false);
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [messages, setMessages] = useState<{ id: string; role: 'user' | 'assistant'; content: string; streaming?: boolean }[]>([]);
+  const convoRef = useRef<HTMLDivElement | null>(null);
+  const STORAGE_KEY = 'jd_chat_history_default';
+  const [showHistory, setShowHistory] = useState(false);
+  // Company slash palette state
+  const [companies, setCompanies] = useState<string[]>([]);
+  const [showCompanyPalette, setShowCompanyPalette] = useState(false);
+  const [companyQuery, setCompanyQuery] = useState("");
+  const paletteRef = useRef<HTMLDivElement | null>(null);
+  const currentFrameRef = useRef<number | null>(null);
+  const abortStreamingRef = useRef<{aborted:boolean}>({aborted:false});
 
-  // Open welcome modal: if already open, close -> return to default
-  const toggleWelcome = () => {
-    setShowWelcome((s) => {
-      const next = !s;
-      if (!next) {
-        setMode('default');
-      } else {
-        setMode('rag');
+  // Load persisted history
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setMessages(parsed);
       }
-      return next;
-    });
+    } catch {/* ignore */}
+  }, []);
+
+  // Persist on change
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); } catch {/* ignore */}
+  }, [messages]);
+
+  // Fetch companies once (used for slash palette)
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('http://localhost:8000/companies');
+        if (res.ok) {
+          const data = await res.json();
+          const names: string[] = (data.companies || []).map((c: any) => c.company_name).filter(Boolean);
+          setCompanies(names.sort((a,b) => a.localeCompare(b)));
+        }
+      } catch {/* ignore network errors silently */}
+    })();
+  }, []);
+
+  // Close palette on outside click
+  useEffect(() => {
+    if (!showCompanyPalette) return;
+    const handler = (e: MouseEvent) => {
+      if (paletteRef.current && !paletteRef.current.contains(e.target as Node)) {
+        setShowCompanyPalette(false);
+      }
+    };
+    window.addEventListener('mousedown', handler);
+    return () => window.removeEventListener('mousedown', handler);
+  }, [showCompanyPalette]);
+
+  // Auto scroll
+  useEffect(() => {
+    if (convoRef.current) {
+      convoRef.current.scrollTop = convoRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  // Typing indicator (Perplexity-style pulsing dots) component
+  const TypingIndicator = () => (
+    <div className="h-6 w-6 select-none" aria-label="Thinking">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="ti_orbit_white" x1="12" y1="0" x2="12" y2="24" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#FFFFFF" stopOpacity="0.9" />
+            <stop offset="1" stopColor="#FFFFFF" stopOpacity="0.2" />
+          </linearGradient>
+        </defs>
+        <circle cx="12" cy="12" r="9" stroke="#FFFFFF" strokeOpacity="0.22" strokeWidth="1.25" />
+        <circle cx="12" cy="12" r="9" stroke="url(#ti_orbit_white)" strokeWidth="1.5" strokeDasharray="40 22" strokeLinecap="round">
+          <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1.05s" repeatCount="indefinite" />
+        </circle>
+        <circle cx="12" cy="12" r="3.2" fill="#FFFFFF" fillOpacity="0.65">
+          <animate attributeName="r" values="3.2;4.2;3.2" dur="1.3s" repeatCount="indefinite" />
+          <animate attributeName="fill-opacity" values="0.65;1;0.65" dur="1.3s" repeatCount="indefinite" />
+        </circle>
+        <circle cx="20" cy="12" r="2" fill="#FFFFFF" fillOpacity="0.85">
+          <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1.05s" repeatCount="indefinite" />
+          <animate attributeName="fill-opacity" values="0.3;0.85;0.3" dur="1.05s" repeatCount="indefinite" />
+        </circle>
+      </svg>
+    </div>
+  );
+
+  // Toggle rag mode; when entering rag show welcome (unless dismissed)
+  const toggleRag = () => {
+    if (mode === 'rag') {
+      setMode('default');
+    } else {
+      setMode('rag');
+      if (!welcomeFaded) setShowWelcome(true);
+    }
   };
 
   // Unified mode change handler that also closes modal if switching away
@@ -475,37 +521,71 @@ export default function Index() {
     } else {
       setMode(nextMode);
     }
-    setShowWelcome(false);
+  // Leaving explicit mode hides welcome
+  if (nextMode !== 'rag') setShowWelcome(false);
   };
 
   const getBackgroundClass = () => {
     switch (mode) {
-      case 'rag': return 'bg-rag-orange/80';
+  case 'rag': return 'bg-[#F69F1C]/80'; // #F69F1C at 80% opacity
       case 'deep-research': return 'bg-rag-light/80';
       default: return 'bg-rag-dark';
     }
   };
 
-  // Send current message to backend (FastAPI demo endpoint)
+  // Send current message to backend real chat endpoint
   const sendMessage = async () => {
+    if (mode !== 'rag') return; // Only active in RAG mode
     const text = message.trim();
     if (!text || isSending) return;
     setIsSending(true);
+    const userEntry = { id: crypto.randomUUID(), role: 'user' as const, content: text };
+    setMessages((m) => [...m, userEntry]);
     try {
-      // Minimal integration; we don't render response yet to avoid new UI assets.
-      const res = await fetch(`http://localhost:8000/api/demo?question=${encodeURIComponent(text)}`);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const res = await fetch('http://localhost:8000/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: text, session_id: 'default' })
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
       const data = await res.json();
-      // Intentionally not displaying response (keeps UI unchanged) – could log if needed.
-      // console.log('Backend response:', data);
+      const answer: string = data.answer || '...';
+      const id = crypto.randomUUID();
+      // create streaming placeholder
+      abortStreamingRef.current.aborted = false;
+      setMessages((m) => [...m, { id, role: 'assistant', content: '', streaming: true }]);
+      const chars = Array.from(answer);
+      let idx = 0;
+      const step = () => {
+        if (abortStreamingRef.current.aborted) {
+          // finalize current content and stop
+          setMessages((m) => m.map(msg => msg.id === id ? { ...msg, streaming: false } : msg));
+          currentFrameRef.current = null;
+          setIsSending(false);
+          return;
+        }
+        idx = Math.min(idx + 1, chars.length);
+        const done = idx >= chars.length;
+        setMessages((m) => m.map(msg => msg.id === id ? { ...msg, content: chars.slice(0, idx).join(''), streaming: !done } : msg));
+        if (!done) {
+          currentFrameRef.current = requestAnimationFrame(step);
+        } else {
+          currentFrameRef.current = null;
+          setIsSending(false);
+        }
+      };
+      currentFrameRef.current = requestAnimationFrame(step);
     } catch (e) {
-      // Swallow errors silently to avoid UI additions.
-      // console.error('Send failed', e);
+      setMessages((m) => [...m, { id: crypto.randomUUID(), role: 'assistant', content: 'Error processing your request.' }]);
     } finally {
-      setIsSending(false);
       setMessage("");
     }
   };
+  // Removed explicit reset button per request; keeping helper for potential internal uses
+  const clearHistory = () => { setMessages([]); try { localStorage.removeItem(STORAGE_KEY); } catch {/* ignore */} };
+
 
   const handleKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -514,16 +594,91 @@ export default function Index() {
     }
   };
 
+  const handleInputEngagement = () => {
+    if (showWelcome) {
+      // trigger fade
+      setWelcomeFaded(true);
+      // remove after animation (500ms)
+      setTimeout(() => setShowWelcome(false), 500);
+    }
+  };
+
+  const handleInputChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const val = e.target.value;
+    setMessage(val);
+    handleInputEngagement();
+    const lastSlash = val.lastIndexOf('/');
+    if (lastSlash !== -1) {
+      const fragment = val.slice(lastSlash + 1).trim();
+      setCompanyQuery(fragment.toLowerCase());
+      setShowCompanyPalette(true);
+    } else {
+      if (showCompanyPalette) setShowCompanyPalette(false);
+    }
+  };
+
+  const filteredCompanies = showCompanyPalette ? companies.filter(c => {
+    if (!companyQuery) return true;
+    return c.toLowerCase().includes(companyQuery);
+  }).slice(0, 30) : [];
+
+  const insertCompany = (name: string) => {
+    const val = message;
+    const lastSlash = val.lastIndexOf('/');
+    if (lastSlash === -1) return;
+    const before = val.slice(0, lastSlash).trimEnd();
+    const newVal = (before ? before + ' ' : '') + name + ' ';
+    setMessage(newVal);
+    setShowCompanyPalette(false);
+  };
+
   return (
     <div className={cn(
       "min-h-screen flex flex-col items-center justify-between p-4 transition-all duration-500 relative overflow-hidden",
       getBackgroundClass()
     )}>
-      <div className="flex-1 flex items-center justify-center">
-        {mode === 'rag' && <WelcomeCardContent />}
+  <div ref={convoRef} className="flex-1 flex flex-col items-center relative w-full pt-6 overflow-y-auto">
+        {mode === 'rag' && showWelcome && (
+          <div
+            className={cn(
+              'transition-opacity duration-500 mb-6',
+              welcomeFaded ? 'opacity-0' : 'opacity-100'
+            )}
+          >
+            <WelcomeCardContent />
+          </div>
+        )}
+        {mode === 'rag' && (
+          <div className="w-full max-w-sm flex flex-col gap-2 pb-4">
+            {messages.map(m => (
+              <div
+                key={m.id}
+                className={cn(
+                  'font-hack text-[11px] leading-relaxed whitespace-pre-wrap rounded-[5px] px-3 py-1.5 transition-colors',
+                  m.role === 'user'
+                    ? 'text-rag-text-primary/85 bg-[#3f3f3f] border border-[#F69F1C]/15'
+                    : 'text-rag-text-primary/75 bg-[#3a3a3a] border border-[#F69F1C]/40 shadow-sm'
+                )}
+              >
+                {m.role === 'assistant' ? (
+                  <div className="flex items-start gap-2">
+                    <AnswerIcon className="mt-0.5 text-white/80" />
+                    <div className="flex-1">{m.content || (m.streaming ? '...' : '')}</div>
+                  </div>
+                ) : (
+                  m.content || (m.streaming ? '...' : '')
+                )}
+              </div>
+            ))}
+            {mode === 'rag' && isSending && !messages.some(m => m.streaming) && (
+              <div className="px-1 py-1">
+                <TypingIndicator />
+              </div>
+            )}
+          </div>
+        )}
       </div>
-
-      <div className="w-full max-w-sm space-y-4 flex flex-col items-center z-10">
+      <div className="w-full max-w-sm space-y-4 flex flex-col items-center z-10 flex-shrink-0">
         {/* Original ChatComponent before backend connection */}
         <div className={cn(
           'w-full max-w-sm h-20 rounded-md border shadow-sm flex flex-col justify-between p-3',
@@ -533,39 +688,83 @@ export default function Index() {
             aria-label="Message input"
             placeholder="Alright genius, spit out..."
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            disabled={isSending}
+            onFocus={handleInputEngagement}
+            onInput={handleInputEngagement}
+            disabled={isSending || mode !== 'rag'}
             className={cn(
-              'bg-transparent outline-none border-none p-0 m-0 font-hack text-xs w-full opacity-60',
-              mode === 'deep-research' ? 'text-rag-text-dark placeholder:text-rag-text-dark' : 'text-rag-text-primary placeholder:text-rag-text-primary'
+              'bg-transparent outline-none border-none p-0 m-0 font-hack text-xs w-full',
+              mode !== 'rag' ? 'opacity-30 cursor-not-allowed text-rag-text-primary/40 placeholder:text-rag-text-primary/30' : 'opacity-70 text-rag-text-primary placeholder:text-rag-text-primary'
             )}
           />
           <div className="flex items-center justify-between">
             <AttachmentIcon mode={mode} />
-            <SendArrowIcon mode={mode} onClick={sendMessage} disabled={!message.trim() || isSending} />
+            {messages.some(m => m.streaming) ? (
+              <StopIcon onClick={() => {
+                abortStreamingRef.current.aborted = true;
+                if (currentFrameRef.current) cancelAnimationFrame(currentFrameRef.current);
+              }} />
+            ) : (
+              <SendArrowIcon mode={mode} onClick={sendMessage} disabled={mode !== 'rag' || !message.trim() || isSending} />
+            )}
           </div>
+          {showCompanyPalette && mode === 'rag' && (
+            <div
+              ref={paletteRef}
+              className="absolute -top-[260px] left-1/2 -translate-x-1/2 w-full max-w-sm bg-rag-chat-dark border border-[#F69F1C]/30 rounded-md shadow-lg max-h-60 overflow-y-auto z-50"
+            >
+              <div className="px-3 py-1 border-b border-[#F69F1C]/20 flex items-center justify-between">
+                <span className="font-hack text-[10px] tracking-wide text-[#F69F1C]">Companies</span>
+                <span className="font-hack text-[9px] text-rag-text-primary/50">{filteredCompanies.length}</span>
+              </div>
+              <ul className="py-1">
+                {filteredCompanies.length === 0 && (
+                  <li className="px-3 py-1 font-hack text-[10px] text-rag-text-primary/40">No matches</li>
+                )}
+                {filteredCompanies.map(c => (
+                  <li
+                    key={c}
+                    onClick={() => insertCompany(c)}
+                    className="px-3 py-1 font-hack text-[11px] text-rag-text-primary/80 hover:bg-[#F69F1C]/10 cursor-pointer select-none"
+                  >{c}</li>
+                ))}
+              </ul>
+              <div className="px-3 py-1 border-t border-[#F69F1C]/15">
+                <span className="font-hack text-[9px] text-rag-text-primary/40">Type '/' then letters to filter • Enter to send</span>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex items-center justify-between w-full">
-          <ToolBox mode={mode} onModeChange={handleModeChange} onOpenWelcome={toggleWelcome} />
-          <ChatHistoryIcon mode={mode} />
+          <ToolBox mode={mode} onModeChange={handleModeChange} onToggleRag={toggleRag} />
+          <button onClick={() => mode === 'rag' && setShowHistory(true)} aria-label="Open chat history" className={cn('p-0 m-0 bg-transparent', mode !== 'rag' && 'opacity-40 cursor-not-allowed') }>
+            <ChatHistoryIcon mode={mode} />
+          </button>
         </div>
       </div>
-
-      {/* Modal overlay for Welcome to RAG (triggered by RAG center button) */}
-      {showWelcome && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-6">
-          <div 
-            className="absolute inset-0 bg-black/50" 
-            onClick={() => toggleWelcome()}
-            aria-hidden
-          />
-
-          <div className="relative mt-12 w-full max-w-md">
-            <div className="transform transition-all duration-300 scale-100">
-              <div className="bg-gray-700 rounded-xl p-6 shadow-2xl">
-                <WelcomeCardContent />
-              </div>
+      {showHistory && mode === 'rag' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowHistory(false)} aria-hidden />
+          <div className="relative w-full max-w-md h-[70vh] bg-rag-chat-dark border border-[#F69F1C]/30 rounded-md shadow-lg flex flex-col">
+            <div className="px-4 py-2 border-b border-[#F69F1C]/20 flex items-center justify-between">
+              <span className="font-hack text-[11px] tracking-wide text-[#F69F1C]">History</span>
+              <button onClick={() => setShowHistory(false)} className="font-hack text-[10px] text-rag-text-primary/60 hover:text-rag-text-primary/90">close</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {messages.length === 0 && (
+                <div className="font-hack text-xs text-rag-text-primary/40">No messages yet.</div>
+              )}
+              {messages.map(m => (
+                <div key={m.id} className={cn(
+                  'font-hack text-xs leading-relaxed whitespace-pre-wrap rounded-md px-2 py-1',
+                  m.role === 'assistant' ? 'border border-[#F69F1C]/35 text-rag-text-primary/70' : 'text-rag-text-primary/80'
+                )}>{m.content}</div>
+              ))}
+            </div>
+            <div className="px-4 py-2 border-t border-[#F69F1C]/20 flex items-center justify-end gap-4">
+              <button onClick={() => { clearHistory(); }} className="font-hack text-[10px] text-rag-text-primary/50 hover:text-rag-text-primary/80">clear</button>
+              <button onClick={() => setShowHistory(false)} className="font-hack text-[10px] text-rag-text-primary/60 hover:text-rag-text-primary/90">done</button>
             </div>
           </div>
         </div>
