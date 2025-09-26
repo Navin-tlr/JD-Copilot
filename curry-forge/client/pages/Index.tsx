@@ -681,7 +681,7 @@ export default function Index() {
       <div className="w-full max-w-sm space-y-4 flex flex-col items-center z-10 flex-shrink-0">
         {/* Original ChatComponent before backend connection */}
         <div className={cn(
-          'w-full max-w-sm h-20 rounded-md border shadow-sm flex flex-col justify-between p-3',
+          'w-full max-w-sm h-20 rounded-md border shadow-sm flex flex-col justify-between p-3 relative',
           mode === 'deep-research' ? 'bg-rag-chat-light border-gray-300' : 'bg-rag-chat-dark border-gray-500/25'
         )}>
           <input
@@ -702,8 +702,12 @@ export default function Index() {
             <AttachmentIcon mode={mode} />
             {messages.some(m => m.streaming) ? (
               <StopIcon onClick={() => {
+                // Abort streaming and finalize current assistant message
                 abortStreamingRef.current.aborted = true;
                 if (currentFrameRef.current) cancelAnimationFrame(currentFrameRef.current);
+                // Mark any streaming assistant message as complete
+                setMessages(m => m.map(msg => msg.streaming ? { ...msg, streaming: false, content: msg.content || '(stopped)' } : msg));
+                setIsSending(false);
               }} />
             ) : (
               <SendArrowIcon mode={mode} onClick={sendMessage} disabled={mode !== 'rag' || !message.trim() || isSending} />
@@ -712,7 +716,7 @@ export default function Index() {
           {showCompanyPalette && mode === 'rag' && (
             <div
               ref={paletteRef}
-              className="absolute -top-[260px] left-1/2 -translate-x-1/2 w-full max-w-sm bg-rag-chat-dark border border-[#F69F1C]/30 rounded-md shadow-lg max-h-60 overflow-y-auto z-50"
+              className="absolute bottom-full mb-2 left-0 w-full bg-rag-chat-dark border border-[#F69F1C]/30 rounded-md shadow-lg max-h-60 overflow-y-auto z-50"
             >
               <div className="px-3 py-1 border-b border-[#F69F1C]/20 flex items-center justify-between">
                 <span className="font-hack text-[10px] tracking-wide text-[#F69F1C]">Companies</span>
