@@ -14,9 +14,27 @@ export default {
     },
     extend: {
       fontFamily: {
-        hack: ["Fira Code", "Monaco", "Consolas", "monospace"],
+        'hack': ['Hack', 'Monaco', 'Consolas', 'monospace'],
       },
       colors: {
+        // RAG App Colors
+        'rag': {
+          'dark': '#313131',
+          'orange': '#F69F1C',
+          'light': '#E1E1E1',
+          'chat-dark': '#464646',
+          'chat-light': '#D2D2D2',
+          'toolbox-dark': '#393939',
+          'toolbox-light': '#D2D2D2',
+          'button-dark': '#4A4A4A',
+          'button-light': '#DDD',
+          'text-primary': '#FFF',
+          'text-secondary': '#BDB6B6',
+          'text-dark': '#3F3C3C',
+          'icon-gray': '#C1C1C1',
+          'icon-orange': '#F68D51',
+          'send-arrow': '#B5B5B5',
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -59,17 +77,6 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
-        },
-        chat: {
-          bg: "hsl(var(--chat-bg))",
-          text: "hsl(var(--chat-text))",
-          icon: "hsl(var(--chat-icon))",
-          send: "hsl(var(--chat-send))",
-        },
-        tool: {
-          bg: "hsl(var(--tool-bg))",
-          button: "hsl(var(--tool-button))",
-          icon: "hsl(var(--tool-icon))",
         },
       },
       borderRadius: {

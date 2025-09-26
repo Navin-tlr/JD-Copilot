@@ -1,86 +1,575 @@
-import { useState } from "react";
-import ChatComponent from "../components/ChatComponent";
-import ToolBox from "../components/ToolBox";
-import ChatHistoryArrow from "../components/ChatHistoryArrow";
-import RAGWelcome from "../components/RAGWelcome";
+import React, { useState } from 'react';
 
-type ActiveTool = "none" | "research" | "rag" | "whisper";
+import { cn } from '@/lib/utils';
+
+type AppMode = 'default' | 'rag' | 'deep-research';
+
+const RagIcon = ({ isActive, className }: { isActive?: boolean; className?: string }) => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 22 22"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <g clipPath="url(#clip0_rag)">
+      <path
+        d="M5.50001 15.7143H1.57144C1.1375 15.7143 0.785721 16.0661 0.785721 16.5V20.4286C0.785721 20.8625 1.1375 21.2143 1.57144 21.2143H5.50001C5.93394 21.2143 6.28572 20.8625 6.28572 20.4286V16.5C6.28572 16.0661 5.93394 15.7143 5.50001 15.7143Z"
+        stroke={isActive ? "#191818" : "url(#paint0_linear_rag)"}
+        strokeWidth="1.57143"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M20.4286 15.7143H16.5C16.0661 15.7143 15.7143 16.0661 15.7143 16.5V20.4286C15.7143 20.8625 16.0661 21.2143 16.5 21.2143H20.4286C20.8625 21.2143 21.2143 20.8625 21.2143 20.4286V16.5C21.2143 16.0661 20.8625 15.7143 20.4286 15.7143Z"
+        stroke={isActive ? "#191818" : "url(#paint1_linear_rag)"}
+        strokeWidth="1.57143"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M13.3571 0.785706H8.64286C8.20892 0.785706 7.85715 1.13748 7.85715 1.57142V6.28571C7.85715 6.71964 8.20892 7.07142 8.64286 7.07142H13.3571C13.7911 7.07142 14.1429 6.71964 14.1429 6.28571V1.57142C14.1429 1.13748 13.7911 0.785706 13.3571 0.785706Z"
+        stroke={isActive ? "#191818" : "url(#paint2_linear_rag)"}
+        strokeWidth="1.57143"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6.28572 18.8571H15.7143"
+        stroke={isActive ? "#191818" : "url(#paint3_linear_rag)"}
+        strokeWidth="1.57143"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7.99857 6.74139L3.92857 15.7143"
+        stroke={isActive ? "#191818" : "url(#paint4_linear_rag)"}
+        strokeWidth="1.57143"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M14.0014 6.74139L18.0714 15.7143"
+        stroke={isActive ? "#191818" : "url(#paint5_linear_rag)"}
+        strokeWidth="1.57143"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </g>
+    <defs>
+      <linearGradient id="paint0_linear_rag" x1="3.53572" y1="15.7143" x2="3.53572" y2="21.2143" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#F68E51" />
+        <stop offset="0.677885" stopColor="#F68D51" />
+        <stop offset="1" stopColor="#F68D51" />
+      </linearGradient>
+      <linearGradient id="paint1_linear_rag" x1="18.4643" y1="15.7143" x2="18.4643" y2="21.2143" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#F68E51" />
+        <stop offset="0.677885" stopColor="#F68D51" />
+        <stop offset="1" stopColor="#F68D51" />
+      </linearGradient>
+      <linearGradient id="paint2_linear_rag" x1="11" y1="0.785706" x2="11" y2="7.07142" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#F68E51" />
+        <stop offset="0.677885" stopColor="#F68D51" />
+        <stop offset="1" stopColor="#F68D51" />
+      </linearGradient>
+      <linearGradient id="paint3_linear_rag" x1="11" y1="18.8571" x2="11" y2="19.8571" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#F68E51" />
+        <stop offset="0.677885" stopColor="#F68D51" />
+        <stop offset="1" stopColor="#F68D51" />
+      </linearGradient>
+      <linearGradient id="paint4_linear_rag" x1="5.96357" y1="6.74139" x2="5.96357" y2="15.7143" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#F68E51" />
+        <stop offset="0.677885" stopColor="#F68D51" />
+        <stop offset="1" stopColor="#F68D51" />
+      </linearGradient>
+      <linearGradient id="paint5_linear_rag" x1="16.0364" y1="6.74139" x2="16.0364" y2="15.7143" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#F68E51" />
+        <stop offset="0.677885" stopColor="#F68D51" />
+        <stop offset="1" stopColor="#F68D51" />
+      </linearGradient>
+      <clipPath id="clip0_rag">
+        <rect width="22" height="22" fill="white" />
+      </clipPath>
+    </defs>
+  </svg>
+);
+
+// Restored DeepResearchIcon (previously lost when gradients duplicated inside RagIcon)
+const DeepResearchIcon = ({ isActive, className }: { isActive?: boolean; className?: string }) => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 22 22"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <g clipPath="url(#clip0_deep)">
+      <path
+        d="M5.50001 15.7143H1.57144C1.1375 15.7143 0.785721 16.0661 0.785721 16.5V20.4286C0.785721 20.8625 1.1375 21.2143 1.57144 21.2143H5.50001C5.93394 21.2143 6.28572 20.8625 6.28572 20.4286V16.5C6.28572 16.0661 5.93394 15.7143 5.50001 15.7143Z"
+        stroke={isActive ? "#191818" : "url(#paint0_linear_deep)"}
+        strokeWidth="1.57143"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M20.4286 15.7143H16.5C16.0661 15.7143 15.7143 16.0661 15.7143 16.5V20.4286C15.7143 20.8625 16.0661 21.2143 16.5 21.2143H20.4286C20.8625 21.2143 21.2143 20.8625 21.2143 20.4286V16.5C21.2143 16.0661 20.8625 15.7143 20.4286 15.7143Z"
+        stroke={isActive ? "#191818" : "url(#paint1_linear_deep)"}
+        strokeWidth="1.57143"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M13.3571 0.785706H8.64286C8.20892 0.785706 7.85715 1.13748 7.85715 1.57142V6.28571C7.85715 6.71964 8.20892 7.07142 8.64286 7.07142H13.3571C13.7911 7.07142 14.1429 6.71964 14.1429 6.28571V1.57142C14.1429 1.13748 13.7911 0.785706 13.3571 0.785706Z"
+        stroke={isActive ? "#191818" : "url(#paint2_linear_deep)"}
+        strokeWidth="1.57143"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </g>
+    <defs>
+      <linearGradient id="paint0_linear_deep" x1="3.53572" y1="15.7143" x2="3.53572" y2="21.2143" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#7D94C5" />
+        <stop offset="0.461538" stopColor="#8483C3" />
+        <stop offset="1" stopColor="#4B649A" />
+      </linearGradient>
+      <linearGradient id="paint1_linear_deep" x1="18.4643" y1="15.7143" x2="18.4643" y2="21.2143" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#7D94C5" />
+        <stop offset="0.461538" stopColor="#8483C3" />
+        <stop offset="1" stopColor="#4B649A" />
+      </linearGradient>
+      <linearGradient id="paint2_linear_deep" x1="11" y1="0.785706" x2="11" y2="7.07142" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#7D94C5" />
+        <stop offset="0.461538" stopColor="#8483C3" />
+        <stop offset="1" stopColor="#4B649A" />
+      </linearGradient>
+      <clipPath id="clip0_deep">
+        <rect width="22" height="22" fill="white" />
+      </clipPath>
+    </defs>
+  </svg>
+);
+
+const WhisperIcon = ({ className }: { className?: string }) => (
+  <svg 
+    width="22" 
+    height="22" 
+    viewBox="0 0 22 22" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <g clipPath="url(#clip0_whisper)">
+      <path 
+        d="M11 14.1429C12.9527 14.1429 14.5357 12.5599 14.5357 10.6072C14.5357 8.65447 12.9527 7.07147 11 7.07147C9.04729 7.07147 7.46429 8.65447 7.46429 10.6072C7.46429 12.5599 9.04729 14.1429 11 14.1429Z" 
+        stroke="#C1C1C1" 
+        strokeWidth="1.57143" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+      />
+      <path 
+        d="M17.2857 21.2144C16.6908 20.0601 15.7896 19.0919 14.6808 18.416C13.572 17.7401 12.2986 17.3825 11 17.3825C9.70146 17.3825 8.42798 17.7401 7.31921 18.416C6.21044 19.0919 5.30919 20.0601 4.71429 21.2144" 
+        stroke="#C1C1C1" 
+        strokeWidth="1.57143" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+      />
+      <path 
+        d="M18.8571 16.5943C19.9723 15.1398 20.6582 13.4023 20.8373 11.5782C21.0164 9.75422 20.6815 7.91648 19.8705 6.27286C19.0596 4.62924 17.8049 3.24533 16.2484 2.27764C14.6919 1.30996 12.8957 0.797119 11.0629 0.797119C9.23006 0.797119 7.43383 1.30996 5.87732 2.27764C4.32081 3.24533 3.06612 4.62924 2.25517 6.27286C1.44421 7.91648 1.10934 9.75422 1.28843 11.5782C1.46752 13.4023 2.15343 15.1398 3.26857 16.5943" 
+        stroke="#C1C1C1" 
+        strokeWidth="1.57143" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+      />
+    </g>
+    <defs>
+      <clipPath id="clip0_whisper">
+        <rect width="22" height="22" fill="white"/>
+      </clipPath>
+    </defs>
+  </svg>
+);
+
+const SendArrowIcon = ({ mode, onClick, disabled }: { mode: AppMode; onClick?: () => void; disabled?: boolean }) => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 14 14"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    onClick={() => !disabled && onClick?.()}
+    role="button"
+    aria-label="Send message"
+    className={cn(disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer select-none')}
+  >
+    <path
+      d="M6 4L9 7L6 10"
+      stroke={mode === 'deep-research' ? '#3D3A3A' : '#B5B5B5'}
+      strokeOpacity="0.87"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M7 13.5C10.5899 13.5 13.5 10.5899 13.5 7C13.5 3.41015 10.5899 0.5 7 0.5C3.41015 0.5 0.5 3.41015 0.5 7C0.5 10.5899 3.41015 13.5 7 13.5Z"
+      stroke={mode === 'deep-research' ? '#3D3A3A' : '#B5B5B5'}
+      strokeOpacity="0.87"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const AttachmentIcon = ({ mode }: { mode: AppMode }) => (
+  <svg 
+    width="14" 
+    height="14" 
+    viewBox="0 0 14 14" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path 
+      d="M10.75 11.5V3C10.75 2.33696 10.4866 1.70107 10.0178 1.23223C9.54893 0.763392 8.91304 0.5 8.25 0.5H5.75C5.08696 0.5 4.45107 0.763392 3.98223 1.23223C3.51339 1.70107 3.25 2.33696 3.25 3V11.5C3.25 12.0304 3.46071 12.5391 3.83579 12.9142C4.21086 13.2893 4.71957 13.5 5.25 13.5H6.25C6.78043 13.5 7.28914 13.2893 7.66421 12.9142C8.03929 12.5391 8.25 12.0304 8.25 11.5V4C8.25 3.73478 8.14464 3.48043 7.95711 3.29289C7.76957 3.10536 7.51522 3 7.25 3H6.75C6.48478 3 6.23043 3.10536 6.04289 3.29289C5.85536 3.48043 5.75 3.73478 5.75 4V9.5" 
+      stroke={mode === 'deep-research' ? "#494747" : "#A9A9A9"} 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const ChatHistoryIcon = ({ mode }: { mode: AppMode }) => (
+  <svg 
+    width="21" 
+    height="21" 
+    viewBox="0 0 21 21" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <g clipPath="url(#clip0_history)">
+      <path 
+        d="M0.75 9V2.25C0.75 1.85218 0.908035 1.47064 1.18934 1.18934C1.47064 0.908035 1.85218 0.75 2.25 0.75H18.75C19.1478 0.75 19.5294 0.908035 19.8107 1.18934C20.092 1.47064 20.25 1.85218 20.25 2.25V18.75C20.25 19.1478 20.092 19.5294 19.8107 19.8107C19.5294 20.092 19.1478 20.25 18.75 20.25H12" 
+        stroke={mode === 'deep-research' ? "#525151" : mode === 'rag' ? "#464646" : "#C1C1C1"} 
+        strokeWidth="1.5" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+      />
+      <path 
+        d="M6 20.25H0.75V15" 
+        stroke={mode === 'deep-research' ? "#525151" : mode === 'rag' ? "#464646" : "#C1C1C1"} 
+        strokeWidth="1.5" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+      />
+      <path 
+        d="M0.75 20.25L10.5 10.5" 
+        stroke={mode === 'deep-research' ? "#525151" : mode === 'rag' ? "#464646" : "#C1C1C1"} 
+        strokeWidth="1.5" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+      />
+    </g>
+    <defs>
+      <clipPath id="clip0_history">
+        <rect width="21" height="21" fill="white"/>
+      </clipPath>
+    </defs>
+  </svg>
+);
+
+
+// Exact Figma welcome card recreation
+const WelcomeCardContent = () => (
+  <div className="w-full max-w-sm flex justify-center">
+    <svg
+      width="308"
+      height="149"
+      viewBox="0 0 334 163"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="flex-shrink-0"
+    >
+      <g filter="url(#filter0_d_welcome)">
+        <rect x="13" y="20" width="308" height="129" rx="6" fill="#424242"/>
+      </g>
+      <path
+        d="M55.4586 17.0468C61.2888 14.2312 67.0447 12.6872 71.6338 12.4617C73.9287 12.3489 75.9249 12.5661 77.4903 13.1135C79.0546 13.6606 80.179 14.5334 80.755 15.7261C81.3309 16.9188 81.315 18.3416 80.7709 19.9067C80.2264 21.473 79.1553 23.1716 77.6401 24.8988C74.6101 28.3528 69.822 31.9007 63.9918 34.7163C58.1616 37.5319 52.4058 39.076 47.8166 39.3015C45.5218 39.4143 43.5255 39.1971 41.9602 38.6497C40.3961 38.1027 39.2718 37.2304 38.6958 36.0379C38.1198 34.8452 38.1353 33.4218 38.6795 31.8565C39.224 30.2902 40.2951 28.5916 41.8103 26.8644C44.8403 23.4104 49.6284 19.8624 55.4586 17.0468Z"
+        fill="#51DA7F"
+        stroke="black"
+        strokeWidth="0.293442"
+      />
+      <circle
+        cx="60.7438"
+        cy="25.2427"
+        r="8.88153"
+        transform="rotate(-25.7774 60.7438 25.2427)"
+        fill="#F8CEEE"
+        stroke="black"
+        strokeWidth="0.293442"
+      />
+      <circle
+        cx="61.5183"
+        cy="20.7399"
+        r="2.65537"
+        transform="rotate(-25.7774 61.5183 20.7399)"
+        fill="black"
+      />
+      <path
+        d="M38.6311 35.9211C36.7111 33.1553 33.9795 25.9259 38.4128 19.1353C43.9545 10.647 64.6378 6.65202 61.6559 18.2631"
+        stroke="black"
+        strokeWidth="0.293442"
+      />
+      <text
+        fill="#BDB6B6"
+        xmlSpace="preserve"
+        style={{ whiteSpace: 'pre' }}
+        fontFamily="Hack"
+        fontSize="11"
+        fontWeight="bold"
+      >
+        <tspan x="35" y="62.8081">Welcome to RAG. </tspan>
+      </text>
+      <text
+        fill="#BDB6B6"
+        xmlSpace="preserve"
+        style={{ whiteSpace: 'pre' }}
+        fontFamily="Hack"
+        fontSize="11"
+      >
+        <tspan x="35" y="94.8081">It digs through job descriptions so </tspan>
+        <tspan x="35" y="110.808">you don't have to. Ask a sharp question, </tspan>
+        <tspan x="35" y="126.808">or don't bother</tspan>
+      </text>
+      <defs>
+        <filter
+          id="filter0_d_welcome"
+          x="0"
+          y="8"
+          width="334"
+          height="155"
+          filterUnits="userSpaceOnUse"
+          colorInterpolationFilters="sRGB"
+        >
+          <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+          <feColorMatrix
+            in="SourceAlpha"
+            type="matrix"
+            values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+            result="hardAlpha"
+          />
+          <feOffset dy="1"/>
+          <feGaussianBlur stdDeviation="6.5"/>
+          <feComposite in2="hardAlpha" operator="out"/>
+          <feColorMatrix
+            type="matrix"
+            values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"
+          />
+          <feBlend
+            mode="normal"
+            in2="BackgroundImageFix"
+            result="effect1_dropShadow_welcome"
+          />
+          <feBlend
+            mode="normal"
+            in="SourceGraphic"
+            in2="effect1_dropShadow_welcome"
+            result="shape"
+          />
+        </filter>
+      </defs>
+    </svg>
+  </div>
+);
+
+const ToolBox = ({ mode, onModeChange, onOpenWelcome }: { mode: AppMode; onModeChange: (mode: AppMode) => void; onOpenWelcome: () => void }) => {
+  const getToolboxBg = () => {
+    switch (mode) {
+      case 'rag': return 'bg-rag-toolbox-dark';
+      case 'deep-research': return 'bg-rag-toolbox-light';
+      default: return 'bg-rag-toolbox-dark';
+    }
+  };
+
+  const getButtonBg = (buttonMode: AppMode | 'welcome') => {
+    const isActive = (buttonMode === 'welcome') ? false : mode === buttonMode;
+    if (mode === 'rag') {
+      if (isActive) return 'bg-gradient-to-b from-orange-400/80 via-orange-400/80 to-orange-400/80';
+      return 'bg-rag-button-dark';
+    }
+    if (mode === 'deep-research') {
+      return isActive ? 'bg-rag-button-light' : 'bg-rag-button-light';
+    }
+    return 'bg-rag-button-dark';
+  };
+
+  return (
+    <div className={cn(
+      "w-40 h-10 rounded-md shadow-sm flex items-center p-1",
+      getToolboxBg()
+    )}>
+      {/* Deep Research (LEFT) - toggles light mode */}
+      <button
+        onClick={() => {
+          if (mode === 'deep-research') onModeChange('default');
+          else onModeChange('deep-research');
+        }}
+        aria-label="Deep Research"
+        className={cn(
+          "w-10 h-8 rounded-md flex items-center justify-center shadow-sm transition-all duration-200",
+          getButtonBg('deep-research')
+        )}
+      >
+        <DeepResearchIcon isActive={mode === 'deep-research'} />
+      </button>
+
+      {/* RAG Icon (CENTER) - opens/closes welcome modal */}
+      <button
+        onClick={() => onOpenWelcome()}
+        aria-label="RAG Welcome"
+        className={cn(
+          "w-10 h-8 rounded-md flex items-center justify-center shadow-sm transition-all duration-200 ml-1.5",
+          getButtonBg('rag')
+        )}
+      >
+        <RagIcon isActive={mode === 'rag'} />
+      </button>
+
+      {/* Whisper / Default (RIGHT) - returns to default */}
+      <button
+        onClick={() => onModeChange('default')}
+        aria-label="Whisper"
+        className={cn(
+          "w-10 h-8 rounded-md flex items-center justify-center shadow-sm transition-all duration-200 ml-1.5",
+          getButtonBg('default')
+        )}
+      >
+        <WhisperIcon />
+      </button>
+    </div>
+  );
+};
+// ...existing code...
 
 export default function Index() {
-  const [activeTool, setActiveTool] = useState<ActiveTool>("none");
+  const [mode, setMode] = useState<AppMode>('default');
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [message, setMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
 
-  // Determine background color based on active tool
-  const getBackgroundColor = () => {
-    switch (activeTool) {
-      case "rag":
-        return "bg-[#F69F1C]/80"; // Orange background from Figma
-      default:
-        return "bg-background"; // Default dark background
+  // Open welcome modal: if already open, close -> return to default
+  const toggleWelcome = () => {
+    setShowWelcome((s) => {
+      const next = !s;
+      if (!next) {
+        setMode('default');
+      } else {
+        setMode('rag');
+      }
+      return next;
+    });
+  };
+
+  // Unified mode change handler that also closes modal if switching away
+  const handleModeChange = (nextMode: AppMode) => {
+    if (mode === nextMode) {
+      setMode('default');
+    } else {
+      setMode(nextMode);
+    }
+    setShowWelcome(false);
+  };
+
+  const getBackgroundClass = () => {
+    switch (mode) {
+      case 'rag': return 'bg-rag-orange/80';
+      case 'deep-research': return 'bg-rag-light/80';
+      default: return 'bg-rag-dark';
+    }
+  };
+
+  // Send current message to backend (FastAPI demo endpoint)
+  const sendMessage = async () => {
+    const text = message.trim();
+    if (!text || isSending) return;
+    setIsSending(true);
+    try {
+      // Minimal integration; we don't render response yet to avoid new UI assets.
+      const res = await fetch(`http://localhost:8000/api/demo?question=${encodeURIComponent(text)}`);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const data = await res.json();
+      // Intentionally not displaying response (keeps UI unchanged) – could log if needed.
+      // console.log('Backend response:', data);
+    } catch (e) {
+      // Swallow errors silently to avoid UI additions.
+      // console.error('Send failed', e);
+    } finally {
+      setIsSending(false);
+      setMessage("");
+    }
+  };
+
+  const handleKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
     }
   };
 
   return (
-    <div className={`min-h-screen overflow-hidden transition-colors duration-500 ${getBackgroundColor()}`}>
-      {/* Main container with mobile-first design */}
-      <div className={`relative w-full h-screen max-w-[390px] mx-auto transition-colors duration-500 ${getBackgroundColor()}`}>
-        {/* Main content area - flex to push chat components to bottom */}
-        <div className="flex flex-col h-full justify-end pb-[39px]">
-          {/* RAG Welcome message - only show when RAG tool is active */}
-          {activeTool === "rag" && (
-            <div className="px-[39px] mb-8 animate-in slide-in-from-top-4 duration-500">
-              <RAGWelcome />
-            </div>
-          )}
+    <div className={cn(
+      "min-h-screen flex flex-col items-center justify-between p-4 transition-all duration-500 relative overflow-hidden",
+      getBackgroundClass()
+    )}>
+      <div className="flex-1 flex items-center justify-center">
+        {mode === 'rag' && <WelcomeCardContent />}
+      </div>
 
-          {/* Chat component positioned from bottom */}
-          <div className="px-[39px] mb-[12px]">
-            <ChatComponent />
+      <div className="w-full max-w-sm space-y-4 flex flex-col items-center z-10">
+        {/* Original ChatComponent before backend connection */}
+        <div className={cn(
+          'w-full max-w-sm h-20 rounded-md border shadow-sm flex flex-col justify-between p-3',
+          mode === 'deep-research' ? 'bg-rag-chat-light border-gray-300' : 'bg-rag-chat-dark border-gray-500/25'
+        )}>
+          <input
+            aria-label="Message input"
+            placeholder="Alright genius, spit out..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isSending}
+            className={cn(
+              'bg-transparent outline-none border-none p-0 m-0 font-hack text-xs w-full opacity-60',
+              mode === 'deep-research' ? 'text-rag-text-dark placeholder:text-rag-text-dark' : 'text-rag-text-primary placeholder:text-rag-text-primary'
+            )}
+          />
+          <div className="flex items-center justify-between">
+            <AttachmentIcon mode={mode} />
+            <SendArrowIcon mode={mode} onClick={sendMessage} disabled={!message.trim() || isSending} />
           </div>
-
-          {/* Bottom row with toolbox and history arrow */}
-          <div className="flex items-center justify-between px-[39px]">
-            {/* Tool box centered */}
-            <div className="flex-1 flex justify-center">
-              <ToolBox activeTool={activeTool} onToolChange={setActiveTool} />
-            </div>
-
-            {/* Chat history arrow positioned to the right */}
-            <div className="ml-[43px]">
-              <ChatHistoryArrow isOrangeTheme={activeTool === "rag"} />
-            </div>
-          </div>
+        </div>
+        <div className="flex items-center justify-between w-full">
+          <ToolBox mode={mode} onModeChange={handleModeChange} onOpenWelcome={toggleWelcome} />
+          <ChatHistoryIcon mode={mode} />
         </div>
       </div>
 
-      {/* Responsive layout for larger screens */}
-      <div className={`hidden sm:block fixed inset-0 transition-colors duration-500 ${getBackgroundColor()}`}>
-        <div className="flex items-center justify-center h-full">
-          <div className={`relative w-[390px] h-[844px] rounded-lg shadow-2xl overflow-hidden transition-colors duration-500 ${getBackgroundColor()}`}>
-            {/* Mobile design preview for larger screens */}
-            <div className="flex flex-col h-full justify-end pb-[39px]">
-              {/* RAG Welcome message for desktop */}
-              {activeTool === "rag" && (
-                <div className="px-[39px] mb-8 animate-in slide-in-from-top-4 duration-500">
-                  <RAGWelcome />
-                </div>
-              )}
+      {/* Modal overlay for Welcome to RAG (triggered by RAG center button) */}
+      {showWelcome && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-6">
+          <div 
+            className="absolute inset-0 bg-black/50" 
+            onClick={() => toggleWelcome()}
+            aria-hidden
+          />
 
-              <div className="px-[39px] mb-[12px]">
-                <ChatComponent />
-              </div>
-
-              <div className="flex items-center justify-between px-[39px]">
-                <div className="flex-1 flex justify-center">
-                  <ToolBox activeTool={activeTool} onToolChange={setActiveTool} />
-                </div>
-                <div className="ml-[43px]">
-                  <ChatHistoryArrow isOrangeTheme={activeTool === "rag"} />
-                </div>
+          <div className="relative mt-12 w-full max-w-md">
+            <div className="transform transition-all duration-300 scale-100">
+              <div className="bg-gray-700 rounded-xl p-6 shadow-2xl">
+                <WelcomeCardContent />
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

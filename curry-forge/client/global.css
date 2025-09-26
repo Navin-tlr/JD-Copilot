@@ -13,56 +13,51 @@
    * A different format will require also updating the theme in tailwind.config.ts.
   */
   :root {
-    /* Dark theme based on Figma design */
-    --background: 0 0% 19.2%; /* #313131 */
-    --foreground: 0 0% 100%; /* #FFFFFF */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
 
-    --card: 0 0% 27.5%; /* #464646 */
-    --card-foreground: 0 0% 100%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
 
-    --popover: 0 0% 27.5%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 0 0% 27.5%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 0 0% 22.4%; /* #393939 */
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 0 0% 29.2%; /* #4A4A4A */
-    --muted-foreground: 0 0% 71%; /* #B5B5B5 */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 22 81% 63%; /* #F68E51 orange from gradient */
-    --accent-foreground: 0 0% 100%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 0 0% 78% / 0.25; /* rgba(200, 200, 200, 0.25) */
-    --input: 0 0% 27.5%;
-    --ring: 0 0% 75.7%; /* #C1C1C1 */
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
 
-    --radius: 0.3125rem; /* 5px */
+    --radius: 0.5rem;
 
-    /* Chat specific colors */
-    --chat-bg: 0 0% 27.5%; /* #464646 */
-    --chat-text: 0 0% 100% / 0.6; /* rgba(255,255,255,0.6) */
-    --chat-icon: 0 0% 66.3%; /* #A9A9A9 */
-    --chat-send: 0 0% 71%; /* #B5B5B5 */
+    --sidebar-background: 0 0% 98%;
 
-    /* Tool specific colors */
-    --tool-bg: 0 0% 22.4%; /* #393939 */
-    --tool-button: 0 0% 29.2%; /* #4A4A4A */
-    --tool-icon: 0 0% 75.7%; /* #C1C1C1 */
+    --sidebar-foreground: 240 5.3% 26.1%;
 
-    --sidebar-background: 0 0% 22.4%;
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 22 81% 63%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 29.2%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 0 0% 78% / 0.25;
-    --sidebar-ring: 0 0% 75.7%;
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
