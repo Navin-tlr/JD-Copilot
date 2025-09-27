@@ -46,6 +46,7 @@ class PlacementDatabase:
                     specialization TEXT NOT NULL,
                     location TEXT,
                     role_description TEXT,
+                    role_types TEXT, -- JSON array of specialization-aware role type tags
                     source_chunk_id TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (company_id) REFERENCES companies (id)
@@ -129,6 +130,9 @@ class PlacementDatabase:
                 if "source_chunk_id" not in cols:
                     cursor.execute("ALTER TABLE roles ADD COLUMN source_chunk_id TEXT")
                     logging.info("Migrated DB: added roles.source_chunk_id column")
+                if "role_types" not in cols:
+                    cursor.execute("ALTER TABLE roles ADD COLUMN role_types TEXT")
+                    logging.info("Migrated DB: added roles.role_types column")
                     conn.commit()
             except Exception:
                 # If ALTER TABLE fails for any reason, continue; insert_company_extraction will still try to insert
@@ -182,16 +186,19 @@ class PlacementDatabase:
                 roles = extraction_data.get("roles", [])
                 for role_data in roles:
                     # Insert role with specialization
+                    role_types = role_data.get("role_types")  # expected list already
+                    role_types_json = json.dumps(role_types) if isinstance(role_types, list) else None
                     cursor.execute("""
-                        INSERT INTO roles (company_id, title, specialization, location, role_description, source_chunk_id)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        INSERT INTO roles (company_id, title, specialization, location, role_description, role_types, source_chunk_id)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        company_id, 
-                        role_data.get("title", ""), 
+                        company_id,
+                        role_data.get("title", ""),
                         role_data.get("specialization", "General"),
                         role_data.get("location"),
                         role_data.get("role_description", ""),
-                        source_chunk_id
+                        role_types_json,
+                        source_chunk_id,
                     ))
                     
                     role_id = cursor.lastrowid

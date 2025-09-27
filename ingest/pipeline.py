@@ -20,8 +20,46 @@ from app.database import PlacementDatabase
 from app.utils import stable_chunk_id
 from ingest.company_extractor import extract_company
 from ingest.structured_extractor import StructuredExtractor
+from app.role_type_classifier import classify_role_types as classify_role_types_rule
+from app.llm_role_type_classifier import classify_role_types_llm
 from ingest.metadata_normalize import canonicalize_company
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+
+def _load_repo_dotenv(dotenv_path: str | Path = None) -> None:
+    """Load a simple .env file into os.environ if variables are not already set.
+
+    - Does not overwrite existing environment variables.
+    - Supports KEY=VALUE with optional quoted values. Ignores comments and blank lines.
+    """
+    try:
+        if dotenv_path is None:
+            dotenv_path = Path(".env")
+        if isinstance(dotenv_path, str):
+            dotenv_path = Path(dotenv_path)
+        if not dotenv_path.exists():
+            return
+        for raw in dotenv_path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k = k.strip()
+            v = v.strip()
+            # strip surrounding quotes
+            if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+                v = v[1:-1]
+            if k and os.getenv(k) is None:
+                os.environ[k] = v
+    except Exception:
+        # Best-effort only
+        pass
+
+
+# Auto-load repository .env so CLI runs pick up keys without manual export
+_load_repo_dotenv()
 
 
 def normalize_company_name(name: str) -> str:
@@ -246,6 +284,40 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
                 # Read back the saved JSON and insert
                 with open(json_path, 'r', encoding='utf-8') as jf:
                     extraction_dict = json.load(jf)
+                # Augment roles with role_types (multi-label) before DB insert
+                # LLM multi-role batch classification (primary)
+                try:
+                    llm_map = classify_role_types_llm(extraction_dict.get("roles", []), text)
+                except Exception as e:
+                    print(f"⚠️ LLM role type batch classification failed: {e}")
+                    llm_map = {}
+
+                for role_obj in extraction_dict.get("roles", []):
+                    title = role_obj.get("title", "")
+                    specialization = role_obj.get("specialization", "")
+                    # Collect description material
+                    desc_parts = []
+                    for k in ("role_description", "responsibilities", "requirements"):
+                        v = role_obj.get(k)
+                        if isinstance(v, list):
+                            desc_parts.extend(v)
+                        elif isinstance(v, str):
+                            desc_parts.append(v)
+                    description = "\n".join(desc_parts)
+
+                    role_types = llm_map.get(title)
+                    source = "llm"
+                    if not role_types:
+                        # Fallback to deterministic rule-based
+                        classifications = classify_role_types_rule(title, specialization, description)
+                        role_types = [c["classification"] for c in classifications]
+                        source = "rules" if role_types else None
+                        if role_types:
+                            role_obj.setdefault("_role_type_debug", classifications)
+                    if role_types:
+                        role_obj["role_types"] = role_types
+                        if source:
+                            role_obj.setdefault("_role_type_source", source)
                 success = db.insert_company_extraction(extraction_dict)
                 if success:
                     print(f"🗄️ Inserted structured extraction into DB: {extraction.company_name}")
