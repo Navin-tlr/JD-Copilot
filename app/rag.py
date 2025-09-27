@@ -405,7 +405,7 @@ Act as a placement consultant who understands the entire landscape.
     if settings.OPENROUTER_API_KEY and OPENROUTER_AVAILABLE:
         print(f"🟡 Attempting synthesis with OpenRouter model: moonshotai/kimi-k2 (fallback)")
         try:
-            openrouter_model = settings.OPENROUTER_MODEL or "moonshotai/kimi-k2"
+            openrouter_model = settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free"
             payload = {
                 "model": openrouter_model,
                 "messages": [
@@ -511,7 +511,7 @@ def _llm_generate_sql(question: str, schema: str) -> str | None:
     if settings.OPENROUTER_API_KEY and OPENROUTER_AVAILABLE:
         try:
             payload = {
-                "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2",
+                "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free",
                 "messages": [
                     {"role": "system", "content": "You output only the SQL query or the fixed error sentence. No explanations."},
                     {"role": "user", "content": prompt},

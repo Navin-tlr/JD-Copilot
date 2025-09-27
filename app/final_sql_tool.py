@@ -1,5 +1,6 @@
 import os
 from typing import Optional
+import json
 
 
 _query_engine = None
@@ -41,8 +42,8 @@ def _build_llamaindex_engine():
         # Explicitly specify tables to ensure proper schema reading
         sql_db = SQLDatabase(engine, include_tables=["companies", "roles", "offers", "skills", "requirements"])
 
-        # Use the model specified in environment variables
-        model_name = os.getenv("OPENROUTER_MODEL", "moonshotai/kimi-k2")
+        # Use explicit free-tier model unless overridden
+        model_name = os.getenv("OPENROUTER_MODEL", "moonshotai/kimi-k2:free")
 
         # Create LLM with proper configuration
         llm = OpenAI(
@@ -231,5 +232,66 @@ def _get_factual_fallback(query: str) -> str:
         print(f"❌ Factual fallback failed: {e}")
 
     return "Unable to retrieve accurate information. Please try a more specific query."
+
+
+def _format_sql_result_with_llm(original_query: str, raw_result: str) -> str:
+    """Format deterministic SQL result with an LLM (optional). Falls back to raw text if unavailable.
+
+    raw_result: plain string from deterministic sql_tool
+    Returns a user-friendly answer (attempting to keep strictly grounded).
+    """
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    model_name = os.getenv("OPENROUTER_MODEL", "moonshotai/kimi-k2:free")
+    if not api_key:
+        return raw_result
+
+    try:
+        import requests  # local import to avoid hard dependency if env not set
+    except Exception:
+        return raw_result
+
+    system_prompt = (
+        "You are a concise SQL result formatter. You MUST only use information present in the provided raw result. "
+        "If the result already reads naturally, return a lightly cleaned version. Never invent companies, counts, or fields."
+    )
+    user_payload = (
+        f"Original Question: {original_query}\n\n"
+        f"Raw Result:\n{raw_result}\n\n"
+        "Rules:\n"
+        "1. Do not hallucinate.\n"
+        "2. If the raw result looks like a list 'Companies: A, B', convert to: 'A, B (N companies)'.\n"
+        "3. If it contains a count sentence already, keep it stable.\n"
+        "4. If no data, respond: 'No data found for this query.'\n"
+    )
+
+    payload = {
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_payload},
+        ],
+        "temperature": 0.0,
+        "max_tokens": 250,
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    try:
+        resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=25)
+        if resp.status_code == 200:
+            content = resp.json()["choices"][0]["message"]["content"].strip()
+            # Basic guardrail: if content emptier or longer than 4x original, fall back
+            if not content or len(content) > 4 * len(raw_result) + 200:
+                return raw_result
+            # Ensure no fabrication keywords (very light heuristic)
+            lower = content.lower()
+            if "approximately" in lower and "approx" not in raw_result.lower():
+                return raw_result
+            return content
+        return raw_result
+    except Exception as e:
+        print(f"❌ Formatting LLM failed: {e}")
+        return raw_result
 
 

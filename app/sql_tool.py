@@ -332,7 +332,7 @@ def _create_sql_query_engine():
     os.environ.setdefault("OPENAI_API_KEY", openrouter_key)
     os.environ.setdefault("OPENAI_API_BASE", "https://openrouter.ai/api/v1")
 
-    model_name = os.getenv("OPENROUTER_MODEL", "moonshotai/kimi-k2")
+    model_name = os.getenv("OPENROUTER_MODEL", "moonshotai/kimi-k2:free")
     llm = OpenAI(api_key=openrouter_key, model=model_name)
     _query_engine = NLSQLTableQueryEngine(sql_database=sql_db, tables=None, llm=llm)
     return _query_engine
