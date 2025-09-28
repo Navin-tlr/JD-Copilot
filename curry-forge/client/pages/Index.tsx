@@ -1,8 +1,54 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import { cn } from '@/lib/utils';
 
 type AppMode = 'default' | 'rag' | 'deep-research';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+const DEFAULT_USER_ID = 'anonymous';
+const HISTORY_STORAGE_KEY = 'jd_chat_history';
+const SESSION_STORAGE_KEY = 'jd_chat_session_id';
+
+const sessionStorageKey = (sessionId: string) => `${HISTORY_STORAGE_KEY}:${sessionId}`;
+
+type TranscriptEntry = {
+  id?: string;
+  role: 'user' | 'assistant';
+  content: string;
+  streaming?: boolean;
+  timestamp?: string;
+};
+
+type SessionSummary = {
+  session_id: string;
+  title?: string | null;
+  updated_at?: string | null;
+  message_count?: number | null;
+  last_message_preview?: string | null;
+};
+
+const createSessionId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+};
+
+const formatTimestamp = (iso?: string | null) => {
+  if (!iso) return '';
+  try {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return '';
+  }
+};
 
 const RagIcon = ({ isActive, className }: { isActive?: boolean; className?: string }) => (
   <svg
@@ -417,9 +463,24 @@ export default function Index() {
   const [welcomeFaded, setWelcomeFaded] = useState(false);
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [messages, setMessages] = useState<{ id: string; role: 'user' | 'assistant'; content: string; streaming?: boolean }[]>([]);
+  const [messages, setMessages] = useState<TranscriptEntry[]>([]);
   const convoRef = useRef<HTMLDivElement | null>(null);
-  const STORAGE_KEY = 'jd_chat_history_default';
+  const userIdRef = useRef(DEFAULT_USER_ID);
+  const [sessionId, setSessionId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = window.localStorage.getItem(SESSION_STORAGE_KEY);
+        if (stored) {
+          return stored;
+        }
+      } catch {/* ignore */}
+    }
+    return createSessionId();
+  });
+  const sessionIdRef = useRef(sessionId);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   // Company slash palette state
   const [companies, setCompanies] = useState<string[]>([]);
@@ -438,28 +499,165 @@ export default function Index() {
   const [generating, setGenerating] = useState(false);
   const [pendingVectorApproval, setPendingVectorApproval] = useState<{question:string; reason?:string} | null>(null);
 
-  // Load persisted history
-  useEffect(() => {
+  const refreshSessions = useCallback(async () => {
+    const normalizedUser = (userIdRef.current || DEFAULT_USER_ID).trim() || DEFAULT_USER_ID;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setMessages(parsed);
+      setHistoryLoading(true);
+      setHistoryError(null);
+      const res = await fetch(`${API_BASE}/chat/history/sessions?user_id=${encodeURIComponent(normalizedUser)}`);
+      if (!res.ok) {
+        if (res.status === 404) {
+          setSessions([]);
+          return;
+        }
+        throw new Error(`HTTP ${res.status}`);
       }
-    } catch {/* ignore */}
+      const data = await res.json();
+      const list = Array.isArray(data.sessions) ? data.sessions : [];
+      setSessions(list);
+    } catch {
+      setHistoryError('Unable to load history.');
+    } finally {
+      setHistoryLoading(false);
+    }
   }, []);
 
-  // Persist on change
+  const beginNewSession = useCallback(() => {
+    const next = createSessionId();
+    setSessionId(next);
+    sessionIdRef.current = next;
+    setMessages([]);
+    setPendingVectorApproval(null);
+    setShowHistory(false);
+    setShowWelcome(true);
+    setWelcomeFaded(false);
+    refreshSessions();
+  }, [refreshSessions]);
+
+  const deleteSession = useCallback(async (targetId: string) => {
+    const normalizedUser = (userIdRef.current || DEFAULT_USER_ID).trim() || DEFAULT_USER_ID;
+    try {
+      await fetch(`${API_BASE}/chat/clear?session_id=${encodeURIComponent(targetId)}&user_id=${encodeURIComponent(normalizedUser)}`, {
+        method: 'POST'
+      });
+    } catch {/* ignore */}
+    try { localStorage.removeItem(sessionStorageKey(targetId)); } catch {/* ignore */}
+
+    if (sessionIdRef.current === targetId) {
+      beginNewSession();
+    } else {
+      refreshSessions();
+    }
+  }, [beginNewSession, refreshSessions]);
+
+  const loadTranscript = useCallback(async (targetSessionId: string) => {
+    const normalizedUser = (userIdRef.current || DEFAULT_USER_ID).trim() || DEFAULT_USER_ID;
+    try {
+      const res = await fetch(`${API_BASE}/chat/history/${encodeURIComponent(targetSessionId)}/transcript?user_id=${encodeURIComponent(normalizedUser)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.messages)) {
+          sessionIdRef.current = targetSessionId;
+          setSessionId(targetSessionId);
+          setMessages(data.messages as TranscriptEntry[]);
+          setShowHistory(false);
+          setPendingVectorApproval(null);
+          if (data.messages.length) {
+            setShowWelcome(false);
+            setWelcomeFaded(true);
+          }
+          await refreshSessions();
+          return;
+        }
+      } else if (res.status === 404) {
+        sessionIdRef.current = targetSessionId;
+        setSessionId(targetSessionId);
+        setMessages([]);
+        setShowHistory(false);
+        setPendingVectorApproval(null);
+        await refreshSessions();
+        return;
+      }
+    } catch {/* ignore */}
+
+    sessionIdRef.current = targetSessionId;
+    setSessionId(targetSessionId);
+    setShowHistory(false);
+    setPendingVectorApproval(null);
+  }, [refreshSessions]);
+
+  const clearHistory = useCallback(async () => {
+    await deleteSession(sessionIdRef.current);
+  }, [deleteSession]);
+
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); } catch {/* ignore */}
-  }, [messages]);
+    let active = true;
+    const hydrate = async () => {
+      const key = sessionStorageKey(sessionId);
+      let fallback: TranscriptEntry[] = [];
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) fallback = parsed as TranscriptEntry[];
+        }
+      } catch {/* ignore */}
+
+      const normalizedUser = (userIdRef.current || DEFAULT_USER_ID).trim() || DEFAULT_USER_ID;
+      try {
+        const res = await fetch(`${API_BASE}/chat/history/${encodeURIComponent(sessionId)}/transcript?user_id=${encodeURIComponent(normalizedUser)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.messages)) {
+            if (!active) return;
+            setMessages(data.messages as TranscriptEntry[]);
+            if (data.messages.length) {
+              setShowWelcome(false);
+              setWelcomeFaded(true);
+            }
+            return;
+          }
+        }
+      } catch {/* ignore */}
+
+      if (!active) return;
+      setMessages(fallback);
+      if (fallback.length) {
+        setShowWelcome(false);
+        setWelcomeFaded(true);
+      }
+    };
+
+    hydrate();
+    return () => { active = false; };
+  }, [sessionId]);
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+    try { localStorage.setItem(SESSION_STORAGE_KEY, sessionId); } catch {/* ignore */}
+  }, [sessionId]);
+
+  useEffect(() => {
+    const key = sessionStorageKey(sessionIdRef.current);
+    try { localStorage.setItem(key, JSON.stringify(messages)); } catch {/* ignore */}
+  }, [messages, sessionId]);
+
+  useEffect(() => {
+    refreshSessions();
+  }, [refreshSessions]);
+
+  useEffect(() => {
+    if (showHistory) {
+      refreshSessions();
+    }
+  }, [showHistory, refreshSessions]);
 
   // Fetch companies and role types once
   useEffect(() => {
     (async () => {
       try {
         // Fetch companies
-        const companiesRes = await fetch('http://localhost:8000/companies');
+  const companiesRes = await fetch(`${API_BASE}/companies`);
         if (companiesRes.ok) {
           const companiesData = await companiesRes.json();
           const names: string[] = (companiesData.companies || []).map((c: any) => c.company_name).filter(Boolean);
@@ -467,7 +665,7 @@ export default function Index() {
         }
         
         // Fetch role types
-        const roleTypesRes = await fetch('http://localhost:8000/role-types');
+  const roleTypesRes = await fetch(`${API_BASE}/role-types`);
         if (roleTypesRes.ok) {
           const roleTypesData = await roleTypesRes.json();
           const types: string[] = (roleTypesData.role_types || []).filter(Boolean);
@@ -557,34 +755,51 @@ export default function Index() {
     if (mode !== 'rag') return; // Only active in RAG mode
     const text = message.trim();
     if (!text || isSending || generating) return;
+
+    const normalizedUser = (userIdRef.current || DEFAULT_USER_ID).trim() || DEFAULT_USER_ID;
+    const activeSessionId = sessionIdRef.current;
+    const now = new Date().toISOString();
+
     setIsSending(true);
     setGenerating(true);
-    const userEntry = { id: crypto.randomUUID(), role: 'user' as const, content: text };
+    setShowWelcome(false);
+    setWelcomeFaded(true);
+
+    const userEntry: TranscriptEntry = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: now };
     setMessages((m) => [...m, userEntry]);
-    // create placeholder assistant message immediately so Stop icon appears instantly
+
     abortStreamingRef.current.aborted = false;
     const placeholderId = crypto.randomUUID();
+    const placeholderTimestamp = new Date().toISOString();
     placeholderAssistantIdRef.current = placeholderId;
-    setMessages((m) => [...m, { id: placeholderId, role: 'assistant', content: '', streaming: true }]);
+    setMessages((m) => [...m, { id: placeholderId, role: 'assistant', content: '', streaming: true, timestamp: placeholderTimestamp }]);
     setMessage("");
+
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    let answer: string | null = null;
+
+    const finish = () => {
+      setIsSending(false);
+      setGenerating(false);
+      refreshSessions();
+    };
+
+    let answer = '';
     try {
-      const res = await fetch('http://localhost:8000/chat', {
+      const res = await fetch(`${API_BASE}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: text, session_id: 'default' }),
+        body: JSON.stringify({
+          question: text,
+          session_id: activeSessionId,
+          user_id: normalizedUser
+        }),
         signal: controller.signal
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      // New deep-dive consent gating: only prompt if backend signals consent needed
-      const incomingAnswer = data.answer || '...';
-      const offerDeepDive = Boolean(data.deep_dive_consent_needed) || (
-        typeof incomingAnswer === 'string' && incomingAnswer.toLowerCase().includes('deep-dive mode available')
-      );
-
+      answer = typeof data.answer === 'string' ? data.answer : '';
+      const offerDeepDive = Boolean(data.needs_vector_approval || data.deep_dive_consent_needed);
       if (offerDeepDive) {
         setPendingVectorApproval({
           question: text,
@@ -593,52 +808,52 @@ export default function Index() {
       } else {
         setPendingVectorApproval(null);
       }
-
-      answer = incomingAnswer;
     } catch (err) {
       if ((err as any).name === 'AbortError' || abortStreamingRef.current.aborted) {
-        // aborted: finalize placeholder
         setMessages(m => m.map(msg => msg.id === placeholderId ? { ...msg, streaming: false, content: msg.content || '(stopped)' } : msg));
-        setIsSending(false);
-        setGenerating(false);
+        finish();
         return;
       }
-      // network error
-      setMessages(m => m.map(msg => msg.id === placeholderId ? { ...msg, streaming: false, content: 'Error processing your request.' } : msg));
-      setIsSending(false);
-      setGenerating(false);
+      setMessages(m => m.map(msg => msg.id === placeholderId ? { ...msg, streaming: false, content: 'Error processing your request.', timestamp: msg.timestamp ?? new Date().toISOString() } : msg));
+      finish();
       return;
     }
+
     if (abortStreamingRef.current.aborted) {
       setMessages(m => m.map(msg => msg.id === placeholderId ? { ...msg, streaming: false, content: msg.content || '(stopped)' } : msg));
-      setIsSending(false); setGenerating(false); return;
+      finish();
+      return;
     }
-    // simulate character streaming now that we have answer
-    if (answer == null) answer = '';
-    const chars = Array.from(answer);
+
+    const chars = Array.from(answer ?? '');
     let idx = 0;
+
     const step = () => {
       if (abortStreamingRef.current.aborted) {
         setMessages(m => m.map(msg => msg.id === placeholderId ? { ...msg, streaming: false, content: msg.content || '(stopped)' } : msg));
         currentFrameRef.current = null;
-        setIsSending(false); setGenerating(false);
+        finish();
         return;
       }
       idx = Math.min(idx + 1, chars.length);
       const done = idx >= chars.length;
-      setMessages(m => m.map(msg => msg.id === placeholderId ? { ...msg, content: chars.slice(0, idx).join(''), streaming: !done } : msg));
+      setMessages(m => m.map(msg => msg.id === placeholderId ? {
+        ...msg,
+        content: chars.slice(0, idx).join(''),
+        streaming: !done,
+        timestamp: msg.timestamp ?? new Date().toISOString()
+      } : msg));
       if (!done) {
         currentFrameRef.current = requestAnimationFrame(step);
       } else {
         currentFrameRef.current = null;
-        setIsSending(false);
-        setGenerating(false);
+        finish();
       }
     };
+
     currentFrameRef.current = requestAnimationFrame(step);
   };
   // Removed explicit reset button per request; keeping helper for potential internal uses
-  const clearHistory = () => { setMessages([]); try { localStorage.removeItem(STORAGE_KEY); } catch {/* ignore */} };
 
 
   const handleKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
@@ -777,21 +992,27 @@ export default function Index() {
               // Fire vector endpoint directly; append new assistant message with deep dive answer
               const q = question;
               setPendingVectorApproval(null);
+              const normalizedUser = (userIdRef.current || DEFAULT_USER_ID).trim() || DEFAULT_USER_ID;
+              const targetSession = sessionIdRef.current;
               try {
-                const resp = await fetch('http://localhost:8000/chat/vector', {
+                const resp = await fetch(`${API_BASE}/chat/vector`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ question: q, session_id: 'default' })
+                  body: JSON.stringify({ question: q, session_id: targetSession, user_id: normalizedUser })
                 });
                 if (resp.ok) {
                   const data = await resp.json();
                   const vecAnswer = data.answer || '(no deep-dive answer)';
-                  setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: vecAnswer }]);
+                  const timestamp = new Date().toISOString();
+                  setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: vecAnswer, timestamp }]);
+                  refreshSessions();
                 } else {
-                  setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: 'Deep-dive failed (network).' }]);
+                  const timestamp = new Date().toISOString();
+                  setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: 'Deep-dive failed (network).', timestamp }]);
                 }
               } catch {
-                setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: 'Deep-dive error.' }]);
+                const timestamp = new Date().toISOString();
+                setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: 'Deep-dive error.', timestamp }]);
               }
             }}
             className="font-hack text-[10px] px-3 py-1 rounded-sm bg-[#F69F1C]/25 border border-[#F69F1C]/40 text-[#F69F1C] hover:bg-[#F69F1C]/35"
@@ -820,9 +1041,16 @@ export default function Index() {
         )}
         {mode === 'rag' && (
           <div className="w-full flex flex-col gap-2 pb-4">
-            {messages.map(m => (
-              <MessageBubble key={m.id} msg={m} />
-            ))}
+            {messages.map((m, idx) => {
+              const fallbackId = `${m.role}-${idx}-${m.timestamp ?? "local"}`;
+              const bubbleMessage = {
+                id: m.id ?? fallbackId,
+                role: m.role,
+                content: m.content,
+                streaming: m.streaming,
+              } as const;
+              return <MessageBubble key={bubbleMessage.id} msg={bubbleMessage} />;
+            })}
             {pendingVectorApproval && mode === 'rag' && (
               <DeepDivePrompt question={pendingVectorApproval.question} reason={pendingVectorApproval.reason} />
             )}
@@ -941,20 +1169,94 @@ export default function Index() {
               <span className="font-hack text-[11px] tracking-wide text-[#F69F1C]">History</span>
               <button onClick={() => setShowHistory(false)} className="font-hack text-[10px] text-rag-text-primary/60 hover:text-rag-text-primary/90">close</button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {messages.length === 0 && (
-                <div className="font-hack text-xs text-rag-text-primary/40">No messages yet.</div>
-              )}
-              {messages.map(m => (
-                <div key={m.id} className={cn(
-                  'font-hack text-xs leading-relaxed whitespace-pre-wrap rounded-md px-2 py-1',
-                  m.role === 'assistant' ? 'border border-[#F69F1C]/35 text-rag-text-primary/70' : 'text-rag-text-primary/80'
-                )}>{m.content}</div>
-              ))}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="space-y-2">
+                <div className="font-hack text-[10px] uppercase tracking-[0.2em] text-rag-text-primary/50">Sessions</div>
+                {historyLoading && (
+                  <div className="font-hack text-xs text-rag-text-primary/40">Loading…</div>
+                )}
+                {historyError && (
+                  <div className="font-hack text-xs text-[#F69F1C]">{historyError}</div>
+                )}
+                {!historyLoading && !historyError && sessions.length === 0 && (
+                  <div className="font-hack text-xs text-rag-text-primary/40">No saved sessions yet.</div>
+                )}
+                {sessions.map((session) => {
+                  const isActive = session.session_id === sessionId;
+                  return (
+                    <div
+                      key={session.session_id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => loadTranscript(session.session_id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          loadTranscript(session.session_id);
+                        }
+                      }}
+                      className={cn(
+                        'rounded-md border px-3 py-2 bg-[#3a3a3a] text-left cursor-pointer select-none focus:outline-none focus:ring-1 focus:ring-[#F69F1C]/60',
+                        isActive ? 'border-[#F69F1C]/60 shadow-sm' : 'border-[#F69F1C]/20 hover:border-[#F69F1C]/40'
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-hack text-[11px] text-rag-text-primary/80 truncate">{session.title || 'Conversation'}</span>
+                        <span className="font-hack text-[9px] text-rag-text-primary/45 whitespace-nowrap">{formatTimestamp(session.updated_at)}</span>
+                      </div>
+                      {session.last_message_preview ? (
+                        <div className="font-hack text-[10px] text-rag-text-primary/55 mt-1 overflow-hidden whitespace-nowrap text-ellipsis">{session.last_message_preview}</div>
+                      ) : (
+                        <div className="font-hack text-[10px] text-rag-text-primary/40 mt-1">No messages yet.</div>
+                      )}
+                      <div className="mt-2 flex items-center justify-between text-[9px] font-hack text-rag-text-primary/40">
+                        <span>{session.message_count ?? 0} messages</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteSession(session.session_id);
+                          }}
+                          className="text-rag-text-primary/45 hover:text-[#F69F1C]"
+                        >
+                          delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="border-t border-[#F69F1C]/20 pt-3 space-y-2">
+                <div className="font-hack text-[10px] uppercase tracking-[0.2em] text-rag-text-primary/50">Current transcript</div>
+                {messages.length === 0 ? (
+                  <div className="font-hack text-xs text-rag-text-primary/40">No messages yet.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {messages.map((m, idx) => {
+                      const fallbackId = `${m.role}-${idx}-${m.timestamp ?? 'local'}`;
+                      const key = m.id ?? fallbackId;
+                      return (
+                        <div
+                          key={key}
+                          className={cn(
+                            'font-hack text-xs leading-relaxed whitespace-pre-wrap rounded-md px-2 py-1',
+                            m.role === 'assistant' ? 'border border-[#F69F1C]/35 text-rag-text-primary/70' : 'text-rag-text-primary/80'
+                          )}
+                        >
+                          {m.content}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="px-4 py-2 border-t border-[#F69F1C]/20 flex items-center justify-end gap-4">
-              <button onClick={() => { clearHistory(); }} className="font-hack text-[10px] text-rag-text-primary/50 hover:text-rag-text-primary/80">clear</button>
-              <button onClick={() => setShowHistory(false)} className="font-hack text-[10px] text-rag-text-primary/60 hover:text-rag-text-primary/90">done</button>
+            <div className="px-4 py-2 border-t border-[#F69F1C]/20 flex items-center justify-between">
+              <button onClick={beginNewSession} className="font-hack text-[10px] text-rag-text-primary/55 hover:text-rag-text-primary/80">new session</button>
+              <div className="flex items-center gap-4">
+                <button onClick={() => { clearHistory(); }} className="font-hack text-[10px] text-rag-text-primary/50 hover:text-[#F69F1C]">delete current</button>
+                <button onClick={() => setShowHistory(false)} className="font-hack text-[10px] text-rag-text-primary/60 hover:text-rag-text-primary/90">done</button>
+              </div>
             </div>
           </div>
         </div>

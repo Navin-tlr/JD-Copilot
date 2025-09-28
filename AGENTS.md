@@ -1,26 +1,30 @@
-# Coding Agent Guidelines for JD-Copilot
+# AGENTS.md
+This file provides guidance to agents when working with code in this repository.
 
-## Build/Test Commands
-- **React Frontend**: `cd "React Style" && npm run dev` (development), `npm run build` (build), `npm run lint` (lint)
-- **Python Backend**: `python -m pytest tests/` (all tests), `python -m pytest tests/test_specific.py` (single test)
-- **Start Backend**: `python -m app.main` or `uvicorn app.main:app --reload`
+## Critical Project Patterns
 
-## Python Code Style
-- Use `from __future__ import annotations` for forward references
-- Type hints required: `from typing import Any, Dict, Optional, List`
-- FastAPI endpoints with Pydantic models for request/response
-- Snake_case for variables/functions, PascalCase for classes
-- Relative imports: `from .module import function`
-- Async/await for I/O operations, use `pytest-asyncio` for tests
+### Hybrid Classification System
+- Role types use both rule-based (`app/role_type_classifier.py`) and LLM-based classification (`app/llm_role_type_classifier.py`)
+- Always call `classify_role_types_rule()` before LLM classification
+- Classification results stored in `_role_type_debug` metadata field
 
-## React/TypeScript Style  
-- Functional components with hooks (`useState`, `useEffect`)
-- TypeScript interfaces for props, strict typing required
-- Tailwind CSS for styling with dark mode support (`dark:` prefix)
-- Named exports for components, default export for main App
-- CamelCase for variables/functions, PascalCase for components
+### PDF Ingestion
+- Requires `LLAMA_CLOUD_API_KEY` for production PDF parsing
+- Fallback to filename analysis if company detection fails
+- Chunking uses `RecursiveCharacterTextSplitter` (700/150 size/overlap)
 
-## Error Handling
-- Python: Use FastAPI's `HTTPException` for API errors
-- React: Graceful fallbacks, error boundaries for component errors
-- Always handle async operations with try/catch or error states
+### Pinecone Integration
+- Index validation checks dimension match (384 default)
+- Metadata includes `company_norm` (normalized lowercase alphanumeric)
+- Batch upsert handles 403 errors gracefully
+
+## Key Commands
+```bash
+# Run single test with warnings filtered
+python -m pytest tests/test_specific.py -k "test_name" -p no:warnings
+
+# Start dev server with auto-reload
+uvicorn app.main:app --reload --port 8000
+
+# Full ingestion pipeline
+python -m ingest.pipeline --pdf_dir data/jds

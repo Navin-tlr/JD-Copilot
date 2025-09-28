@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, List
 import re
 import sqlite3
 
-from fastapi import FastAPI, HTTPException, Depends, Body
+from fastapi import FastAPI, HTTPException, Depends, Body, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
@@ -20,6 +20,7 @@ from .database import PlacementDatabase
 from .rag import retrieve_snippets, synthesize_answer
 from .agent import route_query, LAST_ROUTE_TYPE, get_last_timings, _is_no_data_result  # Import router and guardrail utils
 from .chat_memory import ChatMemory
+from .chat_history_store import chat_history_store
 from .enhanced_chat_memory import enhanced_memory_manager
 from .sql_tool import run_sql_query
 from .chat_api import include_chat_router
@@ -52,13 +53,24 @@ def get_jd_agent():
     """This function is no longer needed as we use the simple router."""
     return None
 
+
+def _sync_history_snapshot(user_id: str, session_id: str) -> None:
+    """Persist the current conversation transcript for the session."""
+    try:
+        messages = chat_memory.get_messages(session_id)
+        chat_history_store.sync_session(user_id, session_id, messages)
+    except Exception as exc:
+        print(f"⚠️ Failed to sync chat history for session {session_id}: {exc}")
+
 class QueryRequest(BaseModel):
     question: str
     session_id: str = "default"
+    user_id: Optional[str] = "anonymous"
 
 class ChatRequest(BaseModel):
     query: str
     session_id: str = "default"
+    user_id: Optional[str] = "anonymous"
 
 class ChatResponse(BaseModel):
     answer: str
@@ -87,15 +99,21 @@ class StructuredResponse(BaseModel):
 async def vector_chat_endpoint(request: QueryRequest):
     """Force vector (unstructured) retrieval path after human approval."""
     try:
+        user_id = (request.user_id or "anonymous").strip() or "anonymous"
+        session_id = request.session_id
+        chat_history_store.ensure_session(user_id, session_id)
+
         question = request.question.strip()
-        chat_memory.add_message(request.session_id, "user", question)
+        chat_memory.add_message(session_id, "user", question)
+        _sync_history_snapshot(user_id, session_id)
         snippets = retrieve_snippets(question, top_k=25, filters={})
         if snippets:
             answer = synthesize_answer(question, snippets, {}) or "No additional context found."
         else:
             answer = "No document context available for deeper search."\
 
-        chat_memory.add_message(request.session_id, "assistant", answer)
+        chat_memory.add_message(session_id, "assistant", answer)
+        _sync_history_snapshot(user_id, session_id)
         citations = []
         for snip in snippets or []:
             md = snip.get("metadata", {})
@@ -122,11 +140,15 @@ async def query_endpoint(request: ChatRequest = Body(...)):
     """
     This endpoint receives a user query and uses the AI agent to generate a response.
     """
-    print(f"Received query for session '{request.session_id}': {request.query}")
+    user_id = (request.user_id or "anonymous").strip() or "anonymous"
+    session_id = request.session_id
+    print(f"Received query for session '{session_id}': {request.query}")
+    chat_history_store.ensure_session(user_id, session_id)
     
     try:
         # Add user message to chat memory
-        chat_memory.add_message(request.session_id, "user", request.query)
+        chat_memory.add_message(session_id, "user", request.query)
+        _sync_history_snapshot(user_id, session_id)
         
         # Use the simple router to process the query
         print("🚀 Using simple LLM router for query processing")
@@ -168,7 +190,8 @@ async def query_endpoint(request: ChatRequest = Body(...)):
                 answer = "I couldn't find any relevant information to answer your question."
         
         # Add assistant response to chat memory
-        chat_memory.add_message(request.session_id, "assistant", answer)
+        chat_memory.add_message(session_id, "assistant", answer)
+        _sync_history_snapshot(user_id, session_id)
         
         # Prepare citations
         citations = []
@@ -236,11 +259,14 @@ async def chat_endpoint(request: QueryRequest):
     try:
         question = request.question.strip()
         session_id = request.session_id
+        user_id = (request.user_id or "anonymous").strip() or "anonymous"
+        chat_history_store.ensure_session(user_id, session_id)
         
         print(f"🤖 Processing query: {question}")
         
         # Add user message to chat memory
         chat_memory.add_message(session_id, "user", question)
+        _sync_history_snapshot(user_id, session_id)
         
         # Check if user is consenting to deep-dive mode
         is_deep_dive_consent = _is_deep_dive_consent(question)
@@ -310,6 +336,7 @@ async def chat_endpoint(request: QueryRequest):
         
         # Add assistant response to chat memory
         chat_memory.add_message(session_id, "assistant", answer)
+        _sync_history_snapshot(user_id, session_id)
         
         print(f"✅ Query processed successfully. Answer length: {len(answer)} chars")
         
@@ -362,7 +389,8 @@ async def enhanced_chat_endpoint(request: QueryRequest):
     try:
         question = request.question.strip()
         session_id = request.session_id
-        user_id = "anonymous"  # Could be extracted from request headers or auth
+        user_id = (request.user_id or "anonymous").strip() or "anonymous"
+        chat_history_store.ensure_session(user_id, session_id)
         
         print(f"🤖 Enhanced processing query: {question}")
         
@@ -375,6 +403,11 @@ async def enhanced_chat_endpoint(request: QueryRequest):
             content=question,
             metadata={"endpoint": "enhanced", "timestamp": datetime.now().isoformat()}
         )
+        try:
+            user_messages_snapshot = [msg.to_dict() for msg in enhanced_session.messages]
+            chat_history_store.sync_session(user_id, session_id, user_messages_snapshot)
+        except Exception as exc:
+            print(f"⚠️ Failed to sync enhanced chat history after user message for session {session_id}: {exc}")
         
         # Use the simple router to process the query
         print("🚀 Using simple LLM router for enhanced query processing")
@@ -430,6 +463,11 @@ async def enhanced_chat_endpoint(request: QueryRequest):
                 "timestamp": datetime.now().isoformat()
             }
         )
+        try:
+            enhanced_messages = [msg.to_dict() for msg in enhanced_session.messages]
+            chat_history_store.sync_session(user_id, session_id, enhanced_messages)
+        except Exception as exc:
+            print(f"⚠️ Failed to sync enhanced chat history for session {session_id}: {exc}")
         
         print(f"✅ Enhanced query processed successfully. Answer length: {len(answer)} chars")
         
@@ -455,22 +493,71 @@ async def structured_endpoint(request: StructuredRequest = Body(...)):
         raise HTTPException(status_code=500, detail=f"Structured query error: {e}")
 
 @app.post("/chat/clear")
-async def clear_chat_history(session_id: str = "default"):
+async def clear_chat_history(session_id: str = "default", user_id: str = "anonymous"):
     """Clear chat history for a session."""
     try:
+        normalized_user = (user_id or "anonymous").strip() or "anonymous"
         chat_memory.clear_session(session_id)
+        chat_history_store.delete_session(normalized_user, session_id)
         return {"message": f"Chat history cleared for session {session_id}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error clearing chat history: {str(e)}")
 
 @app.get("/chat/history")
-async def get_chat_history(session_id: str = "default"):
+async def get_chat_history(session_id: str = "default", user_id: str = "anonymous"):
     """Get chat history for a session."""
     try:
-        messages = chat_memory.get_messages(session_id)
-        return {"session_id": session_id, "messages": messages}
+        normalized_user = (user_id or "anonymous").strip() or "anonymous"
+        messages = chat_history_store.get_transcript(normalized_user, session_id)
+        if not messages:
+            messages = chat_memory.get_messages(session_id)
+        if not messages:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return {"session_id": session_id, "user_id": normalized_user, "messages": messages}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving chat history: {str(e)}")
+
+
+@app.get("/chat/history/sessions")
+async def list_chat_sessions(user_id: str = Query("anonymous")):
+    """List chat sessions for a user ordered by recency."""
+    try:
+        normalized_user = (user_id or "anonymous").strip() or "anonymous"
+        records = chat_history_store.list_sessions(normalized_user)
+        sessions = [
+            {
+                "session_id": record.session_id,
+                "title": record.title,
+                "created_at": record.created_at,
+                "updated_at": record.updated_at,
+                "message_count": record.message_count,
+                "last_message_preview": record.last_message_preview,
+                "summary": record.summary,
+            }
+            for record in records
+        ]
+        return {"user_id": normalized_user, "sessions": sessions}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error listing chat sessions: {str(e)}")
+
+
+@app.get("/chat/history/{session_id}/transcript")
+async def get_chat_transcript(session_id: str, user_id: str = Query("anonymous")):
+    """Get the persisted transcript for a specific session."""
+    normalized_user = (user_id or "anonymous").strip() or "anonymous"
+    try:
+        messages = chat_history_store.get_transcript(normalized_user, session_id)
+        if not messages:
+            messages = chat_memory.get_messages(session_id)
+        if not messages:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return {"session_id": session_id, "user_id": normalized_user, "messages": messages}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving chat transcript: {str(e)}")
 
 # Legacy endpoints for backward compatibility
 @app.get("/companies")
