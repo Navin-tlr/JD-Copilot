@@ -425,12 +425,18 @@ export default function Index() {
   const [companies, setCompanies] = useState<string[]>([]);
   const [showCompanyPalette, setShowCompanyPalette] = useState(false);
   const [companyQuery, setCompanyQuery] = useState("");
+  
+  // Role type selector state (triggered by ">")
+  const [roleTypes, setRoleTypes] = useState<string[]>([]);
+  const [showRoleTypePalette, setShowRoleTypePalette] = useState(false);
+  const [roleTypeQuery, setRoleTypeQuery] = useState("");
   const paletteRef = useRef<HTMLDivElement | null>(null);
   const currentFrameRef = useRef<number | null>(null);
   const abortStreamingRef = useRef<{aborted:boolean}>({aborted:false});
   const abortControllerRef = useRef<AbortController | null>(null);
   const placeholderAssistantIdRef = useRef<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [pendingVectorApproval, setPendingVectorApproval] = useState<{question:string; reason?:string} | null>(null);
 
   // Load persisted history
   useEffect(() => {
@@ -448,31 +454,41 @@ export default function Index() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); } catch {/* ignore */}
   }, [messages]);
 
-  // Fetch companies once (used for slash palette)
+  // Fetch companies and role types once
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('http://localhost:8000/companies');
-        if (res.ok) {
-          const data = await res.json();
-          const names: string[] = (data.companies || []).map((c: any) => c.company_name).filter(Boolean);
+        // Fetch companies
+        const companiesRes = await fetch('http://localhost:8000/companies');
+        if (companiesRes.ok) {
+          const companiesData = await companiesRes.json();
+          const names: string[] = (companiesData.companies || []).map((c: any) => c.company_name).filter(Boolean);
           setCompanies(names.sort((a,b) => a.localeCompare(b)));
+        }
+        
+        // Fetch role types
+        const roleTypesRes = await fetch('http://localhost:8000/role-types');
+        if (roleTypesRes.ok) {
+          const roleTypesData = await roleTypesRes.json();
+          const types: string[] = (roleTypesData.role_types || []).filter(Boolean);
+          setRoleTypes(types);
         }
       } catch {/* ignore network errors silently */}
     })();
   }, []);
 
-  // Close palette on outside click
+  // Close palettes on outside click
   useEffect(() => {
-    if (!showCompanyPalette) return;
+    if (!showCompanyPalette && !showRoleTypePalette) return;
     const handler = (e: MouseEvent) => {
       if (paletteRef.current && !paletteRef.current.contains(e.target as Node)) {
         setShowCompanyPalette(false);
+        setShowRoleTypePalette(false);
       }
     };
     window.addEventListener('mousedown', handler);
     return () => window.removeEventListener('mousedown', handler);
-  }, [showCompanyPalette]);
+  }, [showCompanyPalette, showRoleTypePalette]);
 
   // Auto scroll
   useEffect(() => {
@@ -563,7 +579,22 @@ export default function Index() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      answer = data.answer || '...';
+      // New deep-dive consent gating: only prompt if backend signals consent needed
+      const incomingAnswer = data.answer || '...';
+      const offerDeepDive = Boolean(data.deep_dive_consent_needed) || (
+        typeof incomingAnswer === 'string' && incomingAnswer.toLowerCase().includes('deep-dive mode available')
+      );
+
+      if (offerDeepDive) {
+        setPendingVectorApproval({
+          question: text,
+          reason: data.vector_reason || 'Structured DB returned no rows. Run Deep-Dive over unstructured job descriptions?'
+        });
+      } else {
+        setPendingVectorApproval(null);
+      }
+
+      answer = incomingAnswer;
     } catch (err) {
       if ((err as any).name === 'AbortError' || abortStreamingRef.current.aborted) {
         // aborted: finalize placeholder
@@ -630,19 +661,40 @@ export default function Index() {
     const val = e.target.value;
     setMessage(val);
     handleInputEngagement();
+    
+    // Check for company selector trigger "/"
     const lastSlash = val.lastIndexOf('/');
     if (lastSlash !== -1) {
       const fragment = val.slice(lastSlash + 1).trim();
       setCompanyQuery(fragment.toLowerCase());
       setShowCompanyPalette(true);
-    } else {
-      if (showCompanyPalette) setShowCompanyPalette(false);
+      setShowRoleTypePalette(false); // Close role palette
+      return;
     }
+    
+    // Check for role type selector trigger ">"
+    const lastGreater = val.lastIndexOf('>');
+    if (lastGreater !== -1) {
+      const fragment = val.slice(lastGreater + 1).trim();
+      setRoleTypeQuery(fragment.toLowerCase());
+      setShowRoleTypePalette(true);
+      setShowCompanyPalette(false); // Close company palette
+      return;
+    }
+    
+    // Close both palettes if no triggers found
+    if (showCompanyPalette) setShowCompanyPalette(false);
+    if (showRoleTypePalette) setShowRoleTypePalette(false);
   };
 
   const filteredCompanies = showCompanyPalette ? companies.filter(c => {
     if (!companyQuery) return true;
     return c.toLowerCase().includes(companyQuery);
+  }).slice(0, 30) : [];
+
+  const filteredRoleTypes = showRoleTypePalette ? roleTypes.filter(rt => {
+    if (!roleTypeQuery) return true;
+    return rt.toLowerCase().includes(roleTypeQuery);
   }).slice(0, 30) : [];
 
   const insertCompany = (name: string) => {
@@ -653,6 +705,16 @@ export default function Index() {
     const newVal = (before ? before + ' ' : '') + name + ' ';
     setMessage(newVal);
     setShowCompanyPalette(false);
+  };
+
+  const insertRoleType = (roleType: string) => {
+    const val = message;
+    const lastGreater = val.lastIndexOf('>');
+    if (lastGreater === -1) return;
+    const before = val.slice(0, lastGreater).trimEnd();
+    const newVal = (before ? before + ' ' : '') + roleType + ' ';
+    setMessage(newVal);
+    setShowRoleTypePalette(false);
   };
 
   // Formatting utilities for assistant answers
@@ -698,6 +760,47 @@ export default function Index() {
     );
   };
 
+  // Inline deep dive consent prompt (replaces prior full-screen modal)
+  const DeepDivePrompt = ({ question, reason }: { question: string; reason?: string }) => {
+    return (
+      <div className="w-full bg-[#3a3a3a] border border-[#F69F1C]/45 rounded-[5px] px-3 py-2 flex flex-col gap-2 shadow-sm">
+        <div className="font-hack text-[11px] text-[#F69F1C] tracking-wide">Deep-Dive Mode Available</div>
+        <div className="font-hack text-[10px] text-rag-text-primary/70 leading-snug">{reason || 'Run deeper unstructured search?'}</div>
+        <div className="font-hack text-[9px] text-rag-text-primary/40">Query: <span className="text-rag-text-primary/60">{question}</span></div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button
+            onClick={() => setPendingVectorApproval(null)}
+            className="font-hack text-[10px] px-2 py-1 rounded-sm bg-transparent text-rag-text-primary/55 hover:text-rag-text-primary/85"
+          >dismiss</button>
+          <button
+            onClick={async () => {
+              // Fire vector endpoint directly; append new assistant message with deep dive answer
+              const q = question;
+              setPendingVectorApproval(null);
+              try {
+                const resp = await fetch('http://localhost:8000/chat/vector', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ question: q, session_id: 'default' })
+                });
+                if (resp.ok) {
+                  const data = await resp.json();
+                  const vecAnswer = data.answer || '(no deep-dive answer)';
+                  setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: vecAnswer }]);
+                } else {
+                  setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: 'Deep-dive failed (network).' }]);
+                }
+              } catch {
+                setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: 'Deep-dive error.' }]);
+              }
+            }}
+            className="font-hack text-[10px] px-3 py-1 rounded-sm bg-[#F69F1C]/25 border border-[#F69F1C]/40 text-[#F69F1C] hover:bg-[#F69F1C]/35"
+          >Run Deep-Dive</button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={cn(
       "h-screen flex flex-col items-center p-4 transition-all duration-500 relative overflow-hidden",
@@ -720,6 +823,9 @@ export default function Index() {
             {messages.map(m => (
               <MessageBubble key={m.id} msg={m} />
             ))}
+            {pendingVectorApproval && mode === 'rag' && (
+              <DeepDivePrompt question={pendingVectorApproval.question} reason={pendingVectorApproval.reason} />
+            )}
             {mode === 'rag' && isSending && !messages.some(m => m.streaming) && (
               <div className="px-1 py-1">
                 <TypingIndicator />
@@ -790,6 +896,32 @@ export default function Index() {
               </ul>
               <div className="px-3 py-1 border-t border-[#F69F1C]/15">
                 <span className="font-hack text-[9px] text-rag-text-primary/40">Type '/' then letters to filter • Enter to send</span>
+              </div>
+            </div>
+          )}
+          {showRoleTypePalette && (
+            <div
+              ref={paletteRef}
+              className="absolute bottom-full mb-2 left-0 w-full bg-rag-chat-dark border border-[#F69F1C]/30 rounded-md shadow-lg max-h-60 overflow-y-auto z-50"
+            >
+              <div className="px-3 py-1 border-b border-[#F69F1C]/20 flex items-center justify-between">
+                <span className="font-hack text-[10px] tracking-wide text-[#F69F1C]">Role Types</span>
+                <span className="font-hack text-[9px] text-rag-text-primary/50">{filteredRoleTypes.length}</span>
+              </div>
+              <ul className="py-1">
+                {filteredRoleTypes.length === 0 && (
+                  <li className="px-3 py-1 font-hack text-[10px] text-rag-text-primary/40">No matches</li>
+                )}
+                {filteredRoleTypes.map(rt => (
+                  <li
+                    key={rt}
+                    onClick={() => insertRoleType(rt)}
+                    className="px-3 py-1 font-hack text-[11px] text-rag-text-primary/80 hover:bg-[#F69F1C]/10 cursor-pointer select-none"
+                  >{rt}</li>
+                ))}
+              </ul>
+              <div className="px-3 py-1 border-t border-[#F69F1C]/15">
+                <span className="font-hack text-[9px] text-rag-text-primary/40">Type {'>'} then letters to filter • Enter to send</span>
               </div>
             </div>
           )}

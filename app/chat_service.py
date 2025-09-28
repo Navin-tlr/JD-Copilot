@@ -869,7 +869,7 @@ For more detailed information or specific questions, please ask follow-up questi
             # Prepare comprehensive LLM request
             settings = get_settings()
             payload = {
-                "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free",  # High-capability model
+                "model": settings.OPENROUTER_MODEL or "deepseek/deepseek-r1-distill-llama-70b",  # High-capability model
                 "messages": [
                     {
                         "role": "system", 
@@ -895,7 +895,7 @@ For more detailed information or specific questions, please ask follow-up questi
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=45
+                timeout=180
             )
             
             if response.status_code == 200:

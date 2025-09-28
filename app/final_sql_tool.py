@@ -1,16 +1,12 @@
 import os
 from typing import Optional
-import json
 
 
 _query_engine = None
 
 
 def _build_llamaindex_engine():
-    """
-    Create and cache a LlamaIndex NLSQLTableQueryEngine if dependencies and keys are available.
-    Returns None if unavailable so callers can gracefully fall back.
-    """
+    """Initialize and cache LlamaIndex query engine (silent failure if deps missing)."""
     global _query_engine
     if _query_engine is not None:
         return _query_engine
@@ -23,52 +19,32 @@ def _build_llamaindex_engine():
     except Exception:
         return None
 
-    # Prefer OpenRouter; set OpenAI-compatible env vars so the client routes to OpenRouter
-    openrouter_key = os.getenv("OPENROUTER_API_KEY")
-    if not openrouter_key:
+    key = os.getenv("OPENROUTER_API_KEY")
+    if not key:
         return None
-    os.environ.setdefault("OPENAI_API_KEY", openrouter_key)
+    os.environ.setdefault("OPENAI_API_KEY", key)
     os.environ.setdefault("OPENAI_API_BASE", "https://openrouter.ai/api/v1")
 
     db_path = os.getenv("DATABASE_PATH", "data/placement_data.db")
+    if not os.path.exists(db_path):
+        print(f"❌ Database file not found: {db_path}")
+        return None
+
     try:
-        # Ensure database file exists
-        if not os.path.exists(db_path):
-            print(f"❌ Database file not found: {db_path}")
-            return None
-
         engine = create_engine(f"sqlite:///{db_path}")
-
-        # Explicitly specify tables to ensure proper schema reading
         sql_db = SQLDatabase(engine, include_tables=["companies", "roles", "offers", "skills", "requirements"])
-
-        # Use explicit free-tier model unless overridden
-        model_name = os.getenv("OPENROUTER_MODEL", "moonshotai/kimi-k2:free")
-
-        # Create LLM with proper configuration
-        llm = OpenAI(
-            api_key=openrouter_key,
-            model=model_name,
-            temperature=0.0,  # Ensure deterministic responses
-            max_tokens=1000
-        )
-
-        # Create query engine with explicit table context
+        model_name = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-r1-distill-llama-70b")
+        llm = OpenAI(api_key=key, model=model_name, temperature=0.0, max_tokens=800)
         _query_engine = NLSQLTableQueryEngine(
             sql_database=sql_db,
             tables=["companies", "roles", "offers", "skills", "requirements"],
             llm=llm,
-            verbose=True  # Enable verbose logging for debugging
+            verbose=False
         )
-
         print(f"✅ LlamaIndex engine created with model: {model_name}")
-        print(f"✅ Database path: {db_path}")
         return _query_engine
-
     except Exception as e:
         print(f"❌ Error creating LlamaIndex engine: {e}")
-        import traceback
-        traceback.print_exc()
         return None
 
 
@@ -162,8 +138,9 @@ Generate a SQL query that accurately answers this question using the correct tab
 
         # Use LLM only for formatting the deterministic result
         if raw_sql_result and not raw_sql_result.startswith("Error"):
-            formatted_result = _format_sql_result_with_llm(query, raw_sql_result)
-            print(f"✅ LLM-formatted result: {formatted_result[:100]}...")
+            # Minimal passthrough formatting (avoid external call to keep deterministic)
+            formatted_result = f"Answer based on database: {raw_sql_result}" if '\n' not in raw_sql_result else raw_sql_result
+            print(f"✅ Deterministic formatted result: {formatted_result[:100]}...")
             return formatted_result
         else:
             return raw_sql_result
@@ -232,66 +209,5 @@ def _get_factual_fallback(query: str) -> str:
         print(f"❌ Factual fallback failed: {e}")
 
     return "Unable to retrieve accurate information. Please try a more specific query."
-
-
-def _format_sql_result_with_llm(original_query: str, raw_result: str) -> str:
-    """Format deterministic SQL result with an LLM (optional). Falls back to raw text if unavailable.
-
-    raw_result: plain string from deterministic sql_tool
-    Returns a user-friendly answer (attempting to keep strictly grounded).
-    """
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    model_name = os.getenv("OPENROUTER_MODEL", "moonshotai/kimi-k2:free")
-    if not api_key:
-        return raw_result
-
-    try:
-        import requests  # local import to avoid hard dependency if env not set
-    except Exception:
-        return raw_result
-
-    system_prompt = (
-        "You are a concise SQL result formatter. You MUST only use information present in the provided raw result. "
-        "If the result already reads naturally, return a lightly cleaned version. Never invent companies, counts, or fields."
-    )
-    user_payload = (
-        f"Original Question: {original_query}\n\n"
-        f"Raw Result:\n{raw_result}\n\n"
-        "Rules:\n"
-        "1. Do not hallucinate.\n"
-        "2. If the raw result looks like a list 'Companies: A, B', convert to: 'A, B (N companies)'.\n"
-        "3. If it contains a count sentence already, keep it stable.\n"
-        "4. If no data, respond: 'No data found for this query.'\n"
-    )
-
-    payload = {
-        "model": model_name,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_payload},
-        ],
-        "temperature": 0.0,
-        "max_tokens": 250,
-    }
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    try:
-        resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=25)
-        if resp.status_code == 200:
-            content = resp.json()["choices"][0]["message"]["content"].strip()
-            # Basic guardrail: if content emptier or longer than 4x original, fall back
-            if not content or len(content) > 4 * len(raw_result) + 200:
-                return raw_result
-            # Ensure no fabrication keywords (very light heuristic)
-            lower = content.lower()
-            if "approximately" in lower and "approx" not in raw_result.lower():
-                return raw_result
-            return content
-        return raw_result
-    except Exception as e:
-        print(f"❌ Formatting LLM failed: {e}")
-        return raw_result
 
 

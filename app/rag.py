@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from typing import Any, Dict, List, Tuple
+import re
 
 import numpy as np
 from pinecone import Pinecone
@@ -103,6 +104,112 @@ MAX_SNIPPET_CHARS = 400
 MAX_FULL_JD_CHARS = 10000  # Much larger limit for full JD requests
 
 
+_SEMANTIC_AUGMENTATIONS = {
+    "b2b": [
+        "business to business",
+        "business development",
+        "enterprise sales",
+        "corporate sales",
+        "account executive",
+        "partnership manager",
+    ],
+    "business development": [
+        "b2b sales",
+        "corporate partnerships",
+        "inside sales",
+        "lead generation",
+        "enterprise clients",
+    ],
+    "corporate gifting": [
+        "enterprise gifting",
+        "branded merchandise",
+        "b2b gifting",
+    ],
+    "lead generation": [
+        "prospecting",
+        "outbound sales",
+        "cold calling",
+        "b2b outreach",
+    ],
+}
+
+
+def _augment_query_for_embeddings(question: str) -> str:
+    """Expand key domain terms with synonyms to improve semantic recall."""
+    question_lower = question.lower()
+    augmented_terms: List[str] = []
+
+    for trigger, synonyms in _SEMANTIC_AUGMENTATIONS.items():
+        if trigger in question_lower:
+            augmented_terms.extend(synonyms)
+
+    # Deduplicate while preserving order and avoid re-adding terms already in question
+    seen: set[str] = set()
+    filtered_terms: List[str] = []
+    for term in augmented_terms:
+        normalized = term.lower()
+        if normalized in seen:
+            continue
+        if normalized in question_lower:
+            continue
+        seen.add(normalized)
+        filtered_terms.append(term)
+
+    if not filtered_terms:
+        return question
+
+    return f"{question} {' '.join(filtered_terms)}"
+
+
+def _normalize_company_for_metadata(name: str) -> str:
+    return "".join(c for c in name.lower() if c.isalnum()) if name else ""
+
+
+def _infer_company_from_text(text: str) -> str | None:
+    if not text:
+        return None
+    special_cases = {
+        "tap academy": "Tap Academy",
+        "companystoreio": "CompanyStoreio",
+        "company store": "CompanyStoreio",
+    }
+    snippet_lower = text.lower()
+    for key, value in special_cases.items():
+        if key in snippet_lower:
+            return value
+
+    head = text[:800]
+    lines = [ln.strip() for ln in head.splitlines() if ln.strip()]
+
+    label_patterns = [
+        re.compile(r"(?i)^(?:company|employer|organization)\s*[:\-]\s*(.+)$"),
+        re.compile(r"(?i)^about\s+(?!us\b)([A-Za-z0-9&.,'\- ]{2,})\s*:?.*$"),
+    ]
+    for pat in label_patterns:
+        for ln in lines[:40]:
+            m = pat.match(ln)
+            if m:
+                raw = m.group(1).strip(" \t\n\r-–—|,:;()[]{}\"'")
+                if raw:
+                    return raw.title()
+
+    # All caps heading heuristic (1-3 words)
+    for ln in lines[:30]:
+        words = ln.split()
+        if not (1 <= len(words) <= 3):
+            continue
+        letters = [c for c in ln if c.isalpha()]
+        if not letters:
+            continue
+        if sum(1 for c in letters if c.isupper()) / len(letters) >= 0.8:
+            excluded = {"ABOUT", "JOB", "DESCRIPTION", "ROLE", "RESPONSIBILITIES"}
+            if any(word.upper() in excluded for word in words):
+                continue
+            return ln.title()
+
+    return None
+
+
 def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
     settings = get_settings()
     
@@ -110,7 +217,8 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
     try:
         index = get_pinecone_index()
         embedder = EmbeddingBackend(settings.EMBED_MODEL)
-        q_emb = embedder.embed([question])[0]
+        augmented_question = _augment_query_for_embeddings(question)
+        q_emb = embedder.embed([augmented_question])[0]
     except RuntimeError as e:
         print(f"⚠️ Pinecone not configured, using local database: {e}")
         # Fall back to local database - return sample snippets for now
@@ -241,6 +349,11 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
             continue
             
         full_text = meta.get("chunk_text") or meta.get("preview") or ""
+        if not meta.get("company"):
+            inferred_company = _infer_company_from_text(full_text)
+            if inferred_company:
+                meta["company"] = inferred_company
+                meta.setdefault("company_norm", _normalize_company_for_metadata(inferred_company))
         text = full_text[:snippet_limit]
         scored.append({
             "id": m.get("id") if isinstance(m, dict) else getattr(m, "id", None),
@@ -277,47 +390,30 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
 def synthesize_answer(question: str, snippets: List[Dict[str, Any]], filters: Dict[str, Any] = None) -> str | None:
     settings = get_settings()
     # Aristotelian strategist system prompt (replaces earlier role-specific only prompt)
-    system_prompt = """You are JD-Copilot — The Aristotelian Placement Strategist.
-Role: act as a ruthless, wise mentor and strategic advisor for MBA students and placement officers. Interpret intent first, answer whatever the user asks, and always distinguish hard evidence (retrieved from the system) from strategic reasoning (external knowledge, frameworks, or creative strategy).
+    system_prompt = """You are JD-Copilot — The Strategic Placement Advisor.
 
-PRINCIPLES (non-negotiable)
-1. Evidence first — Any factual claim about a JD, company, requirement, or compensation must be supported by retrieved data (SQL rows or vector snippets). If the retrieval contains no supporting text, reply exactly:
-"I could not find this information in the available documents."
-2. No hallucinations about source data — Never invent or alter JD contents. If you infer, label it (INFERENCE) and show the data used to infer.
-3. Strategic roaming allowed — You MAY draw on external domain knowledge (HBR, academic papers, best‑practice frameworks, market intelligence) for strategy, certifications, frameworks, or comparative context. Clearly label these as STRATEGIC; cite source when possible or note established practice.
-4. Distinguish evidence types — Use explicit tags:
-   (EVID:SQL:table:row) or (EVID:VEC:docID[:loc]) for retrieved facts.
-   (STRAT:EXT:Source:year:label) for external knowledge.
-5. Aristotelian tone — Wise, merciless, precise. Imperatives for actions. Explain reasoning concisely.
-6. MBA lens mandatory — Map implications to Finance, Marketing, Operations, HR, Business Analytics. Clarify long‑term career impact + immediate tactics.
+Role: Act as a direct, knowledgeable mentor for MBA students and placement officers. Provide actionable career insights based on placement data.
 
-OPERATION PROCESS
-1. Parse intent — State detected intent (e.g., role analysis, skill demand, comparative query, strategic prep, resume shaping, compensation benchmarking, multi-company contrast).
-2. Retrieve & anchor — Quote only what retrieval provides. If a requested fact is missing output the exact missing phrase.
-3. Analyze strategically — Build recommendations, roadmaps, certifications, competitive positioning. Tag non‑evidence parts STRATEGIC.
-4. Mark inferences — Any deduction beyond literal text is (INFERENCE) with minimal reasoning chain.
-5. Provide certifications only if tied to evidence or widely accepted (CFA, SHRM‑CP, PMP, CEH, Google Analytics, Six Sigma). Otherwise mark (SUGGESTION).
-6. Evidence block mandatory — List all used snippet IDs / row tags with ≤25 word quotes supporting claims.
+CORE PRINCIPLES:
+1. **Data-First**: Base factual claims on retrieved placement data. If information isn't available, state clearly: "This information is not available in the current data."
 
-STYLE
-- Flexible structure: choose bullets, sections, or narrative fit for intent.
-- No fluff. Each sentence must carry data, inference, or directive value.
-- For numeric derivations show arithmetic.
-- End every response with: Data-grounded. No assumptions left unstated.
+2. **Career-Focused**: Frame every response around career advancement and placement success. Focus on actionable insights.
 
-TAGS EXAMPLES
-(EVID:SQL:roles:row_12)
-(EVID:VEC:JD_doc45:p2)
-(STRAT:EXT:HBR:2019:Leadership-Transition)
-(INFERENCE)
-(SUGGESTION)
+3. **Clean Communication**: Provide clear, readable responses without technical citations or evidence tags. Let the insights speak for themselves.
 
-ETHICS
-- If asked to fabricate: "I cannot fabricate information. Provide data or permit a data lookup."
-- Never misrepresent authority beyond being JD-Copilot.
+4. **Strategic Context**: Combine placement data with strategic career advice, market trends, and skill recommendations.
 
-FINISH
-Always end with: Data-grounded. No assumptions left unstated.
+5. **MBA Specialization Mapping**: Always connect findings to relevant MBA specializations (Finance, Marketing, Operations, HR, Analytics).
+
+RESPONSE STRUCTURE:
+- Start with the most important career insight
+- Provide specific, actionable recommendations  
+- Include relevant skill/certification suggestions when appropriate
+- End with strategic next steps
+
+TONE: Direct, confident, results-oriented. Focus on career impact and competitive advantage.
+
+AVOID: Technical jargon, complex citations, evidence tags, redundant explanations.
 
 Role-Focused Output Formats (reference – adapt structure as needed)
 For role/position queries:
@@ -342,9 +438,9 @@ Special Instructions (condensed)
     - Never drift into generic industry commentary.
 """
 
-    # --- Build the final prompt for the API call ---
+    # --- Build clean context without citations ---
     context = "\n\n".join(
-        f"[{s.get('metadata', {}).get('company','?')} | {s.get('metadata', {}).get('role','?')} | {s.get('metadata', {}).get('year','?')}] {s['text']}"
+        s['text']  # Remove the citation prefixes completely
         for s in snippets
     )
     
@@ -405,7 +501,7 @@ Act as a placement consultant who understands the entire landscape.
     if settings.OPENROUTER_API_KEY and OPENROUTER_AVAILABLE:
         print(f"🟡 Attempting synthesis with OpenRouter model: moonshotai/kimi-k2 (fallback)")
         try:
-            openrouter_model = settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free"
+            openrouter_model = settings.OPENROUTER_MODEL or "moonshotai/kimi-k2"
             payload = {
                 "model": openrouter_model,
                 "messages": [
@@ -425,7 +521,7 @@ Act as a placement consultant who understands the entire landscape.
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
                         json=payload,
-                        timeout=30,
+                        timeout=180,
                     )
                     if resp.status_code == 200:
                         j = resp.json()
@@ -511,7 +607,7 @@ def _llm_generate_sql(question: str, schema: str) -> str | None:
     if settings.OPENROUTER_API_KEY and OPENROUTER_AVAILABLE:
         try:
             payload = {
-                "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free",
+                "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2",
                 "messages": [
                     {"role": "system", "content": "You output only the SQL query or the fixed error sentence. No explanations."},
                     {"role": "user", "content": prompt},
@@ -523,7 +619,7 @@ def _llm_generate_sql(question: str, schema: str) -> str | None:
                 "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
                 "Content-Type": "application/json",
             }
-            resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=20)
+            resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=180)
             if resp.status_code == 200:
                 content = resp.json()["choices"][0]["message"]["content"].strip()
                 return content
@@ -621,7 +717,7 @@ Answer: "**Skills Analysis by Company Demand:**
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
         }
-        resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=20)
+        resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=180)
         if resp.status_code == 200:
             return resp.json()["choices"][0]["message"]["content"].strip()
     except Exception:
@@ -651,14 +747,12 @@ def answer_from_text2sql(question: str) -> str | None:
 def _build_prompt(question: str, snippets: List[Dict[str, Any]]) -> str:
     ctx_lines = []
     for s in snippets:
-        meta = s.get("metadata", {})
-        cite = f"[{meta.get('company','?')} | {meta.get('role','?')} | {meta.get('year','?')}]"
-        ctx_lines.append(f"{cite} {s['text']}")
+        ctx_lines.append(s['text'])  # Remove citation prefixes
     context = "\n\n".join(ctx_lines)
     return (
         "Context snippets:\n" + context + "\n\n"
         + "Question: " + question + "\n"
-        + "Instructions: Answer only the question, briefly (<=120 words). Use only provided context. Include inline citations in the form [Company | Role | Year]."
+        + "Instructions: Answer the question clearly and concisely. Use only the provided context. Focus on actionable career insights."
     )
 
 

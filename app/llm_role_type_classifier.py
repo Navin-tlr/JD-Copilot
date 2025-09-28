@@ -98,7 +98,7 @@ def classify_role_types_llm(roles: List[dict], doc_text: str, max_doc_chars: int
     )
 
     payload = {
-        "model": settings.OPENROUTER_MODEL,
+    "model": settings.OPENROUTER_MODEL,
         "messages": [
             {"role": "system", "content": SYSTEM_INSTRUCTIONS},
             {"role": "user", "content": user_prompt},
@@ -117,7 +117,7 @@ def classify_role_types_llm(roles: List[dict], doc_text: str, max_doc_chars: int
             "https://openrouter.ai/api/v1/chat/completions",
             headers=headers,
             json=payload,
-            timeout=40,
+            timeout=180,
         )
         if resp.status_code != 200:
             print(f"⚠️ Role type LLM classification failed status={resp.status_code}")

@@ -177,7 +177,7 @@ class HybridNormalizer:
                     "temperature": 0.0,
                     "max_tokens": 128,
                 },
-                timeout=20,
+                timeout=180,
             )
             if resp.status_code != 200:
                 return None

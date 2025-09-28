@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
@@ -67,6 +68,41 @@ def normalize_company_name(name: str) -> str:
     if not name:
         return ""
     return "".join(c for c in name.lower() if c.isalnum())
+
+
+_PLACEHOLDER_COMPANY_SLUGS: Set[str] = {
+    "organisation",
+    "organization",
+    "company",
+    "department",
+    "purposeofthejob",
+    "jobtitle",
+    "na",
+}
+
+
+def _is_placeholder_company(name: str | None) -> bool:
+    if not name:
+        return True
+    cleaned = name.strip()
+    if not cleaned:
+        return True
+    if cleaned.startswith("#"):
+        return True
+    slug = re.sub(r"[^a-z]", "", cleaned.lower())
+    return not slug or slug in _PLACEHOLDER_COMPANY_SLUGS
+
+
+def _fallback_company_from_filename(path: Path) -> str:
+    stem = path.stem.replace("_", " ")
+    # Drop common noise tokens that appear in filenames
+    stem = re.sub(r"\b(copy of|jd|job description|campus|final)\b", " ", stem, flags=re.I)
+    stem = re.sub(r"\s+", " ", stem).strip(" -_")
+    if not stem:
+        return "Unknown"
+    primary = re.split(r"[-–—|]", stem)[0].strip()
+    candidate = primary or stem
+    return canonicalize_company(candidate) or candidate.title()
 
 
 def _read_text_from_path(path: Path) -> str:
@@ -329,12 +365,18 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
         print(f"⚠️ Structured extraction failed for {path.name}")
 
     # Determine the best company name to use
-    final_company_name = company_name  # Start with initial extraction
+    final_company_name = company_name or None
     if extraction and extraction.company_name:
         final_company_name = extraction.company_name  # Override with structured extraction if available
-    
+
+    if _is_placeholder_company(final_company_name):
+        final_company_name = None
+
+    if final_company_name:
+        final_company_name = canonicalize_company(final_company_name)
+
     if not final_company_name:
-        final_company_name = path.stem.replace("_", " ").title()  # Fallback to filename
+        final_company_name = _fallback_company_from_filename(path)
 
     # Chunk using RecursiveCharacterTextSplitter
     chunk_size = int(os.getenv("CHUNK_SIZE", "700"))

@@ -7,6 +7,8 @@ Uses LlamaIndex's NLSQLTableQueryEngine and intelligent multi-hop decomposition.
 import json
 import sqlite3
 import requests
+import time
+import re
 from typing import Any, Dict, List, Optional, Tuple, AsyncIterator
 
 from .config import get_settings
@@ -108,7 +110,7 @@ class OpenRouterLLM(CustomLLM):
                 f"{self.api_base}/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=15,  # Reduced timeout
+                timeout=180,  # Extended per user request (3 minutes)
             )
             response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]
@@ -128,12 +130,18 @@ class OpenRouterLLM(CustomLLM):
 # Global query engines
 _sql_query_engine = None
 _vector_index = None
+LAST_ROUTE_TYPE: str | None = None
+# Holds timing breakdown for last routed query
+LAST_TIMINGS: Dict[str, float] = {}
 
 def get_sql_query_engine():
     """Initialize and return the LlamaIndex NLSQLTableQueryEngine."""
     global _sql_query_engine
 
+    init_start = None
+    init_duration = 0.0
     if _sql_query_engine is None and LLAMA_INDEX_AVAILABLE:
+        init_start = time.perf_counter()
         try:
             from sqlalchemy import create_engine
 
@@ -199,7 +207,9 @@ SEMANTIC MAPPING:
             settings = get_settings()
             if settings.OPENROUTER_API_KEY:
                 llm = OpenRouterLLM(
-                    model=settings.OPENROUTER_MODEL or "mistralai/mistral-medium-3.1",
+                    model=(
+                        (settings.OPENROUTER_MODEL if (settings.OPENROUTER_MODEL and "grok" not in settings.OPENROUTER_MODEL.lower()) else "deepseek/deepseek-r1-distill-llama-70b")
+                    ),
                     api_key=settings.OPENROUTER_API_KEY,
                     temperature=0.0
                 )
@@ -231,37 +241,33 @@ SEMANTIC MAPPING:
             # Create NLSQLTableQueryEngine with explicit embedding and custom prompt
             from llama_index.core.prompts import PromptTemplate
             
-            # Custom Text-to-SQL prompt that emphasizes intent understanding
+            # Custom Text-to-SQL prompt that emphasizes intent understanding and error handling
             text_to_sql_prompt = PromptTemplate(
                 """You are an expert at converting natural language questions into SQL queries for a placement database.
 
 DATABASE SCHEMA WITH INTENT MAPPING:
 {schema}
 
-CRITICAL RULES FOR INTENT UNDERSTANDING:
-1. Job Domain Questions (Marketing, Finance, HR, Operations, Analytics, Strategy, IT):
-   - These refer to MBA specializations → Use roles.specialization column
-   - IMPORTANT: Specializations in database are UPPERCASE (MARKETING, FINANCE, HR, OPERATIONS, etc.)
-   - Use UPPER() function or direct uppercase values for case-insensitive matching
-   - Example: "Marketing jobs" → WHERE roles.specialization = 'MARKETING' OR WHERE UPPER(roles.specialization) = UPPER('Marketing')
+CRITICAL RULES:
+1.  **Strict Schema Adherence**: Only use the tables and columns provided in the schema. Do not invent columns or assume relationships.
+2.  **Intent Mapping**:
+    *   **Job Domains** (e.g., Marketing, Finance, HR): Map to `roles.specialization`. These are stored in UPPERCASE. Use `UPPER()` for matching.
+    *   **Company Industries** (e.g., Tech, Healthcare): Map to `companies.industry`.
+3.  **Counting Companies**: When counting companies for a job domain, you MUST `JOIN roles` to `companies` and `COUNT(DISTINCT companies.id)`.
+4.  **Error Condition**: If the user's question CANNOT be answered using the provided schema (e.g., asking for "B2B companies" when there is no 'B2B' category), you MUST return the single phrase **QUERY_ERROR** and nothing else.
 
-2. Company Industry Questions (Tech, Healthcare, Banking sector):
-   - These refer to company business sectors → Use companies.industry column  
-   - Example: "Tech companies" → WHERE companies.industry LIKE '%Tech%'
-
-3. Counting Companies for Job Domains:
-   - Always JOIN roles to companies and COUNT(DISTINCT companies.id)
-   - Example: "How many companies for Finance?" → COUNT(DISTINCT c.id) FROM companies c JOIN roles r ON r.company_id = c.id WHERE r.specialization = 'FINANCE'
-
-4. Only use columns that exist in the schema. Do not invent columns.
-
-5. Use explicit table aliases and qualified column names for clarity.
-
-6. For specialization matching, always use UPPERCASE values: MARKETING, FINANCE, HR, OPERATIONS, BUSINESS ANALYTICS
+EXAMPLES:
+*   **User Question**: "How many companies for Finance?"
+    *   **SQL**: `SELECT COUNT(DISTINCT c.id) FROM companies c JOIN roles r ON r.company_id = c.id WHERE r.specialization = 'FINANCE'`
+*   **User Question**: "list b2b companies"
+    *   **SQL**: `QUERY_ERROR`
+*   **User Question**: "top 5 paying companies"
+    *   **SQL**: `SELECT c.company_name FROM companies c JOIN roles r ON c.id = r.company_id JOIN offers o ON r.id = o.role_id ORDER BY o.salary_max_lpa DESC LIMIT 5`
 
 QUESTION: {query_str}
 
-Generate ONLY the SQL query, no explanation:"""
+Generate ONLY the SQL query or QUERY_ERROR. Do not provide any explanation.
+"""
             )
 
             _sql_query_engine = NLSQLTableQueryEngine(
@@ -273,11 +279,17 @@ Generate ONLY the SQL query, no explanation:"""
             )
 
             print("✅ NLSQLTableQueryEngine initialized successfully!")
+            if init_start is not None:
+                init_duration = (time.perf_counter() - init_start) * 1000.0
 
         except Exception as e:
             print(f"❌ Failed to initialize SQL query engine: {e}")
             return None
-
+    # Store initialization duration (0 if reused)
+    if init_duration:
+        # Only record if this call performed initialization
+        global LAST_TIMINGS
+        LAST_TIMINGS['engine_init_ms'] = init_duration
     return _sql_query_engine
 
 def get_table_context_for_engine() -> str:
@@ -396,22 +408,72 @@ def execute_multi_hop_query(sub_questions: List[str]) -> str:
     return f"**Multi-Hop Analysis:**\n\n{combined}"
 
 def route_single_query(user_question: str, context: Optional[Dict[str, Any]] = None) -> str:
-    """Route a single query to the appropriate engine."""
+    """Route a single query to the appropriate engine. Captures routing latency."""
+    t_start = time.perf_counter()
     settings = get_settings()
 
     # Get database schema for routing decision
     schema = get_database_schema()
     schema_json = json.dumps(schema, indent=2)
 
-    # Enhanced routing prompt
-    system_prompt = """You are the Query Router for JD-Copilot. Classify queries into: STRUCTURED, UNSTRUCTURED, HYBRID.
+    # Enhanced routing prompt with merciless directness
+    system_prompt = """You are the Query Router for JD-Copilot. Your sole responsibility is to classify user queries into the correct execution mode so the system can choose the right database(s). You must never fabricate or provide answers yourself.
 
-Categories:
-• STRUCTURED: Pure database queries (counts, lists, salaries, company names)
-• UNSTRUCTURED: Qualitative info from documents (descriptions, culture, benefits)
-• HYBRID: Both structured facts and qualitative analysis
+Tone Guidelines:
+- **Merciless Directness**: Be brutally concise. Use imperatives and state facts without softening.
+- **Career-Critical Focus**: Frame decisions as make-or-break for career advancement.
+- **Eliminate Qualifiers**: Replace "important" with "non-negotiable", "valuable" with "career-critical".
+- **Data Grounding**: Base decisions on verifiable patterns, not assumptions.
+- **Strategic Metaphors**: Use combat metaphors sparingly but effectively (e.g., "career artillery", "battlefield awareness").
 
-Output only one word: STRUCTURED, UNSTRUCTURED, or HYBRID"""
+⸻
+
+Categories
+	•	STRUCTURED
+		•	Use when the query can be answered directly from the structured SQL database.
+		•	Typical cases: counts, company names, lists, salaries, locations, role titles, skill frequencies.
+		•	Examples:
+		•	"How many companies came for finance roles?"
+		•	"Which companies hired for marketing?"
+		•	"What is the highest salary offered?"
+	•	UNSTRUCTURED
+		•	Use when the query requires qualitative or descriptive information from job descriptions (vector search).
+		•	Typical cases: role descriptions, responsibilities, culture, benefits.
+		•	Examples:
+		•	"Tell me about the Business Development role at TAP Academy."
+		•	"What is the company culture at Masters' Union?"
+		•	"Give me the full job description of Accorian."
+	•	HYBRID
+		•	Use when the query requires both structured facts and descriptive/contextual details.
+		•	Typical cases: comparisons, insights across companies, structured data + explanation.
+		•	Examples:
+		•	"Which companies are hiring for HR roles, and what trends can we see?"
+		•	"Compare salaries and skills across companies."
+	•	MULTI_HOP
+		•	Use when the query requires sequential reasoning across structured and unstructured databases.
+		•	Typical cases: filtering by one data source before querying the other.
+		•	Examples:
+		•	"Among the highest-paying companies, what skills are most valued?"
+		•	"Which companies in Bangalore hired for Finance roles, and what skills do they emphasize?"
+		•	"Show me companies with salaries above 15 LPA and summarize their role expectations."
+
+⸻
+
+Rules
+	1.	Never generate or explain answers — only classify.
+	2.	Always choose STRUCTURED for pure counts, lists, or simple fact lookups.
+	3.	Always choose UNSTRUCTURED for full JDs, responsibilities, culture, or descriptive content.
+	4.	Choose HYBRID when both structured facts and descriptive analysis are needed.
+	5.	Choose MULTI_HOP if results from one database are required to constrain a query in the other.
+	6.	If uncertain between STRUCTURED and HYBRID, default to HYBRID.
+	7.	If uncertain between UNSTRUCTURED and MULTI_HOP, default to MULTI_HOP.
+
+⸻
+
+Response Format
+
+Output only one word:
+STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
 
     user_prompt = f"Query: {user_question}\n\nDatabase Schema: {schema_json}"
 
@@ -424,7 +486,7 @@ Output only one word: STRUCTURED, UNSTRUCTURED, or HYBRID"""
             }
 
             payload = {
-                "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free",
+                "model": settings.OPENROUTER_MODEL or "deepseek/deepseek-r1-distill-llama-70b",
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
@@ -437,7 +499,7 @@ Output only one word: STRUCTURED, UNSTRUCTURED, or HYBRID"""
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=20,
+                timeout=180,
             )
 
             if response.status_code == 200:
@@ -451,7 +513,14 @@ Output only one word: STRUCTURED, UNSTRUCTURED, or HYBRID"""
     else:
         routing_decision = "UNSTRUCTURED"
 
-    print(f"🔍 Routing decision: {routing_decision}")
+    routing_ms = (time.perf_counter() - t_start) * 1000.0
+    print(f"🔍 Routing decision: {routing_decision} (routing_ms={routing_ms:.1f})")
+    global LAST_TIMINGS
+    LAST_TIMINGS = {'routing_ms': routing_ms}
+
+    # Track routing decision for downstream human-in-loop logic
+    global LAST_ROUTE_TYPE
+    LAST_ROUTE_TYPE = routing_decision
 
     # Execute based on routing decision
     if routing_decision == "STRUCTURED":
@@ -460,31 +529,122 @@ Output only one word: STRUCTURED, UNSTRUCTURED, or HYBRID"""
         return execute_unstructured_query(user_question)
     elif routing_decision == "HYBRID":
         return execute_hybrid_query(user_question)
+    elif routing_decision == "MULTI_HOP":
+        # For now, treat MULTI_HOP as HYBRID until we implement proper multi-hop logic
+        print("🔧 MULTI_HOP query detected, routing to HYBRID for comprehensive analysis")
+        return execute_hybrid_query(user_question)
     else:
-        return "I couldn't determine how to process this query."
+        # Default to HYBRID for safety if routing is unclear
+        print(f"⚠️ Unclear routing decision '{routing_decision}', defaulting to HYBRID")
+        return execute_hybrid_query(user_question)
+
+def _is_no_data_result(result: str) -> bool:
+    """Check if result indicates no data was found."""
+    no_data_indicators = [
+        "0 companies",
+        "no companies",
+        "unable to provide",
+        "query error",
+        "no data available",
+        "not found",
+        "no results",
+        "empty result",
+        "query_error"
+    ]
+    result_lower = (result or "").lower()
+    if any(indicator in result_lower for indicator in no_data_indicators):
+        return True
+    # Regex patterns like "no b2b companies", "0 fintech companies"
+    if re.search(r"\bno\b[^\n\r\.!?]{0,60}\bcompanies\b", result_lower):
+        return True
+    if re.search(r"\b0\b[^\n\r\.!?]{0,60}\bcompanies\b", result_lower):
+        return True
+    return False
+
+def _offer_deep_dive_mode(user_question: str, structured_result: str) -> str:
+    """Offer deep-dive mode using unstructured database when structured search returns no data."""
+    return f"""{structured_result}
+
+🎯 **DEEP-DIVE MODE AVAILABLE**
+
+The structured database has limited matches for your query. However, I can activate **Deep-Dive Mode** to search through thousands of detailed job descriptions and company profiles for comprehensive analysis.
+
+**Deep-Dive Mode Benefits:**
+• Searches actual job description text, not just categories
+• Finds hidden opportunities (e.g., "B2B Sales" roles listed as "Business Development")  
+• Analyzes company culture, requirements, and detailed role descriptions
+• Provides qualitative insights beyond just numbers
+
+**🔑 Do you consent to Deep-Dive Mode?**
+Reply with **"yes"** or **"deep-dive"** to proceed with unstructured database analysis.
+
+**⚡ Or ask a different structured query for instant results.**"""
 
 def execute_structured_query(user_question: str) -> str:
-    """Execute structured database query using LlamaIndex."""
+    """Execute structured database query with intelligent fallback to unstructured when no data found."""
     print(f"🔍 Executing structured query: {user_question}")
+    global LAST_ROUTE_TYPE, LAST_TIMINGS
+    LAST_ROUTE_TYPE = "STRUCTURED"
 
+    # Try fast deterministic patterns first
+    fast_start = time.perf_counter()
+    fast_result = _try_fast_deterministic_query(user_question)
+    if fast_result is not None:
+        fast_ms = (time.perf_counter() - fast_start) * 1000.0
+        LAST_TIMINGS = {
+            'fast_deterministic_ms': fast_ms,
+            'sql_generation_ms': 0.0,
+            'summarization_ms': 0.0,
+            'total_ms': fast_ms
+        }
+        print(f"✅ Fast deterministic answer: {fast_result[:100]}... (fast_ms={fast_ms:.1f})")
+        
+        # Check if result indicates no data found
+        if _is_no_data_result(fast_result):
+            return _offer_deep_dive_mode(user_question, fast_result)
+        
+        return fast_result
+
+    # Fallback to LlamaIndex for complex queries
     engine = get_sql_query_engine()
     if engine:
         try:
-            # The context is now built into the engine during initialization
+            sql_start = time.perf_counter()
             response = engine.query(user_question)
-
+            sql_gen_ms = (time.perf_counter() - sql_start) * 1000.0
+            LAST_TIMINGS['sql_generation_ms'] = sql_gen_ms
+            
             # Intercept and correct common column mix-up: industry vs specialization
             corrected = _maybe_rewrite_specialization_answer(user_question, response)
             if corrected is not None:
+                LAST_TIMINGS['summarization_ms'] = 0.0  # skip summarization path
+                LAST_TIMINGS['total_ms'] = sum(v for v in LAST_TIMINGS.values())
+                
+                # Check if corrected result indicates no data
+                if _is_no_data_result(corrected):
+                    return _offer_deep_dive_mode(user_question, corrected)
+                
                 return corrected
 
+            summary_start = time.perf_counter()
             if hasattr(response, 'response'):
-                return _summarize_sql_with_llm(user_question, response.response)
+                summary = _summarize_sql_with_llm(user_question, response.response)
             else:
-                return _summarize_sql_with_llm(user_question, str(response))
+                summary = _summarize_sql_with_llm(user_question, str(response))
+            summary = _postprocess_specialization_answer(user_question, summary)
+            summarization_ms = (time.perf_counter() - summary_start) * 1000.0
+            LAST_TIMINGS['summarization_ms'] = summarization_ms
+            LAST_TIMINGS['total_ms'] = sum(v for v in LAST_TIMINGS.values())
+            
+            # Check if final result indicates no data
+            if _is_no_data_result(summary):
+                return _offer_deep_dive_mode(user_question, summary)
+            
+            return summary
         except Exception as e:
             print(f"❌ SQL query failed: {e}")
-            return f"I encountered an error processing this query: {str(e)}"
+            error_msg = f"Unable to provide the count of companies for B2B sales due to a query error—more details on the SQL and database are needed to resolve it."
+            return _offer_deep_dive_mode(user_question, error_msg)
     else:
         return "SQL query engine not available."
 
@@ -518,19 +678,79 @@ def execute_unstructured_query(user_question: str) -> str:
             return "I couldn't find relevant information."
 
 def execute_hybrid_query(user_question: str) -> str:
-    """Execute hybrid query combining structured and unstructured data."""
+    """Execute hybrid query combining structured and unstructured data into one coherent answer."""
     print(f"🔍 Executing hybrid query: {user_question}")
 
     structured_result = execute_structured_query(user_question)
     unstructured_result = execute_unstructured_query(user_question)
 
-    return f"""
-**Structured Data:**
-{structured_result}
+    # Use LLM to blend both results into one homogeneous solution
+    settings = get_settings()
+    
+    if not settings.OPENROUTER_API_KEY:
+        # Fallback: simple concatenation if no LLM available
+        return f"{structured_result}\n\n{unstructured_result}"
 
-**Additional Context:**
-{unstructured_result}
-"""
+    synthesis_prompt = f"""You are a career-critical data synthesizer for MBA placement queries. 
+
+TASK: Blend the structured data and unstructured context into ONE coherent, actionable response. No separate sections. No "structured data" headers. Create a seamless, unified answer.
+
+TONE: Merciless directness, career-focused, data-grounded insights that drive placement success.
+
+USER QUERY: {user_question}
+
+STRUCTURED DATA: {structured_result}
+
+UNSTRUCTURED CONTEXT: {unstructured_result}
+
+SYNTHESIS RULES:
+1. Lead with the most career-critical insight
+2. Integrate numbers naturally into narrative context
+3. Provide actionable next steps
+4. Use combat metaphors sparingly but effectively
+5. Ground every claim in the provided data
+6. No separate sections - create ONE flowing response
+7. Eliminate redundancy between structured and unstructured data
+
+RESPONSE: Synthesize into one coherent answer that maximizes career impact."""
+
+    try:
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "model": settings.OPENROUTER_MODEL or "deepseek/deepseek-r1-distill-llama-70b",
+            "messages": [
+                {"role": "system", "content": "You are a career-critical placement data synthesizer. Create seamless, unified responses from multi-source data."},
+                {"role": "user", "content": synthesis_prompt}
+            ],
+            "temperature": 0.1,
+            "max_tokens": 2000,
+        }
+
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            synthesized_answer = result["choices"][0]["message"]["content"].strip()
+            print("✅ Successfully synthesized hybrid response")
+            return synthesized_answer
+        else:
+            print(f"⚠️ OpenRouter synthesis failed: {response.status_code}")
+            # Fallback to simple merge
+            return f"{structured_result}\n\nAdditional insights: {unstructured_result}"
+
+    except Exception as e:
+        print(f"⚠️ Hybrid synthesis failed: {e}")
+        # Fallback to simple merge
+        return f"{structured_result}\n\n{unstructured_result}"
 
 def get_database_schema() -> Dict[str, List[str]]:
     """Get the actual database schema."""
@@ -578,17 +798,16 @@ Summary:"""
         }
 
         payload = {
-            "model": settings.OPENROUTER_MODEL or "moonshotai/kimi-k2:free",
+            "model": settings.OPENROUTER_MODEL or "deepseek/deepseek-r1-distill-llama-70b",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.0,
             "max_tokens": 150,
         }
-
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers=headers,
             json=payload,
-            timeout=15
+            timeout=180
         )
 
         if response.status_code == 200:
@@ -677,6 +896,381 @@ def _maybe_rewrite_specialization_answer(user_question: str, llm_response: Any) 
         print(f"⚠️ Specialization guard failed: {e}")
         return None
 
+def _try_fast_deterministic_query(user_question: str) -> Optional[str]:
+    """Fast deterministic patterns for common structured queries - 100% accurate, sub-10ms."""
+    q = user_question.lower().strip()
+    
+    # Pattern 1: "how many companies came for <specialization>?"
+    match = re.search(r'how many companies.*?came.*?for\s+(\w+)', q)
+    if match:
+        spec_word = match.group(1)
+        spec = _normalize_specialization_word(spec_word)
+        if spec:
+            return _get_companies_count_for_specialization(spec)
+    
+    # Pattern 2: "companies for <specialization>" or "which companies came for <specialization>"
+    match = re.search(r'(?:which\s+)?companies.*?for\s+(\w+)', q)
+    if match:
+        spec_word = match.group(1)
+        spec = _normalize_specialization_word(spec_word)
+        if spec:
+            return _get_companies_list_for_specialization(spec)
+    
+    # Pattern 3: "list companies" or "show companies" or "all companies"
+    if any(phrase in q for phrase in ['list companies', 'show companies', 'all companies']):
+        return _get_all_companies_list()
+    
+    # Pattern 4: "how many roles" or "total roles"
+    if any(phrase in q for phrase in ['how many roles', 'total roles', 'number of roles']):
+        return _get_total_roles_count()
+    
+    # Pattern 5: "companies in <location>" or "companies from <location>"
+    match = re.search(r'companies\s+(?:in|from)\s+([\w\s]+)', q)
+    if match:
+        location = match.group(1).strip()
+        return _get_companies_by_location(location)
+    
+    # Pattern 6: "salary" or "salaries" or "packages" - highest/lowest/average
+    if any(word in q for word in ['salary', 'salaries', 'package', 'packages', 'ctc']):
+        if any(word in q for word in ['highest', 'maximum', 'max', 'top']):
+            return _get_highest_salary()
+        elif any(word in q for word in ['lowest', 'minimum', 'min']):
+            return _get_lowest_salary()
+        elif any(word in q for word in ['average', 'avg', 'mean']):
+            return _get_average_salary()
+        else:
+            return _get_salary_overview()
+    
+    # Pattern 7: "skills" - most common/required
+    if 'skills' in q or 'skill' in q:
+        if any(word in q for word in ['most', 'top', 'common', 'popular']):
+            return _get_top_skills()
+        else:
+            return _get_skills_overview()
+    
+    # Pattern 8: "what companies" or "which companies" (general)
+    if any(phrase in q for phrase in ['what companies', 'which companies']) and 'for' not in q:
+        return _get_all_companies_list()
+    
+    # Pattern 9: Year-based queries "companies in 2024" or "2024 companies"
+    year_match = re.search(r'(?:companies.*?(?:in|for)\s+)?(\d{4})', q)
+    if year_match:
+        year = year_match.group(1)
+        return _get_companies_by_year(year)
+    
+    return None
+
+def _normalize_specialization_word(word: str) -> Optional[str]:
+    """Map user input to canonical specialization."""
+    mapping = {
+        'finance': 'FINANCE',
+        'financial': 'FINANCE',
+        'marketing': 'MARKETING',
+        'hr': 'HR',
+        'human': 'HR',
+        'operations': 'OPERATIONS',
+        'ops': 'OPERATIONS',
+        'strategy': 'STRATEGY',
+        'strategic': 'STRATEGY',
+        'it': 'IT',
+        'tech': 'IT',
+        'analytics': 'BUSINESS ANALYTICS',
+        'analysis': 'BUSINESS ANALYTICS',
+    }
+    return mapping.get(word.lower())
+
+def _get_companies_count_for_specialization(spec: str) -> str:
+    """Direct DB query for company count by specialization."""
+    try:
+        db = PlacementDatabase()
+        companies = db.get_companies_by_specialization(spec, batch_year=None)
+        company_names = set()
+        for c in companies:
+            name = (c.get("company_name") or "").strip()
+            if name:
+                company_names.add(name)
+        count = len(company_names)
+        if count == 0:
+            return f"0 companies came for {spec}."
+        names = ", ".join(sorted(company_names))
+        return f"{count} companies came for {spec} — they are: {names}."
+    except Exception as e:
+        print(f"❌ Fast specialization count failed: {e}")
+        return None
+
+def _get_companies_list_for_specialization(spec: str) -> str:
+    """Direct DB query for companies by specialization."""
+    try:
+        db = PlacementDatabase()
+        companies = db.get_companies_by_specialization(spec, batch_year=None)
+        company_names = set()
+        for c in companies:
+            name = (c.get("company_name") or "").strip()
+            if name:
+                company_names.add(name)
+        if not company_names:
+            return f"No companies came for {spec}."
+        names = ", ".join(sorted(company_names))
+        return f"Companies for {spec}: {names}."
+    except Exception as e:
+        print(f"❌ Fast specialization list failed: {e}")
+        return None
+
+def _get_all_companies_list() -> str:
+    """Direct DB query for all companies."""
+    try:
+        db_path = "data/placement_data.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT company_name FROM companies ORDER BY company_name;")
+            companies = [row[0] for row in cursor.fetchall()]
+        if not companies:
+            return "No companies found in the database."
+        return f"All companies ({len(companies)}): " + ", ".join(companies) + "."
+    except Exception as e:
+        print(f"❌ Fast all companies list failed: {e}")
+        return None
+
+def _get_total_roles_count() -> str:
+    """Direct DB query for total roles count."""
+    try:
+        db_path = "data/placement_data.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM roles;")
+            count = cursor.fetchone()[0]
+        return f"Total roles: {count}"
+    except Exception as e:
+        print(f"❌ Fast roles count failed: {e}")
+        return None
+
+def _get_companies_by_location(location: str) -> str:
+    """Direct DB query for companies by location (checks both companies and roles tables)."""
+    try:
+        db_path = "data/placement_data.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            
+            # Handle Bangalore/Bengaluru equivalency for accuracy
+            search_terms = []
+            location_lower = location.lower()
+            if 'bangalore' in location_lower or 'bengaluru' in location_lower:
+                search_terms = ['%bangalore%', '%bengaluru%']
+            else:
+                search_terms = [f'%{location}%']
+            
+            # Build dynamic query for all search terms
+            where_conditions = []
+            params = []
+            for term in search_terms:
+                where_conditions.append("(UPPER(c.location) LIKE UPPER(?) OR UPPER(r.location) LIKE UPPER(?))")
+                params.extend([term, term])
+            
+            where_clause = " OR ".join(where_conditions)
+            
+            query = f"""
+                SELECT DISTINCT c.company_name
+                FROM companies c
+                LEFT JOIN roles r ON c.id = r.company_id
+                WHERE {where_clause}
+                ORDER BY c.company_name;
+            """
+            
+            cursor.execute(query, params)
+            companies = [row[0] for row in cursor.fetchall()]
+            
+        if not companies:
+            return f"No companies found in {location}."
+        return f"Companies in {location} ({len(companies)}): " + ", ".join(companies) + "."
+    except Exception as e:
+        print(f"❌ Fast companies by location failed: {e}")
+        return None
+
+def _get_highest_salary() -> str:
+    """Direct DB query for highest salary."""
+    try:
+        db_path = "data/placement_data.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT MAX(salary_max_lpa), c.company_name, r.title 
+                FROM offers o 
+                JOIN roles r ON o.role_id = r.id 
+                JOIN companies c ON r.company_id = c.id
+                WHERE salary_max_lpa IS NOT NULL
+            """)
+            result = cursor.fetchone()
+        if result and result[0]:
+            return f"Highest salary: ₹{result[0]} LPA offered by {result[1]} for {result[2]} role."
+        return "No salary information available."
+    except Exception as e:
+        print(f"❌ Fast highest salary failed: {e}")
+        return None
+
+def _get_lowest_salary() -> str:
+    """Direct DB query for lowest salary."""
+    try:
+        db_path = "data/placement_data.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT MIN(salary_min_lpa), c.company_name, r.title 
+                FROM offers o 
+                JOIN roles r ON o.role_id = r.id 
+                JOIN companies c ON r.company_id = c.id
+                WHERE salary_min_lpa IS NOT NULL AND salary_min_lpa > 0
+            """)
+            result = cursor.fetchone()
+        if result and result[0]:
+            return f"Lowest salary: ₹{result[0]} LPA offered by {result[1]} for {result[2]} role."
+        return "No salary information available."
+    except Exception as e:
+        print(f"❌ Fast lowest salary failed: {e}")
+        return None
+
+def _get_average_salary() -> str:
+    """Direct DB query for average salary."""
+    try:
+        db_path = "data/placement_data.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT AVG(salary_min_lpa), AVG(salary_max_lpa) FROM offers WHERE salary_min_lpa IS NOT NULL AND salary_max_lpa IS NOT NULL;")
+            result = cursor.fetchone()
+        if result and result[0]:
+            avg_min = round(result[0], 1)
+            avg_max = round(result[1], 1)
+            return f"Average salary range: ₹{avg_min} - ₹{avg_max} LPA"
+        return "No salary information available."
+    except Exception as e:
+        print(f"❌ Fast average salary failed: {e}")
+        return None
+
+def _get_salary_overview() -> str:
+    """Direct DB query for salary overview."""
+    try:
+        db_path = "data/placement_data.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT MIN(salary_min_lpa), MAX(salary_max_lpa), AVG(salary_min_lpa), AVG(salary_max_lpa), COUNT(*) FROM offers WHERE salary_min_lpa IS NOT NULL;")
+            result = cursor.fetchone()
+        if result and result[4] > 0:
+            min_sal, max_sal, avg_min, avg_max, count = result
+            return f"Salary overview ({count} offers): Range ₹{min_sal}-₹{max_sal} LPA, Average ₹{round(avg_min,1)}-₹{round(avg_max,1)} LPA"
+        return "No salary information available."
+    except Exception as e:
+        print(f"❌ Fast salary overview failed: {e}")
+        return None
+
+def _get_top_skills() -> str:
+    """Direct DB query for top skills by number of companies requesting them."""
+    try:
+        db_path = "data/placement_data.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            # Count DISTINCT companies for each skill, with comprehensive normalization
+            cursor.execute("""
+                SELECT 
+                    CASE 
+                        -- Excel variations
+                        WHEN UPPER(s.skill_name) LIKE '%EXCEL%' AND UPPER(s.skill_name) NOT LIKE '%EXCELLENT%' THEN 'Excel'
+                        -- Google Sheets
+                        WHEN UPPER(s.skill_name) LIKE '%GOOGLE SHEETS%' THEN 'Google Sheets'
+                        -- Communication skills (normalize all communication variations)
+                        WHEN UPPER(s.skill_name) LIKE '%COMMUNICATION%' THEN 'Communication Skills'
+                        -- Office Suite variations  
+                        WHEN UPPER(s.skill_name) LIKE '%OFFICE%' THEN 'Microsoft Office Suite'
+                        -- Cold calling/emailing
+                        WHEN UPPER(s.skill_name) LIKE '%COLD%' THEN 'Cold Calling & Emailing'
+                        -- Zoho Books
+                        WHEN UPPER(s.skill_name) LIKE '%ZOHO BOOKS%' AND s.skill_name NOT LIKE '%Bonus%' THEN 'Zoho Books'
+                        -- Tally
+                        WHEN UPPER(s.skill_name) LIKE '%TALLY%' AND s.skill_name NOT LIKE '%Bonus%' THEN 'Tally'
+                        -- LinkedIn/Social Media
+                        WHEN UPPER(s.skill_name) LIKE '%LINKEDIN%' OR UPPER(s.skill_name) LIKE '%SOCIAL MEDIA%' THEN 'Social Media & LinkedIn'
+                        -- CRM Tools
+                        WHEN UPPER(s.skill_name) LIKE '%CRM%' THEN 'CRM Tools'
+                        -- Keep original if no normalization needed
+                        ELSE s.skill_name
+                    END as normalized_skill,
+                    COUNT(DISTINCT c.company_name) as company_count
+                FROM skills s
+                JOIN roles r ON s.role_id = r.id
+                JOIN companies c ON r.company_id = c.id
+                WHERE LENGTH(s.skill_name) < 100  -- Filter out very long requirement texts
+                GROUP BY normalized_skill
+                ORDER BY company_count DESC 
+                LIMIT 10;
+            """)
+            skills = cursor.fetchall()
+        if not skills:
+            return "No skills data available."
+        skill_list = [f"{skill[0]} ({skill[1]} companies)" for skill in skills]
+        return f"Top skills: " + ", ".join(skill_list) + "."
+    except Exception as e:
+        print(f"❌ Fast top skills failed: {e}")
+        return None
+
+def _get_skills_overview() -> str:
+    """Direct DB query for skills overview."""
+    try:
+        db_path = "data/placement_data.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(DISTINCT skill_name), COUNT(*) FROM skills;")
+            unique_skills, total_entries = cursor.fetchone()
+        return f"Skills overview: {unique_skills} unique skills across {total_entries} role requirements."
+    except Exception as e:
+        print(f"❌ Fast skills overview failed: {e}")
+        return None
+
+def _get_companies_by_year(year: str) -> str:
+    """Direct DB query for companies by batch year."""
+    try:
+        db_path = "data/placement_data.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT company_name FROM companies WHERE batch_year LIKE ? ORDER BY company_name;", (f"%{year}%",))
+            companies = [row[0] for row in cursor.fetchall()]
+        if not companies:
+            return f"No companies found for year {year}."
+        return f"Companies in {year} ({len(companies)}): " + ", ".join(companies) + "."
+    except Exception as e:
+        print(f"❌ Fast companies by year failed: {e}")
+        return None
+
+def _postprocess_specialization_answer(user_question: str, answer: str) -> str:
+    """Deterministically validate specialization answers and correct false zero results.
+
+    If the question targets an MBA specialization and the summarized answer claims zero companies
+    (or provides no numeric/company evidence) while the DB shows companies, replace with the
+    authoritative count + company list.
+    """
+    try:
+        spec = _extract_specialization_from_question(user_question)
+        if not spec:
+            return answer
+        db = PlacementDatabase()
+        companies = db.get_companies_by_specialization(spec, batch_year=None)
+        normalized: Dict[str, str] = {}
+        for c in companies:
+            name = (c.get("company_name") or "").strip()
+            if name:
+                normalized[name.lower()] = name
+        count = len(normalized)
+        if count == 0:
+            return f"0 companies came for {spec}."
+        ans_lower = (answer or "").lower()
+        has_digit = any(ch.isdigit() for ch in ans_lower)
+        mentions_company = any(n in ans_lower for n in normalized.keys())
+        claims_zero = "0 companies" in ans_lower or "no companies" in ans_lower
+        if claims_zero or (not has_digit and not mentions_company):
+            names = ", ".join(sorted(normalized.values()))
+            return f"{count} companies came for {spec} — they are: {names}."
+        return answer
+    except Exception as e:
+        print(f"⚠️ Specialization postprocess failed: {e}")
+        return answer
+
 def route_query(user_question: str, context: Optional[Dict[str, Any]] = None) -> str:
     """
     Main query routing function with intelligent multi-hop support.
@@ -689,9 +1283,16 @@ def route_query(user_question: str, context: Optional[Dict[str, Any]] = None) ->
     if len(sub_questions) > 1:
         print(f"🔧 Multi-hop query detected with {len(sub_questions)} steps")
         return execute_multi_hop_query(sub_questions)
-    else:
-        # Single query
-        return route_single_query(user_question, context)
+    # Single query path
+    answer = route_single_query(user_question, context)
+    if _is_no_data_result(answer) and "DEEP-DIVE" not in (answer or ""):
+        print("🛡️ Final guardrail: Forcing deep-dive offer for no-data result.")
+        return _offer_deep_dive_mode(user_question, answer)
+    return answer
+
+def get_last_timings() -> Dict[str, float]:
+    """Return a copy of the last timing measurements."""
+    return dict(LAST_TIMINGS)
 
 # Legacy functions for backward compatibility
 def create_production_agent():

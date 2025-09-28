@@ -244,7 +244,7 @@ User Query: "{question}"
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers=headers,
                     json=payload,
-                    timeout=10,
+                    timeout=180,
                 )
 
                 if response.status_code == 200:
