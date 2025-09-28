@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     # OpenRouter (alternative LLM provider)
     OPENROUTER_API_KEY: str | None = None
     OPENROUTER_MODEL: str | None = None
+    OPENROUTER_SQL_MODEL: str = "cognitivecomputations/dolphin3.0-mistral-24b:free"
+    OPENROUTER_UNSTRUCTURED_MODEL: str = "openai/gpt-oss-120b"
 
     # LlamaParse
     LLAMAPARSE_API_KEY: str | None = None

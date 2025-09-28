@@ -975,48 +975,84 @@ export default function Index() {
     );
   };
 
-  // Inline deep dive consent prompt (replaces prior full-screen modal)
-  const DeepDivePrompt = ({ question, reason }: { question: string; reason?: string }) => {
+  const dismissDeepDive = useCallback(() => {
+    setPendingVectorApproval(null);
+  }, []);
+
+  const triggerDeepDive = useCallback(async (question: string) => {
+    dismissDeepDive();
+    const normalizedUser = (userIdRef.current || DEFAULT_USER_ID).trim() || DEFAULT_USER_ID;
+    const targetSession = sessionIdRef.current;
+    try {
+      const resp = await fetch(`${API_BASE}/chat/vector`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, session_id: targetSession, user_id: normalizedUser })
+      });
+      const timestamp = new Date().toISOString();
+      if (resp.ok) {
+        const data = await resp.json();
+        const vecAnswer = data.answer || '(no deep-dive answer)';
+        setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: vecAnswer, timestamp }]);
+        await refreshSessions();
+      } else {
+        setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: 'Deep-dive failed (network).', timestamp }]);
+      }
+    } catch {
+      const timestamp = new Date().toISOString();
+      setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: 'Deep-dive error.', timestamp }]);
+    }
+  }, [dismissDeepDive, refreshSessions]);
+
+  const DeepDivePrompt = ({ question, reason, onConfirm, onDismiss }: { question: string; reason?: string; onConfirm: () => void; onDismiss: () => void }) => {
+    const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
+
+    useEffect(() => {
+      confirmButtonRef.current?.focus();
+      const handleKey = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          onDismiss();
+        }
+      };
+      window.addEventListener('keydown', handleKey);
+      return () => window.removeEventListener('keydown', handleKey);
+    }, [onDismiss]);
+
     return (
-      <div className="w-full bg-[#3a3a3a] border border-[#F69F1C]/45 rounded-[5px] px-3 py-2 flex flex-col gap-2 shadow-sm">
-        <div className="font-hack text-[11px] text-[#F69F1C] tracking-wide">Deep-Dive Mode Available</div>
-        <div className="font-hack text-[10px] text-rag-text-primary/70 leading-snug">{reason || 'Run deeper unstructured search?'}</div>
-        <div className="font-hack text-[9px] text-rag-text-primary/40">Query: <span className="text-rag-text-primary/60">{question}</span></div>
-        <div className="flex items-center justify-end gap-2 pt-1">
-          <button
-            onClick={() => setPendingVectorApproval(null)}
-            className="font-hack text-[10px] px-2 py-1 rounded-sm bg-transparent text-rag-text-primary/55 hover:text-rag-text-primary/85"
-          >dismiss</button>
-          <button
-            onClick={async () => {
-              // Fire vector endpoint directly; append new assistant message with deep dive answer
-              const q = question;
-              setPendingVectorApproval(null);
-              const normalizedUser = (userIdRef.current || DEFAULT_USER_ID).trim() || DEFAULT_USER_ID;
-              const targetSession = sessionIdRef.current;
-              try {
-                const resp = await fetch(`${API_BASE}/chat/vector`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ question: q, session_id: targetSession, user_id: normalizedUser })
-                });
-                if (resp.ok) {
-                  const data = await resp.json();
-                  const vecAnswer = data.answer || '(no deep-dive answer)';
-                  const timestamp = new Date().toISOString();
-                  setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: vecAnswer, timestamp }]);
-                  refreshSessions();
-                } else {
-                  const timestamp = new Date().toISOString();
-                  setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: 'Deep-dive failed (network).', timestamp }]);
-                }
-              } catch {
-                const timestamp = new Date().toISOString();
-                setMessages(m => [...m, { id: crypto.randomUUID(), role: 'assistant', content: 'Deep-dive error.', timestamp }]);
-              }
-            }}
-            className="font-hack text-[10px] px-3 py-1 rounded-sm bg-[#F69F1C]/25 border border-[#F69F1C]/40 text-[#F69F1C] hover:bg-[#F69F1C]/35"
-          >Run Deep-Dive</button>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 animate-in fade-in duration-200" role="dialog" aria-modal="true" aria-labelledby="deep-dive-title">
+        <div className="w-full max-w-sm rounded-lg border border-[#F69F1C]/40 bg-rag-chat-dark shadow-lg p-4 space-y-3 animate-in zoom-in-95 duration-200">
+          {/* Header */}
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded bg-[#F69F1C]/20 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#F69F1C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <div className="font-hack text-[11px] uppercase tracking-wide text-[#F69F1C] font-bold">Deep-Dive</div>
+          </div>
+
+          {/* Description */}
+          <div className="font-hack text-[10px] text-white/70 leading-relaxed">
+            Structured data limit reached. Search unstructured job descriptions for deeper insights?
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button
+              onClick={onDismiss}
+              className="font-hack text-[10px] px-3 py-1.5 rounded bg-transparent text-white/50 hover:text-white/70 transition-colors"
+            >
+              Skip
+            </button>
+            <button
+              ref={confirmButtonRef}
+              onClick={onConfirm}
+              className="font-hack text-[10px] px-4 py-1.5 rounded bg-[#F69F1C] text-black font-medium hover:bg-[#E8891C] focus:outline-none focus:ring-1 focus:ring-[#F69F1C]/60 transition-colors"
+            >
+              Activate
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1051,9 +1087,6 @@ export default function Index() {
               } as const;
               return <MessageBubble key={bubbleMessage.id} msg={bubbleMessage} />;
             })}
-            {pendingVectorApproval && mode === 'rag' && (
-              <DeepDivePrompt question={pendingVectorApproval.question} reason={pendingVectorApproval.reason} />
-            )}
             {mode === 'rag' && isSending && !messages.some(m => m.streaming) && (
               <div className="px-1 py-1">
                 <TypingIndicator />
@@ -1062,6 +1095,14 @@ export default function Index() {
           </div>
         )}
       </div>
+      {pendingVectorApproval && mode === 'rag' && (
+        <DeepDivePrompt
+          question={pendingVectorApproval.question}
+          reason={pendingVectorApproval.reason}
+          onDismiss={dismissDeepDive}
+          onConfirm={() => triggerDeepDive(pendingVectorApproval.question)}
+        />
+      )}
       <div className="w-full space-y-4 flex flex-col items-center z-10 flex-shrink-0">
         {/* Original ChatComponent before backend connection */}
         <div className={cn(

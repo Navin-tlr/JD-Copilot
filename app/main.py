@@ -268,48 +268,25 @@ async def chat_endpoint(request: QueryRequest):
         chat_memory.add_message(session_id, "user", question)
         _sync_history_snapshot(user_id, session_id)
         
-        # Check if user is consenting to deep-dive mode
-        is_deep_dive_consent = _is_deep_dive_consent(question)
-        
-        if is_deep_dive_consent:
-            print("🎯 Deep-dive mode activated by user consent")
-            # Get the previous question from chat memory for context
-            previous_messages = chat_memory.get_messages(session_id)
-            if len(previous_messages) >= 2:  # At least one previous Q&A
-                # Get the last user question before consent
-                for i in range(len(previous_messages) - 2, -1, -1):
-                    message = previous_messages[i]
-                    role = message.get("role") if isinstance(message, dict) else getattr(message, "role", None)
-                    if role == "user":
-                        original_question = message.get("content") if isinstance(message, dict) else getattr(message, "content", "")
-                        print(f"🔍 Deep-dive analyzing original query: {original_question}")
-                        # Force unstructured search
-                        answer = _execute_deep_dive_search(original_question)
-                        break
-                else:
-                    answer = "I need the original question to perform deep-dive analysis. Please ask your question again."
-            else:
-                answer = "I need the original question to perform deep-dive analysis. Please ask your question again."
-        else:
-            # Use the simple router to process the query
-            print("🚀 Using simple LLM router for query processing")
-            try:
-                answer = route_query(question)
-                print(f"🔍 Router answer: {answer}")
-                
-                if not answer or answer.strip() == "":
-                    answer = "I couldn't process your query. Please try again."
-                    
-                print(f"🔍 Final answer: {answer}")
-            except Exception as router_error:
-                print(f"❌ Router error: {router_error}")
-                # Return a graceful error response instead of crashing
-                return ChatResponse(
-                    answer=f"Sorry, I encountered an error while processing your query: {str(router_error)}",
-                    snippets=[],
-                    citations=[],
-                    error=True
-                )
+        # Use the simple router to process the query
+        print("🚀 Using simple LLM router for query processing")
+        try:
+            answer = route_query(question)
+            print(f"🔍 Router answer: {answer}")
+
+            if not answer or answer.strip() == "":
+                answer = "I couldn't process your query. Please try again."
+
+            print(f"🔍 Final answer: {answer}")
+        except Exception as router_error:
+            print(f"❌ Router error: {router_error}")
+            # Return a graceful error response instead of crashing
+            return ChatResponse(
+                answer=f"Sorry, I encountered an error while processing your query: {str(router_error)}",
+                snippets=[],
+                citations=[],
+                error=True
+            )
         
         # Extract snippets from the answer if available
         snippets = []
@@ -351,13 +328,15 @@ async def chat_endpoint(request: QueryRequest):
         reason = None
         deep_dive_mandatory = False
 
-        if LAST_ROUTE_TYPE == "STRUCTURED":
-            # Only prompt for deep dive if structured data was insufficient
-            if no_data or deep_dive_phrase:
-                deep_dive_offered = True
-                deep_dive_consent_needed = True and not deep_dive_analysis
-                needs_vector = True  # front-end can show consent CTA
-                reason = "Structured database returned no direct data. Offer deep-dive search of unstructured job descriptions." 
+        # Offer deep-dive whenever query returns no data, or for all structured queries to enhance semantic understanding
+        if no_data or deep_dive_phrase or LAST_ROUTE_TYPE == "STRUCTURED":
+            deep_dive_offered = True
+            deep_dive_consent_needed = True and not deep_dive_analysis
+            needs_vector = True  # front-end can show consent CTA
+            if LAST_ROUTE_TYPE == "STRUCTURED":
+                reason = "Structured query completed. Deep-dive available for enhanced semantic understanding."
+            else:
+                reason = "Query returned no results. Offer deep-dive search of unstructured job descriptions."
         # If user already consented, we mark vector_used implicitly in answer content; keep flags off
 
         return ChatResponse(
@@ -617,14 +596,6 @@ async def get_companies_by_specialization(specialization: str, year: Optional[st
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving stats: {str(e)}")
 
-def _is_deep_dive_consent(user_input: str) -> bool:
-    """Check if user is giving consent for deep-dive mode."""
-    consent_keywords = [
-        "yes", "deep-dive", "deep dive", "proceed", "activate", 
-        "go ahead", "search", "unstructured", "detailed", "comprehensive"
-    ]
-    input_lower = user_input.lower().strip()
-    return any(keyword in input_lower for keyword in consent_keywords) and len(input_lower) < 50
 
 def _execute_deep_dive_search(question: str) -> str:
     """Execute deep-dive search using unstructured database."""

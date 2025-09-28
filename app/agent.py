@@ -209,13 +209,11 @@ SEMANTIC MAPPING:
             settings = get_settings()
             if settings.OPENROUTER_API_KEY:
                 llm = OpenRouterLLM(
-                    model=(
-                        (settings.OPENROUTER_MODEL if (settings.OPENROUTER_MODEL and "grok" not in settings.OPENROUTER_MODEL.lower()) else "deepseek/deepseek-r1-distill-llama-70b")
-                    ),
+                    model=settings.OPENROUTER_SQL_MODEL,
                     api_key=settings.OPENROUTER_API_KEY,
                     temperature=0.0
                 )
-                print(f"✅ OpenRouter LLM initialized with model: {llm.model}")
+                print(f"✅ OpenRouter LLM for SQL initialized with model: {llm.model}")
             else:
                 print("❌ No OpenRouter API key available")
                 return None
@@ -574,7 +572,7 @@ STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
             }
 
             payload = {
-                "model": settings.OPENROUTER_MODEL or "deepseek/deepseek-r1-distill-llama-70b",
+                "model": settings.OPENROUTER_UNSTRUCTURED_MODEL,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
@@ -637,7 +635,11 @@ def _is_no_data_result(result: str) -> bool:
         "not found",
         "no results",
         "empty result",
-        "query_error"
+        "query_error",
+        "could not find",
+        "couldn't find",
+        "no relevant information",
+        "no information available"
     ]
     result_lower = (result or "").lower()
     if any(indicator in result_lower for indicator in no_data_indicators):
@@ -649,24 +651,6 @@ def _is_no_data_result(result: str) -> bool:
         return True
     return False
 
-def _offer_deep_dive_mode(user_question: str, structured_result: str) -> str:
-    """Offer deep-dive mode using unstructured database when structured search returns no data."""
-    return f"""{structured_result}
-
-🎯 **DEEP-DIVE MODE AVAILABLE**
-
-The structured database has limited matches for your query. However, I can activate **Deep-Dive Mode** to search through thousands of detailed job descriptions and company profiles for comprehensive analysis.
-
-**Deep-Dive Mode Benefits:**
-• Searches actual job description text, not just categories
-• Finds hidden opportunities (e.g., "B2B Sales" roles listed as "Business Development")  
-• Analyzes company culture, requirements, and detailed role descriptions
-• Provides qualitative insights beyond just numbers
-
-**🔑 Do you consent to Deep-Dive Mode?**
-Reply with **"yes"** or **"deep-dive"** to proceed with unstructured database analysis.
-
-**⚡ Or ask a different structured query for instant results.**"""
 
 def execute_structured_query(user_question: str) -> str:
     """Execute structured database query with intelligent fallback to unstructured when no data found."""
@@ -687,10 +671,6 @@ def execute_structured_query(user_question: str) -> str:
         }
         print(f"✅ Fast deterministic answer: {fast_result[:100]}... (fast_ms={fast_ms:.1f})")
         
-        # Check if result indicates no data found
-        if _is_no_data_result(fast_result):
-            return _offer_deep_dive_mode(user_question, fast_result)
-        
         return fast_result
 
     # Fallback to LlamaIndex for complex queries
@@ -708,10 +688,6 @@ def execute_structured_query(user_question: str) -> str:
                 LAST_TIMINGS['summarization_ms'] = 0.0  # skip summarization path
                 LAST_TIMINGS['total_ms'] = sum(v for v in LAST_TIMINGS.values())
                 
-                # Check if corrected result indicates no data
-                if _is_no_data_result(corrected):
-                    return _offer_deep_dive_mode(user_question, corrected)
-                
                 return corrected
 
             summary_start = time.perf_counter()
@@ -724,15 +700,10 @@ def execute_structured_query(user_question: str) -> str:
             LAST_TIMINGS['summarization_ms'] = summarization_ms
             LAST_TIMINGS['total_ms'] = sum(v for v in LAST_TIMINGS.values())
             
-            # Check if final result indicates no data
-            if _is_no_data_result(summary):
-                return _offer_deep_dive_mode(user_question, summary)
-            
             return summary
         except Exception as e:
             print(f"❌ SQL query failed: {e}")
-            error_msg = f"Unable to provide the count of companies for B2B sales due to a query error—more details on the SQL and database are needed to resolve it."
-            return _offer_deep_dive_mode(user_question, error_msg)
+            return f"Unable to provide the count of companies for B2B sales due to a query error—more details on the SQL and database are needed to resolve it."
     else:
         return "SQL query engine not available."
 
@@ -804,7 +775,7 @@ def execute_hybrid_query(user_question: str, previous_context: Optional[str] = N
         }
 
         payload = {
-            "model": settings.OPENROUTER_MODEL or "deepseek/deepseek-r1-distill-llama-70b",
+            "model": settings.OPENROUTER_UNSTRUCTURED_MODEL,
             "messages": [
                 {
                     "role": "system",
@@ -890,7 +861,7 @@ Summary:"""
         }
 
         payload = {
-            "model": settings.OPENROUTER_MODEL or "deepseek/deepseek-r1-distill-llama-70b",
+            "model": settings.OPENROUTER_UNSTRUCTURED_MODEL,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.0,
             "max_tokens": 150,
