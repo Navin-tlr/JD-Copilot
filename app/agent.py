@@ -590,12 +590,18 @@ STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
 
             if response.status_code == 200:
                 raw_response = response.json()["choices"][0]["message"]["content"].strip().upper()
-                routing_decision = raw_response
+                # Validate the response is one of the expected categories
+                valid_categories = {"STRUCTURED", "UNSTRUCTURED", "HYBRID", "MULTI_HOP"}
+                if raw_response in valid_categories:
+                    routing_decision = raw_response
+                else:
+                    print(f"⚠️ Invalid routing response: '{raw_response}', defaulting to STRUCTURED")
+                    routing_decision = "STRUCTURED"  # Default to STRUCTURED for count queries
             else:
-                routing_decision = "UNSTRUCTURED"
+                routing_decision = "STRUCTURED"
         except Exception as e:
             print(f"❌ Routing API call failed: {e}")
-            routing_decision = "UNSTRUCTURED"
+            routing_decision = "STRUCTURED"
     else:
         routing_decision = "UNSTRUCTURED"
 
@@ -1446,9 +1452,6 @@ def route_query(user_question: str, context: Optional[Dict[str, Any]] = None) ->
         return execute_multi_hop_query(sub_questions)
     # Single query path
     answer = route_single_query(user_question, context)
-    if _is_no_data_result(answer) and "DEEP-DIVE" not in (answer or ""):
-        print("🛡️ Final guardrail: Forcing deep-dive offer for no-data result.")
-        return _offer_deep_dive_mode(user_question, answer)
     return answer
 
 def get_last_timings() -> Dict[str, float]:
