@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from typing import Any, Dict, List, Tuple
+from .prompts import assemble_prompt, get_banned_patterns
 import re
 
 import numpy as np
@@ -10,7 +11,12 @@ import sqlite3
 import json
 
 from .config import get_settings
-from .utils import cosine_similarity, filter_metadata, role_contains, slugify_company
+from .utils import (
+    cosine_similarity,
+    filter_metadata,
+    role_contains,
+    slugify_company,
+)
 from .database import PlacementDatabase
 # Removed circular import - QueryRouter is not needed in this file
 import os
@@ -488,13 +494,21 @@ Act as a placement consultant who understands the entire landscape.
         spec_list = ", ".join(sp for sp in specializations_present if sp) or "(none detected)"
         mode_instruction += f"\nFOCUS OVERRIDE: Provide strategic advice ONLY for the specializations explicitly present in the retrieved snippets: {spec_list}. Do NOT fabricate advice for absent specializations. If only one specialization exists, restrict advice strictly to that specialization.\n"
 
+    factual_appendix = assemble_prompt(
+        user_question=question,
+        structured_result="(structured layer not invoked in this path)",
+        unstructured_result="(refer to CONTEXT block below)",
+        mode="direct",
+        persona="placement_cell",
+    )
     final_prompt = (
         f"{mode_instruction}\n\n"
         "CONTEXT:\n"
         "---------------------\n"
         f"{context}\n"
         "---------------------\n\n"
-        f"QUESTION: {question}"
+        f"QUESTION: {question}\n\n"
+        f"FACTUAL SYNTHESIS GUIDANCE (Canonical):\n{factual_appendix}"
     )
 
     # OpenRouter only (Gemini removed per user request)
@@ -532,7 +546,16 @@ Act as a placement consultant who understands the entire landscape.
                             text = choice.get("message", {}).get("content") or choice.get("text")
                             if text:
                                 print("✅ Successfully received answer from OpenRouter.")
-                                return text.strip()
+                                cleaned = text.strip()
+                                banned_patterns = get_banned_patterns()
+                                if any(re.search(p, cleaned) for p in banned_patterns):
+                                    sentences = re.split(r'(?<=[.!?])\s+', cleaned)
+                                    kept = [s for s in sentences if not any(re.search(p, s) for p in banned_patterns)]
+                                    merged = " ".join(kept).strip()
+                                    if merged:
+                                        cleaned = merged
+                                # Post-generation company hallucination checks rely solely on prompt instructions.
+                                return cleaned
                         return "The model generated an empty response. Please try rephrasing your question."
                     else:
                         print(f"❌ OpenRouter API error (status {resp.status_code}): {resp.text}")

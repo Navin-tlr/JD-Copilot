@@ -9,11 +9,13 @@ import sqlite3
 import requests
 import time
 import re
+from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, AsyncIterator
 
 from .config import get_settings
 from .database import PlacementDatabase
 from .rag import retrieve_snippets, synthesize_answer, get_pinecone_index
+from .prompts import assemble_prompt, get_banned_patterns
 
 # LlamaIndex imports for intelligent Text-to-SQL
 try:
@@ -380,18 +382,86 @@ def get_vector_index():
 
     return PineconeQueryAdapter(index)
 
+QUESTION_STARTERS = (
+    "what", "which", "who", "where", "when", "why", "how",
+    "is", "are", "do", "does", "did", "can", "could", "would", "should",
+    "list", "give", "tell", "show", "provide", "explain"
+)
+
+CONNECTOR_SPLIT_PATTERN = re.compile(
+    r"\b(?:and|also|plus|then|along with|as well as|besides|additionally)\s+(?=(?:" + "|".join(QUESTION_STARTERS) + r")\b)",
+    re.IGNORECASE
+)
+
+
 def decompose_multi_hop_query(user_question: str) -> List[str]:
-    """
-    Query decomposition is disabled as per user request to prevent hallucinations.
-    This function now returns the original question directly.
-    """
-    print("ℹ️ Query decomposition is disabled. Processing the query directly.")
-    return [user_question]
+    """Split a user question into sequenced sub-questions when multiple asks are detected."""
+    if not user_question:
+        return [user_question]
+
+    text = user_question.strip()
+    if not text:
+        return [user_question]
+
+    # First pass: explicit question marks
+    question_mark_parts = [part.strip(" ,;:") for part in re.split(r"\?\s*", text) if part.strip()]
+    sub_questions: List[str] = []
+    if len(question_mark_parts) > 1:
+        for part in question_mark_parts:
+            cleaned = part.rstrip(".;,")
+            if not cleaned.endswith("?"):
+                cleaned = cleaned + "?"
+            sub_questions.append(cleaned)
+        if sub_questions:
+            print(f"ℹ️ Decomposed query into {len(sub_questions)} sub-questions via question marks.")
+            return sub_questions
+
+    # Second pass: connective phrases followed by new interrogative
+    connector_parts = [seg.strip(" ,;:") for seg in re.split(CONNECTOR_SPLIT_PATTERN, text) if seg.strip(" ,;:")]
+    if len(connector_parts) > 1:
+        for part in connector_parts:
+            cleaned = part.rstrip(".;,")
+            if not cleaned.endswith("?"):
+                cleaned = cleaned + "?"
+            sub_questions.append(cleaned)
+        if sub_questions:
+            print(f"ℹ️ Decomposed query into {len(sub_questions)} sub-questions via connectors.")
+            return sub_questions
+
+    # Third pass: multiple interrogative starters without connectors or punctuation
+    # DISABLED: This pass was too aggressive and incorrectly split single-intent
+    # questions containing relative clauses (e.g., "...which will help...").
+    # The first two passes (question marks, connectors) are more reliable.
+    # starter_pattern = re.compile(r"\b(" + "|".join(QUESTION_STARTERS) + r")\b", re.IGNORECASE)
+    # matches = list(starter_pattern.finditer(text))
+    # if len(matches) > 1:
+    #     segments: List[str] = []
+    #     for idx, match in enumerate(matches):
+    #         chunk_start = match.start()
+    #         chunk_end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
+    #         chunk = text[chunk_start:chunk_end].strip(" ,;:")
+
+    #         if idx == 0 and chunk_start > 0:
+    #             prefix = text[:chunk_start].strip(" ,;:")
+    #             if prefix:
+    #                 chunk = f"{prefix} {chunk}".strip()
+
+    #         if chunk:
+    #             if not chunk.endswith("?"):
+    #                 chunk = chunk.rstrip(".;,") + "?"
+    #             segments.append(chunk)
+
+    #     if segments:
+    #         print(f"ℹ️ Decomposed query into {len(segments)} sub-questions via interrogative starters.")
+    #         return segments
+
+    return [text]
 
 def execute_multi_hop_query(sub_questions: List[str]) -> str:
     """Execute a sequence of sub-questions and combine results."""
     results = []
-    context = {}
+    previous_answers: List[str] = []
+    context: Dict[str, Any] = {"previous_answers": previous_answers}
 
     for i, question in enumerate(sub_questions, 1):
         print(f"🔍 Executing sub-question {i}: {question}")
@@ -401,16 +471,26 @@ def execute_multi_hop_query(sub_questions: List[str]) -> str:
 
         # Store result for context
         context[f"step_{i}_result"] = result
+        previous_answers.append(result)
         results.append(f"**Step {i}:** {question}\n{result}")
 
     # Combine all results
     combined = "\n\n".join(results)
-    return f"**Multi-Hop Analysis:**\n\n{combined}"
+    return f"**Multi-question analysis**\n\n{combined}"
 
 def route_single_query(user_question: str, context: Optional[Dict[str, Any]] = None) -> str:
     """Route a single query to the appropriate engine. Captures routing latency."""
     t_start = time.perf_counter()
     settings = get_settings()
+
+    previous_context_text: Optional[str] = None
+    if context:
+        previews = context.get("previous_answers")
+        if isinstance(previews, list) and previews:
+            # Keep only the last three snippets to control prompt size
+            clipped = [str(p).strip() for p in previews[-3:] if str(p).strip()]
+            if clipped:
+                previous_context_text = "\n\n".join(clipped)
 
     # Get database schema for routing decision
     schema = get_database_schema()
@@ -467,6 +547,7 @@ Rules
 	5.	Choose MULTI_HOP if results from one database are required to constrain a query in the other.
 	6.	If uncertain between STRUCTURED and HYBRID, default to HYBRID.
 	7.	If uncertain between UNSTRUCTURED and MULTI_HOP, default to MULTI_HOP.
+    8.	If the user packs multiple distinct questions in one sentence (multiple '?' or phrases like 'and what'), classify as MULTI_HOP so the planner answers every part.
 
 ⸻
 
@@ -475,7 +556,14 @@ Response Format
 Output only one word:
 STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
 
-    user_prompt = f"Query: {user_question}\n\nDatabase Schema: {schema_json}"
+    if previous_context_text:
+        user_prompt = (
+            f"Query: {user_question}\n\n"
+            f"Relevant previous context (keep for reference only, do NOT answer):\n{previous_context_text}\n\n"
+            f"Database Schema: {schema_json}"
+        )
+    else:
+        user_prompt = f"Query: {user_question}\n\nDatabase Schema: {schema_json}"
 
     # Use OpenRouter for routing decision
     if settings.OPENROUTER_API_KEY:
@@ -528,15 +616,15 @@ STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
     elif routing_decision == "UNSTRUCTURED":
         return execute_unstructured_query(user_question)
     elif routing_decision == "HYBRID":
-        return execute_hybrid_query(user_question)
+        return execute_hybrid_query(user_question, previous_context=previous_context_text)
     elif routing_decision == "MULTI_HOP":
         # For now, treat MULTI_HOP as HYBRID until we implement proper multi-hop logic
         print("🔧 MULTI_HOP query detected, routing to HYBRID for comprehensive analysis")
-        return execute_hybrid_query(user_question)
+        return execute_hybrid_query(user_question, previous_context=previous_context_text)
     else:
         # Default to HYBRID for safety if routing is unclear
         print(f"⚠️ Unclear routing decision '{routing_decision}', defaulting to HYBRID")
-        return execute_hybrid_query(user_question)
+        return execute_hybrid_query(user_question, previous_context=previous_context_text)
 
 def _is_no_data_result(result: str) -> bool:
     """Check if result indicates no data was found."""
@@ -677,42 +765,37 @@ def execute_unstructured_query(user_question: str) -> str:
         else:
             return "I couldn't find relevant information."
 
-def execute_hybrid_query(user_question: str) -> str:
+def execute_hybrid_query(user_question: str, previous_context: Optional[str] = None) -> str:
     """Execute hybrid query combining structured and unstructured data into one coherent answer."""
     print(f"🔍 Executing hybrid query: {user_question}")
 
     structured_result = execute_structured_query(user_question)
     unstructured_result = execute_unstructured_query(user_question)
 
+    contextual_unstructured = unstructured_result or ""
+    if previous_context:
+        previous_context = previous_context.strip()
+        if previous_context:
+            contextual_unstructured = (
+                contextual_unstructured +
+                ("\n\n" if contextual_unstructured else "") +
+                "PREVIOUS_STEP_CONTEXT:\n" + previous_context
+            )
+
     # Use LLM to blend both results into one homogeneous solution
     settings = get_settings()
-    
+
     if not settings.OPENROUTER_API_KEY:
         # Fallback: simple concatenation if no LLM available
-        return f"{structured_result}\n\n{unstructured_result}"
+        return f"{structured_result}\n\n{contextual_unstructured}"
 
-    synthesis_prompt = f"""You are a career-critical data synthesizer for MBA placement queries. 
-
-TASK: Blend the structured data and unstructured context into ONE coherent, actionable response. No separate sections. No "structured data" headers. Create a seamless, unified answer.
-
-TONE: Merciless directness, career-focused, data-grounded insights that drive placement success.
-
-USER QUERY: {user_question}
-
-STRUCTURED DATA: {structured_result}
-
-UNSTRUCTURED CONTEXT: {unstructured_result}
-
-SYNTHESIS RULES:
-1. Lead with the most career-critical insight
-2. Integrate numbers naturally into narrative context
-3. Provide actionable next steps
-4. Use combat metaphors sparingly but effectively
-5. Ground every claim in the provided data
-6. No separate sections - create ONE flowing response
-7. Eliminate redundancy between structured and unstructured data
-
-RESPONSE: Synthesize into one coherent answer that maximizes career impact."""
+    synthesis_prompt = assemble_prompt(
+        user_question=user_question,
+        structured_result=structured_result,
+        unstructured_result=contextual_unstructured,
+        mode="direct",
+        persona="placement_cell",
+    )
 
     try:
         headers = {
@@ -723,7 +806,10 @@ RESPONSE: Synthesize into one coherent answer that maximizes career impact."""
         payload = {
             "model": settings.OPENROUTER_MODEL or "deepseek/deepseek-r1-distill-llama-70b",
             "messages": [
-                {"role": "system", "content": "You are a career-critical placement data synthesizer. Create seamless, unified responses from multi-source data."},
+                {
+                    "role": "system",
+                    "content": "You are the MBA Placement Cell speaking with Linus Torvalds' dry precision. Obey all instructions in the user message without deviation."
+                },
                 {"role": "user", "content": synthesis_prompt}
             ],
             "temperature": 0.1,
@@ -740,17 +826,23 @@ RESPONSE: Synthesize into one coherent answer that maximizes career impact."""
         if response.status_code == 200:
             result = response.json()
             synthesized_answer = result["choices"][0]["message"]["content"].strip()
-            print("✅ Successfully synthesized hybrid response")
+            # Lightweight post-processing guard to reduce residual hallucination/hype
+            banned_patterns = get_banned_patterns()
+            if any(re.search(p, synthesized_answer) for p in banned_patterns):
+                sentences = re.split(r'(?<=[.!?])\s+', synthesized_answer)
+                cleaned = [s for s in sentences if not any(re.search(p, s) for p in banned_patterns)]
+                cleaned_answer = " ".join(cleaned).strip()
+                if cleaned_answer:
+                    synthesized_answer = cleaned_answer
+            print("✅ Successfully synthesized hybrid response (factual mode)")
             return synthesized_answer
         else:
             print(f"⚠️ OpenRouter synthesis failed: {response.status_code}")
-            # Fallback to simple merge
-            return f"{structured_result}\n\nAdditional insights: {unstructured_result}"
+            return f"{structured_result}\n\nAdditional insights: {contextual_unstructured}"
 
     except Exception as e:
         print(f"⚠️ Hybrid synthesis failed: {e}")
-        # Fallback to simple merge
-        return f"{structured_result}\n\n{unstructured_result}"
+        return f"{structured_result}\n\n{contextual_unstructured}"
 
 def get_database_schema() -> Dict[str, List[str]]:
     """Get the actual database schema."""
@@ -907,6 +999,10 @@ def _try_fast_deterministic_query(user_question: str) -> Optional[str]:
         spec = _normalize_specialization_word(spec_word)
         if spec:
             return _get_companies_count_for_specialization(spec)
+
+    if re.search(r'how many companies', q) and re.search(r'came|visited|participated', q):
+        if any(token in q for token in ['placement', 'placements', 'campus', 'drive']):
+            return _get_total_companies_participated()
     
     # Pattern 2: "companies for <specialization>" or "which companies came for <specialization>"
     match = re.search(r'(?:which\s+)?companies.*?for\s+(\w+)', q)
@@ -1030,6 +1126,26 @@ def _get_all_companies_list() -> str:
     except Exception as e:
         print(f"❌ Fast all companies list failed: {e}")
         return None
+
+
+def _get_total_companies_participated() -> str:
+    """Total distinct companies that participated in the placement drives."""
+    try:
+        db_path = "data/placement_data.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(DISTINCT company_name) FROM companies;")
+            total = cursor.fetchone()[0] or 0
+            cursor.execute("SELECT DISTINCT company_name FROM companies ORDER BY company_name LIMIT 5;")
+            sample = [row[0] for row in cursor.fetchall()]
+        if total == 0:
+            return "0 companies are recorded in the placement database."
+        sample_text = f" Sample recruiters: {', '.join(sample)}." if sample else ""
+        return f"{total} companies participated in the placements.{sample_text}"
+    except Exception as e:
+        print(f"❌ Fast total companies count failed: {e}")
+        return None
+
 
 def _get_total_roles_count() -> str:
     """Direct DB query for total roles count."""
@@ -1162,50 +1278,124 @@ def _get_salary_overview() -> str:
         return None
 
 def _get_top_skills() -> str:
-    """Direct DB query for top skills by number of companies requesting them."""
+    """Direct DB query for top skills with company coverage and specific tool highlights."""
     try:
         db_path = "data/placement_data.db"
         with sqlite3.connect(db_path) as conn:
+            conn.execute("PRAGMA group_concat_max_len = 100000;")
             cursor = conn.cursor()
-            # Count DISTINCT companies for each skill, with comprehensive normalization
-            cursor.execute("""
-                SELECT 
-                    CASE 
-                        -- Excel variations
-                        WHEN UPPER(s.skill_name) LIKE '%EXCEL%' AND UPPER(s.skill_name) NOT LIKE '%EXCELLENT%' THEN 'Excel'
-                        -- Google Sheets
-                        WHEN UPPER(s.skill_name) LIKE '%GOOGLE SHEETS%' THEN 'Google Sheets'
-                        -- Communication skills (normalize all communication variations)
-                        WHEN UPPER(s.skill_name) LIKE '%COMMUNICATION%' THEN 'Communication Skills'
-                        -- Office Suite variations  
-                        WHEN UPPER(s.skill_name) LIKE '%OFFICE%' THEN 'Microsoft Office Suite'
-                        -- Cold calling/emailing
-                        WHEN UPPER(s.skill_name) LIKE '%COLD%' THEN 'Cold Calling & Emailing'
-                        -- Zoho Books
-                        WHEN UPPER(s.skill_name) LIKE '%ZOHO BOOKS%' AND s.skill_name NOT LIKE '%Bonus%' THEN 'Zoho Books'
-                        -- Tally
-                        WHEN UPPER(s.skill_name) LIKE '%TALLY%' AND s.skill_name NOT LIKE '%Bonus%' THEN 'Tally'
-                        -- LinkedIn/Social Media
-                        WHEN UPPER(s.skill_name) LIKE '%LINKEDIN%' OR UPPER(s.skill_name) LIKE '%SOCIAL MEDIA%' THEN 'Social Media & LinkedIn'
-                        -- CRM Tools
-                        WHEN UPPER(s.skill_name) LIKE '%CRM%' THEN 'CRM Tools'
-                        -- Keep original if no normalization needed
-                        ELSE s.skill_name
-                    END as normalized_skill,
-                    COUNT(DISTINCT c.company_name) as company_count
-                FROM skills s
-                JOIN roles r ON s.role_id = r.id
-                JOIN companies c ON r.company_id = c.id
-                WHERE LENGTH(s.skill_name) < 100  -- Filter out very long requirement texts
+
+            normalize_case = """
+                CASE 
+                    WHEN UPPER(s.skill_name) LIKE '%EXCEL%' AND UPPER(s.skill_name) NOT LIKE '%EXCELLENT%' THEN 'Excel'
+                    WHEN UPPER(s.skill_name) LIKE '%GOOGLE SHEETS%' THEN 'Google Sheets'
+                    WHEN UPPER(s.skill_name) LIKE '%COMMUNICATION%' THEN 'Communication Skills'
+                    WHEN UPPER(s.skill_name) LIKE '%OFFICE%' THEN 'Microsoft Office Suite'
+                    WHEN UPPER(s.skill_name) LIKE '%COLD%' THEN 'Cold Calling & Emailing'
+                    WHEN UPPER(s.skill_name) LIKE '%ZOHO BOOKS%' AND s.skill_name NOT LIKE '%Bonus%' THEN 'Zoho Books'
+                    WHEN UPPER(s.skill_name) LIKE '%TALLY%' AND s.skill_name NOT LIKE '%Bonus%' THEN 'Tally'
+                    WHEN UPPER(s.skill_name) LIKE '%LINKEDIN%' OR UPPER(s.skill_name) LIKE '%SOCIAL MEDIA%' THEN 'Social Media & LinkedIn'
+                    WHEN UPPER(s.skill_name) LIKE '%CRM%' THEN 'CRM Tools'
+                    ELSE s.skill_name
+                END
+            """
+
+            top_query = f"""
+                WITH normalized AS (
+                    SELECT 
+                        {normalize_case} AS normalized_skill,
+                        c.company_name AS company_name,
+                        TRIM(s.skill_name) AS raw_skill
+                    FROM skills s
+                    JOIN roles r ON s.role_id = r.id
+                    JOIN companies c ON r.company_id = c.id
+                    WHERE LENGTH(s.skill_name) < 100
+                )
+                SELECT normalized_skill, COUNT(DISTINCT company_name) AS company_count
+                FROM normalized
                 GROUP BY normalized_skill
-                ORDER BY company_count DESC 
+                ORDER BY company_count DESC
                 LIMIT 10;
-            """)
-            skills = cursor.fetchall()
-        if not skills:
-            return "No skills data available."
-        skill_list = [f"{skill[0]} ({skill[1]} companies)" for skill in skills]
-        return f"Top skills: " + ", ".join(skill_list) + "."
+            """
+
+            cursor.execute(top_query)
+            top_rows = cursor.fetchall()
+            if not top_rows:
+                return "No skills data available."
+
+            top_skills = [row[0] for row in top_rows]
+            placeholders = ",".join(["?"] * len(top_skills))
+
+            detail_query = f"""
+                WITH normalized AS (
+                    SELECT 
+                        {normalize_case} AS normalized_skill,
+                        c.company_name AS company_name,
+                        TRIM(s.skill_name) AS raw_skill
+                    FROM skills s
+                    JOIN roles r ON s.role_id = r.id
+                    JOIN companies c ON r.company_id = c.id
+                    WHERE LENGTH(s.skill_name) < 100
+                )
+                SELECT normalized_skill, company_name, raw_skill
+                FROM normalized
+                WHERE normalized_skill IN ({placeholders})
+            """
+
+            cursor.execute(detail_query, top_skills)
+            detail_rows = cursor.fetchall()
+
+        detail_map: Dict[str, Dict[str, Any]] = {
+            skill: {"count": count, "companies": set(), "raw_skills": defaultdict(set)}
+            for skill, count in top_rows
+        }
+
+        for normalized_skill, company_name, raw_skill in detail_rows:
+            info = detail_map.get(normalized_skill)
+            if not info:
+                continue
+            if company_name:
+                info["companies"].add(company_name)
+            if raw_skill:
+                cleaned = raw_skill.strip()
+                if cleaned:
+                    info["raw_skills"][cleaned].add(company_name)
+
+        def _format_samples(items: List[str], limit: int = 4) -> str:
+            if not items:
+                return ""
+            ordered = sorted(items)
+            if len(ordered) <= limit:
+                return ", ".join(ordered)
+            return ", ".join(ordered[:limit]) + f", +{len(ordered) - limit} more"
+
+        summary_lines: List[str] = []
+        for skill_name, count in top_rows:
+            info = detail_map[skill_name]
+            company_sample = _format_samples(list(info["companies"]))
+            line = f"{skill_name} — {count} companies"
+            if company_sample:
+                line += f" (e.g., {company_sample})"
+
+            raw_map = info["raw_skills"]
+            specifics: List[str] = []
+            for raw_skill, companies in sorted(raw_map.items(), key=lambda item: (-len(item[1]), item[0].lower())):
+                raw_lower = raw_skill.lower()
+                if raw_lower == skill_name.lower():
+                    continue
+                comp_sample = _format_samples(list(companies), limit=2)
+                if comp_sample:
+                    specifics.append(f"{raw_skill} ({comp_sample})")
+                if len(specifics) >= 3:
+                    break
+
+            if specifics:
+                line += f". Notable asks: {', '.join(specifics)}"
+
+            summary_lines.append(line)
+
+        summary = "Top skills in demand:\n" + "\n".join(f"- {line}" for line in summary_lines)
+        return summary
     except Exception as e:
         print(f"❌ Fast top skills failed: {e}")
         return None
