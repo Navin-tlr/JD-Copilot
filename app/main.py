@@ -106,7 +106,7 @@ async def vector_chat_endpoint(request: QueryRequest):
         question = request.question.strip()
         chat_memory.add_message(session_id, "user", question)
         _sync_history_snapshot(user_id, session_id)
-        snippets = retrieve_snippets(question, top_k=25, filters={})
+        snippets = retrieve_snippets(question, top_k=75, filters={})
         if snippets:
             answer = synthesize_answer(question, snippets, {}) or "No additional context found."
         else:
@@ -174,7 +174,7 @@ async def query_endpoint(request: ChatRequest = Body(...)):
             snippets = []
             try:
                 # Try to get relevant snippets for citations
-                temp_snippets = retrieve_snippets(request.query, top_k=15, filters={})
+                temp_snippets = retrieve_snippets(request.query, top_k=50, filters={})
                 if temp_snippets:
                     snippets = temp_snippets
             except Exception as e:
@@ -183,7 +183,7 @@ async def query_endpoint(request: ChatRequest = Body(...)):
         else:
             print("⚠️ AI agent not available, falling back to basic RAG")
             # Fallback to basic RAG if agent fails
-            snippets = retrieve_snippets(request.query, top_k=15, filters={})
+            snippets = retrieve_snippets(request.query, top_k=50, filters={})
             if snippets:
                 answer = synthesize_answer(request.query, snippets, {})
             else:
@@ -242,10 +242,10 @@ async def query_endpoint(request: ChatRequest = Body(...)):
         import traceback
         traceback.print_exc()
         
-        # Return a structured error response instead of raising an exception
+        # Return a structured error response
         # This ensures the React app always gets valid JSON
         return ChatResponse(
-            answer=f"An error occurred while processing your query: {str(e)}",
+            answer=f"Processing error: {str(e)}. Debug input and retry.",
             snippets=[],
             citations=[],
             error=True  # Add error flag for frontend handling
@@ -267,32 +267,62 @@ async def chat_endpoint(request: QueryRequest):
         # Add user message to chat memory
         chat_memory.add_message(session_id, "user", question)
         _sync_history_snapshot(user_id, session_id)
-        
-        # Use the simple router to process the query
-        print("🚀 Using simple LLM router for query processing")
-        try:
-            answer = route_query(question)
-            print(f"🔍 Router answer: {answer}")
 
-            if not answer or answer.strip() == "":
-                answer = "I couldn't process your query. Please try again."
+        # Check if user is consenting to deep-dive mode
+        is_deep_dive_consent = _is_deep_dive_consent(question)
 
-            print(f"🔍 Final answer: {answer}")
-        except Exception as router_error:
-            print(f"❌ Router error: {router_error}")
-            # Return a graceful error response instead of crashing
-            return ChatResponse(
-                answer=f"Sorry, I encountered an error while processing your query: {str(router_error)}",
-                snippets=[],
-                citations=[],
-                error=True
-            )
+        if is_deep_dive_consent:
+            print("🎯 Deep-dive mode activated by user consent")
+            # Get the previous question from chat memory for context
+            previous_messages = chat_memory.get_messages(session_id)
+            print(f"📝 Chat history has {len(previous_messages)} messages")
+            original_question = None
+            if len(previous_messages) >= 2:  # At least one previous Q&A
+                # Get the last user question before consent (skip the current "yes" message)
+                for i in range(len(previous_messages) - 2, -1, -1):
+                    message = previous_messages[i]
+                    role = message.get("role") if isinstance(message, dict) else getattr(message, "role", None)
+                    content = message.get("content") if isinstance(message, dict) else getattr(message, "content", "")
+                    print(f"  Message {i}: role={role}, content='{content[:50]}...'")
+                    if role == "user" and content and not _is_deep_dive_consent(content):
+                        original_question = content
+                        print(f"🔍 Found original query: {original_question}")
+                        break
+                if original_question:
+                    # Force unstructured search
+                    answer = _execute_deep_dive_search(original_question)
+                else:
+                    print("❌ Could not find original question in chat history")
+                    answer = "I need the original question to perform deep-dive analysis. Please ask your question again."
+            else:
+                print("❌ Not enough messages in chat history")
+                answer = "I need the original question to perform deep-dive analysis. Please ask your question again."
+        else:
+            # Use the simple router to process the query
+            print("🚀 Using simple LLM router for query processing")
+            try:
+                answer = route_query(question)
+                print(f"🔍 Router answer: {answer}")
+
+                if not answer or answer.strip() == "":
+                    answer = "I couldn't process your query. Please try again."
+
+                print(f"🔍 Final answer: {answer}")
+            except Exception as router_error:
+                print(f"❌ Router error: {router_error}")
+                # Return a direct error response
+                return ChatResponse(
+                    answer=f"Query processing failed: {str(router_error)}. Check input syntax or system status.",
+                    snippets=[],
+                    citations=[],
+                    error=True
+                )
         
         # Extract snippets from the answer if available
         snippets = []
         try:
             # Try to get relevant snippets for citations
-            temp_snippets = retrieve_snippets(question, top_k=15, filters={})
+            temp_snippets = retrieve_snippets(question, top_k=50, filters={})
             if temp_snippets:
                 snippets = temp_snippets
         except Exception as e:
@@ -321,6 +351,8 @@ async def chat_endpoint(request: QueryRequest):
         no_data = _is_no_data_result(answer)
         deep_dive_phrase = "deep-dive mode available" in lower_ans
         deep_dive_analysis = "deep-dive analysis complete" in lower_ans
+        is_error_response = "i couldn't process your query" in lower_ans or "i apologize" in lower_ans
+        limited = len(answer) < 40 and ("no companies" in lower_ans or "couldn't" in lower_ans)
 
         deep_dive_offered = False
         deep_dive_consent_needed = False
@@ -328,13 +360,15 @@ async def chat_endpoint(request: QueryRequest):
         reason = None
         deep_dive_mandatory = False
 
-        # Offer deep-dive whenever query returns no data, or for all structured queries to enhance semantic understanding
-        if no_data or deep_dive_phrase or LAST_ROUTE_TYPE == "STRUCTURED":
+        # Offer deep-dive only for structured queries with no/limited results, or when no data/error occurs from other routes
+        if (LAST_ROUTE_TYPE == "STRUCTURED" and (no_data or limited or is_error_response)) or (not LAST_ROUTE_TYPE == "STRUCTURED" and (no_data or deep_dive_phrase or is_error_response)):
             deep_dive_offered = True
             deep_dive_consent_needed = True and not deep_dive_analysis
             needs_vector = True  # front-end can show consent CTA
             if LAST_ROUTE_TYPE == "STRUCTURED":
-                reason = "Structured query completed. Deep-dive available for enhanced semantic understanding."
+                reason = "Structured query returned limited results. Deep-dive available for enhanced semantic understanding."
+            elif is_error_response:
+                reason = "Query processing failed. Deep-dive may provide alternative insights."
             else:
                 reason = "Query returned no results. Offer deep-dive search of unstructured job descriptions."
         # If user already consented, we mark vector_used implicitly in answer content; keep flags off
@@ -354,10 +388,10 @@ async def chat_endpoint(request: QueryRequest):
         
     except Exception as e:
         # Log the error for debugging
-        print(f"An error occurred: {e}")
+        print(f"Processing error: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail="An error occurred while processing your query.")
+        raise HTTPException(status_code=500, detail="Processing failed. Debug input and retry.")
 
 
 @app.post("/chat/enhanced", response_model=ChatResponse)
@@ -400,9 +434,9 @@ async def enhanced_chat_endpoint(request: QueryRequest):
             print(f"🔍 Final answer: {answer}")
         except Exception as router_error:
             print(f"❌ Router error: {router_error}")
-            # Return a graceful error response instead of crashing
+            # Return a direct error response
             return ChatResponse(
-                answer=f"Sorry, I encountered an error while processing your query: {str(router_error)}",
+                answer=f"Query processing failed: {str(router_error)}. Check input syntax or system status.",
                 snippets=[],
                 citations=[],
                 error=True
@@ -412,7 +446,7 @@ async def enhanced_chat_endpoint(request: QueryRequest):
         snippets = []
         try:
             # Try to get relevant snippets for citations
-            temp_snippets = retrieve_snippets(question, top_k=15, filters={})
+            temp_snippets = retrieve_snippets(question, top_k=50, filters={})
             if temp_snippets:
                 snippets = temp_snippets
         except Exception as e:
@@ -602,7 +636,8 @@ def _execute_deep_dive_search(question: str) -> str:
     try:
         print("🎯 Executing deep-dive mode search")
         # Force unstructured search by retrieving and synthesizing from vector DB
-        snippets = retrieve_snippets(question, top_k=30, filters={})
+        # Increase retrieval for comprehensive analysis across all PDFs
+        snippets = retrieve_snippets(question, top_k=150, filters={})
         if snippets:
             answer = synthesize_answer(question, snippets, {})
             if answer:
@@ -621,6 +656,15 @@ async def get_placement_stats(year: Optional[str] = None):
         return {"year": year, "stats": stats}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving stats: {str(e)}")
+
+def _is_deep_dive_consent(user_input: str) -> bool:
+    """Check if user is giving consent for deep-dive mode."""
+    consent_keywords = [
+        "yes", "deep-dive", "deep dive", "proceed", "activate",
+        "go ahead", "search", "unstructured", "detailed", "comprehensive"
+    ]
+    input_lower = user_input.lower().strip()
+    return any(keyword in input_lower for keyword in consent_keywords) and len(input_lower) < 50
 
 @app.get("/health")
 async def health_check():

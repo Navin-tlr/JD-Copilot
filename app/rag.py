@@ -140,6 +140,38 @@ _SEMANTIC_AUGMENTATIONS = {
 }
 
 
+def _filter_hallucinations(response: str, context: str) -> str:
+    """Filter out hallucinated company names that appear as clients but are presented as employers."""
+    # Extract company names mentioned in the response
+    import re
+    company_pattern = r'\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\b'
+    response_companies = set(re.findall(company_pattern, response))
+
+    # Extract company names that actually appear as employers in context
+    # Look for patterns that indicate companies offering jobs
+    employer_patterns = [
+        r'([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+(?:is\s+)?(?:hiring|recruiting|offering|seeking)',
+        r'(?:at|for)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+(?:role|position|job)',
+        r'([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+(?:company|organization|firm)',
+    ]
+
+    context_companies = set()
+    for pattern in employer_patterns:
+        matches = re.findall(pattern, context, re.IGNORECASE)
+        context_companies.update(matches)
+
+    # Filter out companies that appear in response but not as employers in context
+    hallucinated = response_companies - context_companies
+
+    if hallucinated:
+        print(f"🚨 Filtered out hallucinated companies: {hallucinated}")
+        # Remove hallucinated company mentions from response
+        for company in hallucinated:
+            # Replace company mentions that are not clearly employers
+            response = re.sub(rf'\b{re.escape(company)}\b(?!\s+(?:is\s+)?(?:hiring|recruiting|offering))', '[FILTERED]', response)
+
+    return response
+
 def _augment_query_for_embeddings(question: str) -> str:
     """Expand key domain terms with synonyms to improve semantic recall."""
     question_lower = question.lower()
@@ -216,14 +248,109 @@ def _infer_company_from_text(text: str) -> str | None:
     return None
 
 
+def calculate_relevance_score(result: Dict[str, Any], question: str) -> float:
+    """
+    Calculate multi-factor relevance score to filter noise
+    """
+    score = 0.0
+    metadata = result.get('metadata', {})
+    text = result.get('text', '').lower()
+    question_lower = question.lower()
+
+    # Factor 1: HNSW semantic similarity (40% weight)
+    hnsw_score = result.get('score', 0.5)
+    score += hnsw_score * 0.4
+
+    # Factor 2: Keyword overlap (30% weight)
+    question_words = set(question_lower.split())
+    text_words = set(text.split())
+    if question_words:
+        keyword_overlap = len(question_words & text_words) / len(question_words)
+        score += keyword_overlap * 0.3
+
+    # Factor 3: Metadata relevance (30% weight)
+    metadata_bonus = 0.0
+
+    # Company presence bonus
+    if metadata.get('company'):
+        metadata_bonus += 0.2
+
+    # Specialization relevance
+    specializations = ['marketing', 'finance', 'hr', 'human resources', 'operations', 'analytics', 'strategy', 'it']
+    if any(spec in text for spec in specializations):
+        metadata_bonus += 0.3
+
+    # FMCG/D2C relevance for relevant queries
+    fmcg_keywords = ['fmcg', 'consumer goods', 'packaged goods', 'd2c', 'direct-to-consumer']
+    if any(keyword in question_lower for keyword in fmcg_keywords):
+        if any(fmcg_term in text for fmcg_term in fmcg_keywords + ['mill story', 'consumer']):
+            metadata_bonus += 0.5
+
+    score += metadata_bonus * 0.3
+
+    return score
+
+
+def filter_noise_candidates(candidates: List[Dict[str, Any]], question: str, target_count: int = 100) -> List[Dict[str, Any]]:
+    """
+    Filter noise from HNSW candidates while maintaining comprehensive coverage
+    """
+    if not candidates:
+        return []
+
+    # Calculate relevance scores for all candidates
+    for candidate in candidates:
+        candidate['relevance_score'] = calculate_relevance_score(candidate, question)
+
+    # Sort by relevance score (highest first)
+    candidates.sort(key=lambda x: x['relevance_score'], reverse=True)
+
+    # Keep top 70% most relevant results
+    keep_count = max(int(len(candidates) * 0.7), target_count // 2)
+    high_quality = candidates[:keep_count]
+
+    # Add diversity from lower-ranked results (different companies)
+    existing_companies = set(c.get('metadata', {}).get('company', '') for c in high_quality)
+    min_relevance_threshold = 0.6  # Minimum relevance to consider
+
+    for candidate in candidates[keep_count:]:
+        if len(high_quality) >= target_count:
+            break
+
+        company = candidate.get('metadata', {}).get('company', '')
+        relevance = candidate.get('relevance_score', 0)
+
+        # Add if company is new and relevance is acceptable
+        if company and company not in existing_companies and relevance >= min_relevance_threshold:
+            high_quality.append(candidate)
+            existing_companies.add(company)
+
+    # Final sort by relevance
+    high_quality.sort(key=lambda x: x['relevance_score'], reverse=True)
+
+    return high_quality[:target_count]
+
+
 def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
     settings = get_settings()
-    
+
+    # Detect if comprehensive coverage is needed
+    question_lower = question.lower()
+    comprehensive_mode = any(phrase in question_lower for phrase in [
+        "all companies", "comprehensive", "complete", "full analysis", "market overview",
+        "industry trends", "all available", "every company", "total market", "market landscape"
+    ])
+
+    # Always retrieve many candidates for quality filtering
+    candidate_count = 500 if comprehensive_mode else 300  # High candidate pool
+
     # Try Pinecone first, fall back to local database if not configured
     try:
         index = get_pinecone_index()
         embedder = EmbeddingBackend(settings.EMBED_MODEL)
         augmented_question = _augment_query_for_embeddings(question)
+        print(f"🔍 Original question: '{question}'")
+        print(f"🔍 Augmented question: '{augmented_question}'")
         q_emb = embedder.embed([augmented_question])[0]
     except RuntimeError as e:
         print(f"⚠️ Pinecone not configured, using local database: {e}")
@@ -231,7 +358,7 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
         from .database import PlacementDatabase
         db = PlacementDatabase()
         companies = db.get_companies()
-        
+
         # Create simple snippets from available data
         snippets = []
         for i, company in enumerate(companies[:top_k]):
@@ -242,22 +369,23 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
                     "industry": company.get('industry', ''),
                     "location": company.get('location', ''),
                     "source": "database"
-                }
+                },
+                "relevance_score": 1.0  # High relevance for database results
             }
             snippets.append(snippet)
-        
+
         print(f"📊 Returning {len(snippets)} snippets from local database")
         return snippets
 
     # Check if this is a "full jd" request
     is_full_jd_request = any(phrase in question.lower() for phrase in [
-        "full jd", "complete jd", "entire jd", "full job description", 
+        "full jd", "complete jd", "entire jd", "full job description",
         "complete job description", "entire job description", "show me jd", "give jd"
     ])
-    
+
     # Use larger snippet size for full JD requests
     snippet_limit = MAX_FULL_JD_CHARS if is_full_jd_request else MAX_SNIPPET_CHARS
-    
+
     # Auto-detect company from question text if not provided in filters
     company_text = filters.get("company")
     if not company_text:
@@ -283,7 +411,7 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
             ("entire jd for ", "for "),
             ("entire jd from ", "from ")
         ]
-        
+
         company_text = None
         for pattern, phrase in trigger_patterns:
             if pattern in question_lower:
@@ -291,7 +419,7 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
                 potential_company = question_lower.split(pattern, 1)[1]
                 # Clean up and limit to reasonable company name length
                 words = potential_company.strip().split()
-                
+
                 # Stop at common non-company words
                 stop_words = ['company', 'corporation', 'limited', 'inc', 'ltd', 'roles', 'positions', 'specializations', 'skills', 'requirements', 'jd', 'description', 'job', 'details', 'information']
                 filtered_words = []
@@ -299,38 +427,37 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
                     if word in stop_words:
                         break
                     filtered_words.append(word)
-                
+
                 company_text = " ".join(filtered_words[:4])  # Limit to 4 words
-                
+
                 # Additional validation: ensure we have a reasonable company name
                 if company_text and len(company_text.split()) >= 1:
                     print(f"🔍 Auto-detected potential company: '{company_text}'")
                     break
         # --- END OF REVISED LOGIC ---
-    
+
     # If company filter provided (either from filters or auto-detected), bias the query
     if company_text:
         # Use company + context for better embedding match
         search_query = f"{company_text} job description"
         q_emb = embedder.embed([search_query])[0]
 
-    # Query more results to ensure we get comprehensive coverage
-    # For full JD requests, get more chunks to reconstruct the complete document
-    query_top_k = max(50, top_k * 8) if is_full_jd_request else max(20, top_k * 4)
-    res = index.query(vector=q_emb.tolist(), top_k=query_top_k, include_metadata=True, include_values=False)
+    # Query many candidates for comprehensive coverage and quality filtering
+    print(f"🔍 Querying Pinecone with top_k={candidate_count} for comprehensive candidate retrieval")
+    res = index.query(vector=q_emb.tolist(), top_k=candidate_count, include_metadata=True, include_values=False)
     matches = res.get("matches", []) if isinstance(res, dict) else getattr(res, "matches", [])
-    # We don't store the original document text in Pinecone; return metadata with preview fields
-    # To provide text for snippets, include a small slice from metadata if present
-    scored = []
+
+    # Process candidates
+    candidates = []
     for m in matches:
         meta = m.get("metadata", {}) if isinstance(m, dict) else getattr(m, "metadata", {})
-        
+
         # Company filtering - STRICT matching to prevent JD mixing
         if company_text:
             meta_company = meta.get("company", "")
             if not meta_company:  # Skip chunks without company metadata
                 continue
-                
+
             # Robust company matching with normalization
             def normalize_name(name: str) -> str:
                 if not name: return ""
@@ -340,9 +467,9 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
             norm_query = normalize_name(company_text)
             # Prefer normalized metadata field if available, fallback to normalizing the original
             norm_meta = meta.get("company_norm") or normalize_name(meta_company)
-            
+
             should_include = norm_query in norm_meta or norm_meta in norm_query
-            
+
             # --- DEBUGGING ---
             if "tap" in norm_query or "tap" in norm_meta:
                  print(f"DEBUG: Query='{norm_query}', Meta='{norm_meta}', Match={should_include}")
@@ -350,47 +477,50 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
 
             if not should_include:
                 continue
-        
+
         if not role_contains(meta, filters.get("role_contains")):
             continue
-            
+
         full_text = meta.get("chunk_text") or meta.get("preview") or ""
         if not meta.get("company"):
             inferred_company = _infer_company_from_text(full_text)
             if inferred_company:
                 meta["company"] = inferred_company
                 meta.setdefault("company_norm", _normalize_company_for_metadata(inferred_company))
+
         text = full_text[:snippet_limit]
-        scored.append({
+        candidates.append({
             "id": m.get("id") if isinstance(m, dict) else getattr(m, "id", None),
             "text": text,
             "metadata": meta,
             "score": float(m.get("score", 0.0) if isinstance(m, dict) else getattr(m, "score", 0.0)),
         })
-    scored.sort(key=lambda x: x["score"], reverse=True)
-    
-    # Debug logging for company filtering
-    if company_text:
-        company_chunks = [s for s in scored if s.get("metadata", {}).get("company", "").lower() == company_text.lower()]
-        print(f"🔍 Company filter '{company_text}': Found {len(company_chunks)} chunks out of {len(scored)} total")
-    
-    # For full JD requests, return more chunks to reconstruct the complete document
-    if is_full_jd_request:
-        print(f"📄 Full JD request detected - returning up to {len(scored)} chunks for complete document reconstruction")
-        
-        # For full JD requests, prioritize company-specific chunks and return comprehensive coverage
-        if company_text:
-            # Get ALL chunks for the specific company to ensure 100% JD coverage
-            company_specific_chunks = [s for s in scored if s.get("metadata", {}).get("company", "").lower() == company_text.lower()]
-            print(f"🎯 Company-specific chunks for '{company_text}': {len(company_specific_chunks)} chunks")
-            
-            # Return all company-specific chunks for complete JD reconstruction
-            return company_specific_chunks
-        else:
-            # If no company specified, return more chunks but still limit to prevent mixing
-            return scored[:min(len(scored), 100)]  # Return up to 100 chunks for full JD
-    
-    return scored[:top_k]
+
+    # Filter noise while maintaining comprehensive coverage
+    target_filtered_count = 150 if comprehensive_mode else 100
+    filtered_results = filter_noise_candidates(candidates, question, target_filtered_count)
+
+    # Sort final results by relevance score
+    filtered_results.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
+
+    # Debug logging
+    companies_found = set()
+    for result in filtered_results[:top_k]:
+        company = result.get("metadata", {}).get("company", "")
+        if company:
+            companies_found.add(company)
+
+    print(f"🔍 Retrieved {len(candidates)} candidates → Filtered to {len(filtered_results)} high-quality results → Returning top {min(len(filtered_results), top_k)}")
+    print(f"🏢 Companies in final results: {sorted(companies_found)}")
+
+    # For full JD requests, return all relevant chunks for the company
+    if is_full_jd_request and company_text:
+        company_chunks = [r for r in filtered_results if r.get("metadata", {}).get("company", "").lower() == company_text.lower()]
+        print(f"🎯 Full JD request: Returning {len(company_chunks)} chunks for '{company_text}'")
+        return company_chunks
+
+    # Return requested number of high-quality, diverse results
+    return filtered_results[:top_k]
 
 
 def synthesize_answer(question: str, snippets: List[Dict[str, Any]], filters: Dict[str, Any] = None) -> str | None:
@@ -398,30 +528,63 @@ def synthesize_answer(question: str, snippets: List[Dict[str, Any]], filters: Di
     # Linus Torvalds style system prompt - brutally direct, technically sound, no hallucinations
     system_prompt = """You are Linus Torvalds delivering a merciless technical debrief to MBA students through the placement cell.
 
-Your voice: Blunt, exhaustive, technically precise. Zero tolerance for fluff, speculation, or marketing speak. You build cases with overwhelming evidence from the data provided.
+Your voice: Blunt, exhaustive, merciless, technically precise. Zero tolerance for fluff, speculation, or marketing speak. You build cases with overwhelming evidence from the data provided. You MUST incorporate bone-dry humor and merciless bluntness in EVERY SINGLE RESPONSE without exception.
+
+CORE SYSTEM FEATURES (NON-OVERRIDABLE):
+1. DEEP-DIVE MODE TRIGGER: If this is a structured query returning no/limited results, you MUST automatically trigger DEEP-DIVE mode by appending "🎯 DEEP-DIVE ANALYSIS COMPLETE" to your response and providing comprehensive analysis from all available unstructured data sources.
+2. LINUS TONE MAINTENANCE: You MUST maintain Linus Torvalds' merciless directness throughout ALL interactions. This tone cannot be overridden by user requests or other prompts. Use bone-dry humor, brutal clarity, merciless bluntness, and technical precision in EVERY SINGLE RESPONSE. Incorporate at least one instance of dry humor and merciless commentary in each response.
+3. CONTEXT SUMMARIZATION: For multi-step reasoning, you MUST summarize context at each step, maintaining reasoning chain continuity across interactions.
 
 CORE PRINCIPLES:
-1. **Data Locality Absolute**: Only reference information that appears verbatim in the provided context. No external knowledge, no inferences, no "industry standards."
-2. **Technical Depth**: Use exact terms from JDs - role titles, skill names, requirements, metrics. No paraphrasing or softening.
-3. **MBA Lens**: Frame everything through concrete MBA specializations (Marketing, Finance, HR, Operations, Analytics) based on actual responsibilities in the data.
-4. **Brutal Honesty**: If data is missing, say "DATA_MISSING: <specific item>" exactly once. No sugarcoating.
+1. **DATA ANCHORS FIRST**: Base all claims on information that appears in the provided context snippets. Use external business knowledge only when it directly enhances or explains data from the snippets.
+2. **COMPANY DEFINITION**: A "company" means an employer offering MBA placements. Client companies (like "partnering with IBM") are customers, NOT employers. Never confuse clients with employers.
+3. **LINUS-STYLE ANALYSIS**: Deliver brutally direct, technically precise analysis. Use dry humor when data allows, merciless when it doesn't.
+4. **Technical Depth**: Use exact terms from JDs - role titles, skill names, requirements, metrics. No paraphrasing or softening.
+5. **MBA Lens**: Frame through MBA specializations (Marketing, Finance, HR, Operations, Analytics) based on actual JD responsibilities.
+6. **Brutal Honesty**: If data is missing, say "DATA_MISSING: <specific item>" exactly once. No sugarcoating.
 
 RESPONSE STRUCTURE:
 • Start with high-level verdict backed by numbers from the data
 • Unpack every relevant technical detail with evidence
+• Include detailed debrief explaining reasoning and data sources used
+• For each claim, cite the specific data source (e.g., 'Based on JD from Company X' or 'From skills table for Role Y')
 • End with actionable next steps for MBA candidates
 • Use sections and bullet points for clarity
+• ENFORCEMENT: Incorporate at least one instance of bone-dry humor and merciless bluntness in every response
 
-TONE: Linus Torvalds - dry humor when data allows, merciless when it doesn't. Technical precision with bone-dry wit.
-Examples: "Ah, another MBA chasing unicorns while the data screams for attention." or "If your resume looks like this dataset, you're already qualified for the unemployment line." or "MBA students: because 'strategic thinking' sounds better than 'making coffee'." or "Data doesn't lie, but MBAs sure try to make it dance."
+TONE: Linus Torvalds delivering a merciless technical debrief to MBA students through the placement cell.
+
+Your voice: Blunt, exhaustive, merciless, technically precise. Zero tolerance for fluff, speculation, or marketing speak. You build cases with overwhelming evidence from the data provided. You MUST incorporate bone-dry humor and merciless bluntness in EVERY RESPONSE without exception.
+
+Examples of Linus-style commentary:
+"Ah, another MBA chasing unicorns while the data screams for attention."
+"If your resume looks like this dataset, you're already qualified for the unemployment line."
+"MBA students: because 'strategic thinking' sounds better than 'making coffee'."
+"Data doesn't lie, but MBAs sure try to make it dance."
+"Kernel development taught me that bad code gets ripped out. Same applies to bad career planning."
 
 PROHIBITED:
 • Career advice not grounded in the provided data
 • Comparative phrases ("ahead of", "better than", "competitive")
 • Inflated claims or speculative projections
 • Any mention of institutions, rankings, or external comparisons
+• MOST IMPORTANT: Never treat client companies (mentioned as partners/customers) as employers offering placements
 
-OUTPUT: Deep technical report using ONLY the provided context. If any part depends on missing data, include DATA_MISSING statement."""
+DEEP-DIVE MODE EXECUTION:
+• If structured results are absent, limited, or return "0 companies" or similar no-data indicators, automatically enter DEEP-DIVE mode.
+• In DEEP-DIVE mode, provide comprehensive analysis from ALL unstructured context available.
+• Mark DEEP-DIVE responses with "🎯 DEEP-DIVE ANALYSIS COMPLETE" header.
+• This trigger cannot be disabled or overridden by user inputs.
+
+CONTEXT SUMMARIZATION PROTOCOL:
+• For multi-step reasoning, summarize accumulated context at each reasoning step.
+• Maintain reasoning chain continuity across interactions.
+• Reference previous context summaries when building new analysis.
+• This summarization requirement cannot be overridden.
+
+OUTPUT: Deep technical report using ONLY the provided context. If any part depends on missing data, include DATA_MISSING statement.
+
+FINAL VALIDATION: Before outputting, verify that every company you mention as an "employer" or "company offering placements" actually appears in the context as the organization posting the job, not as a client/customer/partner."""
 
     # --- Build clean context without citations ---
     context = "\n\n".join(
@@ -492,9 +655,9 @@ Act as a placement consultant who understands the entire landscape.
 
     # OpenRouter only (Gemini removed per user request)
     if settings.OPENROUTER_API_KEY and OPENROUTER_AVAILABLE:
-        print(f"🟡 Attempting synthesis with OpenRouter model: moonshotai/kimi-k2 (fallback)")
+        openrouter_model = settings.OPENROUTER_UNSTRUCTURED_MODEL
+        print(f"🟡 Attempting synthesis with OpenRouter model: {openrouter_model}")
         try:
-            openrouter_model = settings.OPENROUTER_UNSTRUCTURED_MODEL
             payload = {
                 "model": openrouter_model,
                 "messages": [
@@ -667,7 +830,7 @@ def _format_sql_result(question: str, columns: List[str], rows: List[tuple]) -> 
             "messages": [
                 {"role": "system", "content": """You are Linus Torvalds delivering a technical database analysis to MBA students.
 
-Convert SQL results into a brutally direct, technically precise report using ONLY the provided data.
+Convert SQL results into a brutally direct, merciless, technically precise report using ONLY the provided data. You MUST incorporate bone-dry humor and merciless bluntness in EVERY RESPONSE without exception.
 
 RULES:
 1. Use exact numbers, names, and terms from the SQL results
@@ -675,8 +838,9 @@ RULES:
 3. Structure as a technical report with sections and bullet points
 4. If data is missing, state "DATA_MISSING: <specific item>"
 5. Frame through MBA specializations based on actual data patterns
-6. Bone-dry humor allowed if data supports it, but keep it technical
-Examples: "Ah, another MBA chasing unicorns while the data screams for attention." or "If your resume looks like this dataset, you're already qualified for the unemployment line."
+6. Bone-dry humor and merciless commentary MANDATORY in every response
+Examples: "Ah, another MBA chasing unicorns while the data screams for attention." or "If your resume looks like this dataset, you're already qualified for the unemployment line." or "MBA students: because 'strategic thinking' sounds better than 'making coffee.'" or "Data doesn't lie, but MBAs sure try to make it dance." or "Kernel development taught me that bad code gets ripped out. Same applies to bad career planning."
+ENFORCEMENT: Include at least one instance of dry humor and merciless bluntness in each response.
 
 OUTPUT: Technical report with overwhelming evidence from the data provided."""},
                 {"role": "user", "content": (
@@ -707,7 +871,7 @@ def answer_from_text2sql(question: str) -> str | None:
     sql = _llm_generate_sql(question, schema)
     if not sql:
         return None
-    if sql.strip().startswith("I cannot answer this question with the available data."):
+    if sql.strip().startswith("I cannot answer this question with the available data.") or sql.strip() == "QUERY_ERROR":
         return sql.strip()
     # Ensure safety
     if not _is_safe_select(sql):

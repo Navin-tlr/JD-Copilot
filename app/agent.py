@@ -361,8 +361,8 @@ def get_vector_index():
         def query(self, question: str):
             # Use existing retrieve_snippets + synthesize_answer to produce a response
             try:
-                # INCREASED TOP_K for comprehensive JD analysis - get more snippets for complete information
-                snippets = retrieve_snippets(question, top_k=50, filters={})
+                # SIGNIFICANTLY INCREASED TOP_K for comprehensive coverage across all PDFs
+                snippets = retrieve_snippets(question, top_k=100, filters={})
                 answer = synthesize_answer(question, snippets, {})
                 class Resp:
                     def __init__(self, text: str):
@@ -455,26 +455,95 @@ def decompose_multi_hop_query(user_question: str) -> List[str]:
 
     return [text]
 
-def execute_multi_hop_query(sub_questions: List[str]) -> str:
-    """Execute a sequence of sub-questions and combine results."""
-    results = []
+def execute_multi_hop_query(sub_questions: List[str], original_question: str, enhanced_context: Optional[Dict[str, Any]] = None) -> str:
+    """Execute a sequence of sub-questions and synthesize into a cohesive, conversational response."""
+    step_results = []
     previous_answers: List[str] = []
     context: Dict[str, Any] = {"previous_answers": previous_answers}
+
+    # Include enhanced context if provided
+    if enhanced_context:
+        context.update(enhanced_context)
 
     for i, question in enumerate(sub_questions, 1):
         print(f"🔍 Executing sub-question {i}: {question}")
 
-        # Route each sub-question
+        # Route each sub-question with full context
         result = route_single_query(question, context)
 
-        # Store result for context
+        # Store result for context and synthesis
         context[f"step_{i}_result"] = result
         previous_answers.append(result)
-        results.append(f"**Step {i}:** {question}\n{result}")
+        step_results.append(result)
 
-    # Combine all results
-    combined = "\n\n".join(results)
-    return f"**Multi-question analysis**\n\n{combined}"
+    # Synthesize results into a conversational response using LLM
+    settings = get_settings()
+
+    if not settings.OPENROUTER_API_KEY:
+        # Fallback: simple concatenation if no LLM available
+        combined = "\n\n".join([f"Step {i+1}: {result}" for i, result in enumerate(step_results)])
+        return f"Multi-question analysis:\n\n{combined}"
+
+    from .prompts import build_multi_hop_synthesis_prompt
+
+    synthesis_prompt = build_multi_hop_synthesis_prompt(
+        original_question=original_question,
+        sub_questions=sub_questions,
+        step_results=step_results,
+        mode="direct"
+    )
+
+    try:
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "model": settings.OPENROUTER_UNSTRUCTURED_MODEL,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are synthesizing multi-step reasoning into a coherent, conversational response. Maintain factual accuracy while creating natural flow."
+                },
+                {"role": "user", "content": synthesis_prompt}
+            ],
+            "temperature": 0.1,
+            "max_tokens": 2000,
+        }
+
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            synthesized_answer = result["choices"][0]["message"]["content"].strip()
+            # Apply banned patterns filtering
+            from .prompts import get_banned_patterns
+            banned_patterns = get_banned_patterns()
+            if any(re.search(p, synthesized_answer) for p in banned_patterns):
+                sentences = re.split(r'(?<=[.!?])\s+', synthesized_answer)
+                cleaned = [s for s in sentences if not any(re.search(p, s) for p in banned_patterns)]
+                cleaned_answer = " ".join(cleaned).strip()
+                if cleaned_answer:
+                    synthesized_answer = cleaned_answer
+            print("✅ Successfully synthesized multi-hop response")
+            return synthesized_answer
+        else:
+            print(f"⚠️ Multi-hop synthesis failed: {response.status_code}")
+            # Fallback to simple combination
+            combined = "\n\n".join([f"Step {i+1}: {result}" for i, result in enumerate(step_results)])
+            return f"Multi-question analysis:\n\n{combined}"
+
+    except Exception as e:
+        print(f"⚠️ Multi-hop synthesis failed: {e}")
+        # Fallback to simple combination
+        combined = "\n\n".join([f"Step {i+1}: {result}" for i, result in enumerate(step_results)])
+        return f"Multi-question analysis:\n\n{combined}"
 
 def route_single_query(user_question: str, context: Optional[Dict[str, Any]] = None) -> str:
     """Route a single query to the appropriate engine. Captures routing latency."""
@@ -482,7 +551,9 @@ def route_single_query(user_question: str, context: Optional[Dict[str, Any]] = N
     settings = get_settings()
 
     previous_context_text: Optional[str] = None
+    enhanced_context_info: Optional[Dict[str, Any]] = None
     if context:
+        # Handle multi-hop context (previous_answers)
         previews = context.get("previous_answers")
         if isinstance(previews, list) and previews:
             # Keep only the last three snippets to control prompt size
@@ -490,78 +561,99 @@ def route_single_query(user_question: str, context: Optional[Dict[str, Any]] = N
             if clipped:
                 previous_context_text = "\n\n".join(clipped)
 
-    # Get database schema for routing decision
+        # Handle enhanced context from chat memory
+        if isinstance(context, dict):
+            enhanced_context_info = {
+                'conversation_summary': context.get('conversation_summary'),
+                'current_topic': context.get('current_topic'),
+                'key_findings': context.get('key_findings', []),
+                'reasoning_chain': context.get('reasoning_chain', []),
+                'recent_companies': context.get('recent_companies', []),
+                'recent_entities': context.get('recent_entities', [])
+            }
+
+    # Use LLM for all routing decisions - more accurate and context-aware
+    routing_decision = "STRUCTURED"  # Default fallback
+
     schema = get_database_schema()
     schema_json = json.dumps(schema, indent=2)
 
-    # Enhanced routing prompt with merciless directness
-    system_prompt = """You are the Query Router for JD-Copilot. Your sole responsibility is to classify user queries into the correct execution mode so the system can choose the right database(s). You must never fabricate or provide answers yourself.
+    system_prompt = """You are an expert query classifier for a placement database system. Your job is to classify user questions into exactly ONE category. Be precise and consider the intent.
 
-Tone Guidelines:
-- **Merciless Directness**: Be brutally concise. Use imperatives and state facts without softening.
-- **Career-Critical Focus**: Frame decisions as make-or-break for career advancement.
-- **Eliminate Qualifiers**: Replace "important" with "non-negotiable", "valuable" with "career-critical".
-- **Data Grounding**: Base decisions on verifiable patterns, not assumptions.
-- **Strategic Metaphors**: Use combat metaphors sparingly but effectively (e.g., "career artillery", "battlefield awareness").
+DATABASE SCHEMA OVERVIEW:
+- Companies table: company names, industries, locations
+- Roles table: job titles, specializations (MBA domains like Finance, Marketing, HR, Operations, IT, Analytics)
+- Offers table: salaries, hiring numbers
+- Skills table: required skills for roles
+- Requirements table: educational/experience requirements
 
-⸻
+CLASSIFICATION RULES:
 
-Categories
-	•	STRUCTURED
-		•	Use when the query can be answered directly from the structured SQL database.
-		•	Typical cases: counts, company names, lists, salaries, locations, role titles, skill frequencies.
-		•	Examples:
-		•	"How many companies came for finance roles?"
-		•	"Which companies hired for marketing?"
-		•	"What is the highest salary offered?"
-	•	UNSTRUCTURED
-		•	Use when the query requires qualitative or descriptive information from job descriptions (vector search).
-		•	Typical cases: role descriptions, responsibilities, culture, benefits.
-		•	Examples:
-		•	"Tell me about the Business Development role at TAP Academy."
-		•	"What is the company culture at Masters' Union?"
-		•	"Give me the full job description of Accorian."
-	•	HYBRID
-		•	Use when the query requires both structured facts and descriptive/contextual details.
-		•	Typical cases: comparisons, insights across companies, structured data + explanation.
-		•	Examples:
-		•	"Which companies are hiring for HR roles, and what trends can we see?"
-		•	"Compare salaries and skills across companies."
-	•	MULTI_HOP
-		•	Use when the query requires sequential reasoning across structured and unstructured databases.
-		•	Typical cases: filtering by one data source before querying the other.
-		•	Examples:
-		•	"Among the highest-paying companies, what skills are most valued?"
-		•	"Which companies in Bangalore hired for Finance roles, and what skills do they emphasize?"
-		•	"Show me companies with salaries above 15 LPA and summarize their role expectations."
+STRUCTURED: Questions asking for specific factual data from the database
+- Company counts by specialization: "how many companies for Finance?", "how many companies came for Marketing?"
+- Company lists: "which companies hire for HR?", "companies offering Operations roles?"
+- Salary queries: "highest salary", "average salary for Finance", "salary range"
+- Skills queries: "top skills", "most demanded skills for IT"
+- Location queries: "companies in Bangalore", "companies from Mumbai"
+- General counts: "how many companies participated?", "total roles"
 
-⸻
+UNSTRUCTURED: Questions requiring descriptive or narrative information
+- Role descriptions: "what does a Business Analyst do?", "describe the Marketing role"
+- Company culture: "what is the culture at Google?", "work environment at Microsoft"
+- Benefits/perks: "what benefits do companies offer?", "perks at tech companies"
+- Interview processes: "what is the hiring process?", "interview stages"
+- Full job descriptions: "give me the complete JD", "full job description for Analyst"
 
-Rules
-	1.	Never generate or explain answers — only classify.
-	2.	Always choose STRUCTURED for pure counts, lists, or simple fact lookups.
-	3.	Always choose UNSTRUCTURED for full JDs, responsibilities, culture, or descriptive content.
-	4.	Choose HYBRID when both structured facts and descriptive analysis are needed.
-	5.	Choose MULTI_HOP if results from one database are required to constrain a query in the other.
-	6.	If uncertain between STRUCTURED and HYBRID, default to HYBRID.
-	7.	If uncertain between UNSTRUCTURED and MULTI_HOP, default to MULTI_HOP.
-    8.	If the user packs multiple distinct questions in one sentence (multiple '?' or phrases like 'and what'), classify as MULTI_HOP so the planner answers every part.
+HYBRID: Questions needing both data and explanation/analysis
+- Comparisons: "compare salaries between Finance and Marketing"
+- Trends: "what trends do you see in skills demand?"
+- Analysis: "why do companies hire for this specialization?"
+- Contextual insights: "what makes this role attractive?"
 
-⸻
+MULTI_HOP: Complex questions requiring sequential database operations
+- Multi-step queries: "find high-paying companies, then show their skills"
+- Conditional analysis: "among companies in Bangalore, what skills are most valued?"
 
-Response Format
+EXAMPLES:
+- "HOW MANY COMPANIES CAME FOR FMCG ROLE?" → STRUCTURED (count companies by FMCG specialization)
+- "HOW MANY COMPANIES FOR FINANCE?" → STRUCTURED (count companies by Finance specialization)
+- "WHAT DOES A BUSINESS ANALYST DO?" → UNSTRUCTURED (role description)
+- "WHAT IS THE CULTURE AT GOOGLE?" → UNSTRUCTURED (company culture)
+- "WHY DO COMPANIES HIRE FOR FINANCE?" → HYBRID (analysis of hiring reasons)
+- "COMPARE SALARIES BETWEEN FINANCE AND MARKETING" → HYBRID (comparison)
+- "FIND COMPANIES WITH HIGH SALARIES AND SHOW THEIR SKILLS" → MULTI_HOP (sequential operations)
+- "AMONG TOP-PAYING COMPANIES, WHAT SKILLS ARE VALUED?" → MULTI_HOP (conditional analysis)
 
-Output only one word:
-STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
+Output ONLY the category word: STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
 
+    # Build enhanced context for routing
+    context_parts = []
     if previous_context_text:
-        user_prompt = (
-            f"Query: {user_question}\n\n"
-            f"Relevant previous context (keep for reference only, do NOT answer):\n{previous_context_text}\n\n"
-            f"Database Schema: {schema_json}"
-        )
+        context_parts.append(f"Previous conversation:\n{previous_context_text}")
+
+    if enhanced_context_info:
+        if enhanced_context_info.get('conversation_summary'):
+            context_parts.append(f"Conversation summary: {enhanced_context_info['conversation_summary']}")
+
+        if enhanced_context_info.get('current_topic'):
+            context_parts.append(f"Current topic: {enhanced_context_info['current_topic']}")
+
+        if enhanced_context_info.get('key_findings'):
+            findings = enhanced_context_info['key_findings'][:3]  # Limit to top 3
+            if findings:
+                context_parts.append(f"Key findings: {'; '.join(findings)}")
+
+        if enhanced_context_info.get('recent_companies'):
+            companies = enhanced_context_info['recent_companies'][:5]  # Limit to 5
+            if companies:
+                context_parts.append(f"Recently discussed companies: {', '.join(companies)}")
+
+    context_text = "\n\n".join(context_parts) if context_parts else None
+
+    if context_text:
+        user_prompt = f"Query: {user_question}\n\nContext:\n{context_text}\n\nSchema: {schema_json}"
     else:
-        user_prompt = f"Query: {user_question}\n\nDatabase Schema: {schema_json}"
+        user_prompt = f"Query: {user_question}\n\nSchema: {schema_json}"
 
     # Use OpenRouter for routing decision
     if settings.OPENROUTER_API_KEY:
@@ -596,7 +688,7 @@ STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
                     routing_decision = raw_response
                 else:
                     print(f"⚠️ Invalid routing response: '{raw_response}', defaulting to STRUCTURED")
-                    routing_decision = "STRUCTURED"  # Default to STRUCTURED for count queries
+                    routing_decision = "STRUCTURED"
             else:
                 routing_decision = "STRUCTURED"
         except Exception as e:
@@ -614,21 +706,45 @@ STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
     global LAST_ROUTE_TYPE
     LAST_ROUTE_TYPE = routing_decision
 
-    # Execute based on routing decision
-    if routing_decision == "STRUCTURED":
-        return execute_structured_query(user_question)
-    elif routing_decision == "UNSTRUCTURED":
-        return execute_unstructured_query(user_question)
-    elif routing_decision == "HYBRID":
-        return execute_hybrid_query(user_question, previous_context=previous_context_text)
-    elif routing_decision == "MULTI_HOP":
-        # For now, treat MULTI_HOP as HYBRID until we implement proper multi-hop logic
-        print("🔧 MULTI_HOP query detected, routing to HYBRID for comprehensive analysis")
-        return execute_hybrid_query(user_question, previous_context=previous_context_text)
-    else:
-        # Default to HYBRID for safety if routing is unclear
-        print(f"⚠️ Unclear routing decision '{routing_decision}', defaulting to HYBRID")
-        return execute_hybrid_query(user_question, previous_context=previous_context_text)
+    # Execute based on routing decision with robust fallback
+    try:
+        if routing_decision == "STRUCTURED":
+            result = execute_structured_query(user_question)
+            # If structured query fails or returns generic error, try hybrid as fallback
+            if result and ("unable to provide" in result.lower() or "error" in result.lower()):
+                print("⚠️ Structured query failed, falling back to hybrid analysis")
+                return execute_hybrid_query(user_question, previous_context=previous_context_text, enhanced_context=enhanced_context_info)
+            return result
+
+        elif routing_decision == "UNSTRUCTURED":
+            result = execute_unstructured_query(user_question)
+            # If unstructured fails, try hybrid as fallback
+            if not result or result.startswith("I encountered an error"):
+                print("⚠️ Unstructured query failed, falling back to hybrid analysis")
+                return execute_hybrid_query(user_question, previous_context=previous_context_text, enhanced_context=enhanced_context_info)
+            return result
+
+        elif routing_decision == "HYBRID":
+            return execute_hybrid_query(user_question, previous_context=previous_context_text, enhanced_context=enhanced_context_info)
+
+        elif routing_decision == "MULTI_HOP":
+            # For now, treat MULTI_HOP as HYBRID until we implement proper multi-hop logic
+            print("🔧 MULTI_HOP query detected, routing to HYBRID for comprehensive analysis")
+            return execute_hybrid_query(user_question, previous_context=previous_context_text, enhanced_context=enhanced_context_info)
+
+        else:
+            # Default to HYBRID for safety if routing is unclear
+            print(f"⚠️ Unclear routing decision '{routing_decision}', defaulting to HYBRID")
+            return execute_hybrid_query(user_question, previous_context=previous_context_text)
+
+    except Exception as e:
+        print(f"❌ Critical routing error: {e}")
+        # Ultimate fallback: try hybrid query
+        try:
+            return execute_hybrid_query(user_question, previous_context=previous_context_text, enhanced_context=enhanced_context_info)
+        except Exception as fallback_error:
+            print(f"❌ Fallback also failed: {fallback_error}")
+            return "System error: Query processing failed. Debug input syntax and retry. Contact admin if persistent."
 
 def _is_no_data_result(result: str) -> bool:
     """Check if result indicates no data was found."""
@@ -664,22 +780,7 @@ def execute_structured_query(user_question: str) -> str:
     global LAST_ROUTE_TYPE, LAST_TIMINGS
     LAST_ROUTE_TYPE = "STRUCTURED"
 
-    # Try fast deterministic patterns first
-    fast_start = time.perf_counter()
-    fast_result = _try_fast_deterministic_query(user_question)
-    if fast_result is not None:
-        fast_ms = (time.perf_counter() - fast_start) * 1000.0
-        LAST_TIMINGS = {
-            'fast_deterministic_ms': fast_ms,
-            'sql_generation_ms': 0.0,
-            'summarization_ms': 0.0,
-            'total_ms': fast_ms
-        }
-        print(f"✅ Fast deterministic answer: {fast_result[:100]}... (fast_ms={fast_ms:.1f})")
-        
-        return fast_result
-
-    # Fallback to LlamaIndex for complex queries
+    # Use LlamaIndex for all structured queries - more accurate and reliable
     engine = get_sql_query_engine()
     if engine:
         try:
@@ -698,18 +799,40 @@ def execute_structured_query(user_question: str) -> str:
 
             summary_start = time.perf_counter()
             if hasattr(response, 'response'):
-                summary = _summarize_sql_with_llm(user_question, response.response)
+                raw_response = response.response
             else:
-                summary = _summarize_sql_with_llm(user_question, str(response))
+                raw_response = str(response)
+
+            # Handle empty responses from LlamaIndex
+            if not raw_response or raw_response.strip() == "":
+                print("⚠️ LlamaIndex returned empty response, using fallback")
+                # Try to extract meaningful answer from the question
+                spec = _extract_specialization_from_question(user_question)
+                if spec and "how many companies" in user_question.lower():
+                    # For count queries, check if we can get a direct answer
+                    try:
+                        db = PlacementDatabase()
+                        companies = db.get_companies_by_specialization(spec, batch_year=None)
+                        count = len(set(c.get("company_name", "").strip() for c in companies if c.get("company_name", "").strip()))
+                        if count == 0:
+                            raw_response = f"0 companies came for {spec}."
+                        else:
+                            names = ", ".join(sorted(set(c.get("company_name", "").strip() for c in companies if c.get("company_name", "").strip())))
+                            raw_response = f"{count} companies came for {spec} — they are: {names}."
+                    except Exception as e:
+                        print(f"⚠️ Fallback count failed: {e}")
+                        raw_response = f"No data found for {spec} specialization."
+
+            summary = _summarize_sql_with_llm(user_question, raw_response)
             summary = _postprocess_specialization_answer(user_question, summary)
             summarization_ms = (time.perf_counter() - summary_start) * 1000.0
             LAST_TIMINGS['summarization_ms'] = summarization_ms
             LAST_TIMINGS['total_ms'] = sum(v for v in LAST_TIMINGS.values())
-            
+
             return summary
         except Exception as e:
             print(f"❌ SQL query failed: {e}")
-            return f"Unable to provide the count of companies for B2B sales due to a query error—more details on the SQL and database are needed to resolve it."
+            return f"SQL query failed for company count. Error details: {e}. Check database schema and query syntax."
     else:
         return "SQL query engine not available."
 
@@ -742,22 +865,44 @@ def execute_unstructured_query(user_question: str) -> str:
         else:
             return "I couldn't find relevant information."
 
-def execute_hybrid_query(user_question: str, previous_context: Optional[str] = None) -> str:
+def execute_hybrid_query(user_question: str, previous_context: Optional[str] = None, enhanced_context: Optional[Dict[str, Any]] = None) -> str:
     """Execute hybrid query combining structured and unstructured data into one coherent answer."""
     print(f"🔍 Executing hybrid query: {user_question}")
 
     structured_result = execute_structured_query(user_question)
     unstructured_result = execute_unstructured_query(user_question)
 
-    contextual_unstructured = unstructured_result or ""
+    # Build comprehensive context
+    context_parts = []
+    if unstructured_result:
+        context_parts.append(unstructured_result)
+
     if previous_context:
         previous_context = previous_context.strip()
         if previous_context:
-            contextual_unstructured = (
-                contextual_unstructured +
-                ("\n\n" if contextual_unstructured else "") +
-                "PREVIOUS_STEP_CONTEXT:\n" + previous_context
-            )
+            context_parts.append(f"PREVIOUS_STEP_CONTEXT:\n{previous_context}")
+
+    if enhanced_context:
+        # Add enhanced context information
+        if enhanced_context.get('conversation_summary'):
+            context_parts.append(f"CONVERSATION_SUMMARY:\n{enhanced_context['conversation_summary']}")
+
+        if enhanced_context.get('key_findings'):
+            findings = enhanced_context['key_findings'][:5]  # Limit findings
+            if findings:
+                context_parts.append(f"KEY_FINDINGS:\n" + "\n".join(f"- {f}" for f in findings))
+
+        if enhanced_context.get('reasoning_chain'):
+            chain = enhanced_context['reasoning_chain'][-3:]  # Last 3 steps
+            if chain:
+                context_parts.append(f"REASONING_CHAIN:\n" + "\n".join(chain))
+
+        if enhanced_context.get('recent_companies'):
+            companies = enhanced_context['recent_companies'][:3]
+            if companies:
+                context_parts.append(f"RECENTLY_DISCUSSED_COMPANIES: {', '.join(companies)}")
+
+    contextual_unstructured = "\n\n".join(context_parts) if context_parts else ""
 
     # Use LLM to blend both results into one homogeneous solution
     settings = get_settings()
@@ -966,71 +1111,112 @@ def _maybe_rewrite_specialization_answer(user_question: str, llm_response: Any) 
         return None
 
 def _try_fast_deterministic_query(user_question: str) -> Optional[str]:
-    """Fast deterministic patterns for common structured queries - 100% accurate, sub-10ms."""
+    """Fast deterministic patterns for common structured queries - expanded for robustness."""
     q = user_question.lower().strip()
-    
-    # Pattern 1: "how many companies came for <specialization>?"
-    match = re.search(r'how many companies.*?came.*?for\s+(\w+)', q)
-    if match:
-        spec_word = match.group(1)
-        spec = _normalize_specialization_word(spec_word)
-        if spec:
-            return _get_companies_count_for_specialization(spec)
 
-    if re.search(r'how many companies', q) and re.search(r'came|visited|participated', q):
-        if any(token in q for token in ['placement', 'placements', 'campus', 'drive']):
-            return _get_total_companies_participated()
-    
-    # Pattern 2: "companies for <specialization>" or "which companies came for <specialization>"
-    match = re.search(r'(?:which\s+)?companies.*?for\s+(\w+)', q)
-    if match:
-        spec_word = match.group(1)
-        spec = _normalize_specialization_word(spec_word)
-        if spec:
-            return _get_companies_list_for_specialization(spec)
-    
-    # Pattern 3: "list companies" or "show companies" or "all companies"
-    if any(phrase in q for phrase in ['list companies', 'show companies', 'all companies']):
+    # Pattern 1: Company counts by specialization - expanded patterns
+    company_count_patterns = [
+        r'how many companies.*?came.*?for\s+(\w+)',
+        r'how many companies.*?(\w+)\s+roles?',
+        r'how many companies.*?hiring.*?(\w+)',
+        r'how many companies.*?recruiting.*?(\w+)',
+        r'how many companies.*?offering.*?(\w+)',
+        r'count.*companies.*?(\w+)',
+        r'number.*companies.*?(\w+)'
+    ]
+
+    for pattern in company_count_patterns:
+        match = re.search(pattern, q)
+        if match:
+            spec_word = match.group(1)
+            spec = _normalize_specialization_word(spec_word)
+            if spec:
+                return _get_companies_count_for_specialization(spec)
+
+    # Pattern 2: General company participation counts (only when no specialization/role mentioned)
+    if (re.search(r'how many companies', q) and
+        re.search(r'came|visited|participated|placements?|campus|drive', q) and
+        not re.search(r'for\s+\w+', q) and  # Don't match if "for X" is present
+        not re.search(r'\w+\s+roles?', q)):  # Don't match if "X roles" is present
+        return _get_total_companies_participated()
+
+    # Pattern 3: Companies by specialization - expanded
+    company_list_patterns = [
+        r'(?:which\s+|what\s+)?companies.*?for\s+(\w+)',
+        r'companies.*?(\w+)\s+roles?',
+        r'companies.*?hiring.*?(\w+)',
+        r'companies.*?recruiting.*?(\w+)',
+        r'companies.*?offering.*?(\w+)',
+        r'companies.*?specialization.*?(\w+)'
+    ]
+
+    for pattern in company_list_patterns:
+        match = re.search(pattern, q)
+        if match:
+            spec_word = match.group(1)
+            spec = _normalize_specialization_word(spec_word)
+            if spec:
+                return _get_companies_list_for_specialization(spec)
+
+    # Pattern 4: General company lists
+    if any(phrase in q for phrase in ['list companies', 'show companies', 'all companies', 'what companies', 'which companies']):
         return _get_all_companies_list()
-    
-    # Pattern 4: "how many roles" or "total roles"
-    if any(phrase in q for phrase in ['how many roles', 'total roles', 'number of roles']):
+
+    # Pattern 5: Role counts
+    if any(phrase in q for phrase in ['how many roles', 'total roles', 'number of roles', 'count roles']):
         return _get_total_roles_count()
-    
-    # Pattern 5: "companies in <location>" or "companies from <location>"
-    match = re.search(r'companies\s+(?:in|from)\s+([\w\s]+)', q)
-    if match:
-        location = match.group(1).strip()
-        return _get_companies_by_location(location)
-    
-    # Pattern 6: "salary" or "salaries" or "packages" - highest/lowest/average
-    if any(word in q for word in ['salary', 'salaries', 'package', 'packages', 'ctc']):
-        if any(word in q for word in ['highest', 'maximum', 'max', 'top']):
+
+    # Pattern 6: Location-based queries - expanded
+    location_patterns = [
+        r'companies\s+(?:in|from|at|located\s+in)\s+([\w\s]+)',
+        r'companies\s+([\w\s]+)\s+(?:location|city|place)'
+    ]
+
+    for pattern in location_patterns:
+        match = re.search(pattern, q)
+        if match:
+            location = match.group(1).strip()
+            return _get_companies_by_location(location)
+
+    # Pattern 7: Salary queries - comprehensive
+    if any(word in q for word in ['salary', 'salaries', 'package', 'packages', 'ctc', 'pay', 'compensation']):
+        if any(word in q for word in ['highest', 'maximum', 'max', 'top', 'best']):
             return _get_highest_salary()
         elif any(word in q for word in ['lowest', 'minimum', 'min']):
             return _get_lowest_salary()
-        elif any(word in q for word in ['average', 'avg', 'mean']):
+        elif any(word in q for word in ['average', 'avg', 'mean', 'typical']):
             return _get_average_salary()
         else:
             return _get_salary_overview()
-    
-    # Pattern 7: "skills" - most common/required
+
+    # Pattern 8: Skills queries - expanded
     if 'skills' in q or 'skill' in q:
-        if any(word in q for word in ['most', 'top', 'common', 'popular']):
+        if any(word in q for word in ['most', 'top', 'common', 'popular', 'demanded', 'required', 'important']):
             return _get_top_skills()
-        else:
+        elif any(word in q for word in ['overview', 'summary', 'all']):
             return _get_skills_overview()
-    
-    # Pattern 8: "what companies" or "which companies" (general)
-    if any(phrase in q for phrase in ['what companies', 'which companies']) and 'for' not in q:
-        return _get_all_companies_list()
-    
-    # Pattern 9: Year-based queries "companies in 2024" or "2024 companies"
-    year_match = re.search(r'(?:companies.*?(?:in|for)\s+)?(\d{4})', q)
-    if year_match:
-        year = year_match.group(1)
-        return _get_companies_by_year(year)
-    
+        else:
+            return _get_top_skills()  # Default to top skills
+
+    # Pattern 9: Year-based queries - improved
+    year_patterns = [
+        r'companies.*?(?:in|for|during)\s+(\d{4})',
+        r'(\d{4})\s+companies',
+        r'batch.*?\b(\d{4})\b'
+    ]
+
+    for pattern in year_patterns:
+        match = re.search(pattern, q)
+        if match:
+            year = match.group(1)
+            return _get_companies_by_year(year)
+
+    # Pattern 10: Specialization queries without "companies"
+    if any(word in q for word in ['marketing', 'finance', 'hr', 'human resources', 'operations', 'strategy', 'it', 'analytics']):
+        spec = _extract_specialization_from_question(user_question)
+        if spec:
+            return _get_companies_count_for_specialization(spec)
+
     return None
 
 def _normalize_specialization_word(word: str) -> Optional[str]:
@@ -1449,7 +1635,7 @@ def route_query(user_question: str, context: Optional[Dict[str, Any]] = None) ->
 
     if len(sub_questions) > 1:
         print(f"🔧 Multi-hop query detected with {len(sub_questions)} steps")
-        return execute_multi_hop_query(sub_questions)
+        return execute_multi_hop_query(sub_questions, user_question, context)
     # Single query path
     answer = route_single_query(user_question, context)
     return answer
