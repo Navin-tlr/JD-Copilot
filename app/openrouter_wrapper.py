@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
         # Example embedding
         embedding_response = wrapper.get_embedding("Hello, world!")
-        print("Embedding vector (first 5 dimensions):
+        print("Embedding vector (first 5 dimensions):")
         print(embedding_response.data[0].embedding[:5])
 
     except (ValueError, openai.APIError) as e:

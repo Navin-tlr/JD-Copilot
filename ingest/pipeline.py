@@ -22,6 +22,7 @@ from ingest.company_extractor import extract_company
 from ingest.structured_extractor import StructuredExtractor
 from ingest.metadata_normalize import canonicalize_company
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from app.smart_preprocessing import SmartPreprocessor
 
 
 def normalize_company_name(name: str) -> str:
@@ -216,11 +217,22 @@ def _split_into_chunks(text: str, chunk_size: int, chunk_overlap: int) -> List[T
 
 
 def process_file(path: Path) -> Tuple[int, Optional[str]]:
-    """Parse → extract company → structured extraction → chunk → embed → upsert. Returns (num_chunks, company)."""
+    """Parse → smart preprocessing → extract company → structured extraction → chunk → embed → upsert. Returns (num_chunks, company)."""
     settings = get_settings()
     text = _read_text_from_path(path)
     preview = text[:500]
     print(f"Preview for {path.name}:\n{preview}\n{'-'*80}")
+
+    # Smart preprocessing: generate and store summary
+    try:
+        preprocessor = SmartPreprocessor()
+        summary = preprocessor.process_text(text, str(path))
+        if summary:
+            print(f"✅ Smart preprocessing completed for {path.name}")
+        else:
+            print(f"⚠️ Smart preprocessing skipped for {path.name}")
+    except Exception as e:
+        print(f"❌ Smart preprocessing failed for {path.name}: {e}")
 
     # Extract company once per document using LangExtract (with robust prompt)
     company_name: Optional[str] = extract_company(text)
