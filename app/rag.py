@@ -110,34 +110,8 @@ MAX_SNIPPET_CHARS = 400
 MAX_FULL_JD_CHARS = 10000  # Much larger limit for full JD requests
 
 
-_SEMANTIC_AUGMENTATIONS = {
-    "b2b": [
-        "business to business",
-        "business development",
-        "enterprise sales",
-        "corporate sales",
-        "account executive",
-        "partnership manager",
-    ],
-    "business development": [
-        "b2b sales",
-        "corporate partnerships",
-        "inside sales",
-        "lead generation",
-        "enterprise clients",
-    ],
-    "corporate gifting": [
-        "enterprise gifting",
-        "branded merchandise",
-        "b2b gifting",
-    ],
-    "lead generation": [
-        "prospecting",
-        "outbound sales",
-        "cold calling",
-        "b2b outreach",
-    ],
-}
+# Removed hardcoded semantic augmentations - let the LLM handle natural language understanding
+_SEMANTIC_AUGMENTATIONS = {}
 
 
 def _filter_hallucinations(response: str, context: str) -> str:
@@ -280,11 +254,7 @@ def calculate_relevance_score(result: Dict[str, Any], question: str) -> float:
     if any(spec in text for spec in specializations):
         metadata_bonus += 0.3
 
-    # FMCG/D2C relevance for relevant queries
-    fmcg_keywords = ['fmcg', 'consumer goods', 'packaged goods', 'd2c', 'direct-to-consumer']
-    if any(keyword in question_lower for keyword in fmcg_keywords):
-        if any(fmcg_term in text for fmcg_term in fmcg_keywords + ['mill story', 'consumer']):
-            metadata_bonus += 0.5
+    # Let the LLM handle relevance through synthesis - no hardcoded keyword boosting
 
     score += metadata_bonus * 0.3
 

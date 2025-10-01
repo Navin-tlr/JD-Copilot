@@ -9,6 +9,7 @@ from .agent import route_query
 from .rag import retrieve_snippets, synthesize_answer
 from .database import PlacementDatabase
 from .config import get_settings
+from .chat_memory import ConversationMemory
 
 @dataclass
 class ChatMessage:
@@ -30,8 +31,8 @@ class ChatSession:
 class ChatService:
     def __init__(self):
         self.sessions: Dict[str, ChatSession] = {}
-        self.messages: Dict[str, List[ChatMessage]] = {}
-        
+        self.memories: Dict[str, ConversationMemory] = {}
+
         # Initialize your existing RAG components
         self.db = PlacementDatabase()
     
@@ -44,32 +45,46 @@ class ChatService:
             last_activity=datetime.now()
         )
         self.sessions[session_id] = session
-        self.messages[session_id] = []
+        self.memories[session_id] = ConversationMemory(session_id)
         return session_id
     
     async def send_message(self, session_id: str, content: str, user_id: str) -> AsyncGenerator[ChatMessage, None]:
         print(f"🔍 Backend received query: '{content}' from user {user_id}")
-        
+
         # Create session if it doesn't exist
         if session_id not in self.sessions:
             new_session_id = await self.create_session(user_id)
             # Use the new session ID if one was created
             if new_session_id != session_id:
                 session_id = new_session_id
-        
-        # Store user message
-        user_message = ChatMessage(
-            id=str(uuid.uuid4()),
+
+        memory = self.memories[session_id]
+
+        # Check if query needs context resolution
+        if memory.is_contextual_query(content):
+            resolved_query, context_info = memory.resolve_context(content)
+            print(f"🔄 Resolved contextual query: '{content}' → '{resolved_query}'")
+            content = resolved_query
+
+        # Store user message in memory
+        memory.add_message(
+            role='user',
             content=content,
-            sender='user',
-            timestamp=datetime.now(),
-            session_id=session_id
+            metadata={'user_id': user_id, 'original_query': content if 'resolved_query' in locals() else None}
         )
-        self.messages[session_id].append(user_message)
-        
-        # Generate AI response using your RAG system with context
-        context = self._build_context(session_id)
+
+        # Generate AI response using your RAG system with enhanced context
+        context = self._build_enhanced_context(session_id)
         ai_response = await self._generate_rag_response(content, session_id, user_id, context)
+
+        # Store AI response in memory
+        memory.add_message(
+            role='assistant',
+            content=ai_response,
+            metadata={'context_used': bool(context)}
+        )
+
+        # Create response message
         ai_message = ChatMessage(
             id=str(uuid.uuid4()),
             content=ai_response,
@@ -77,43 +92,109 @@ class ChatService:
             timestamp=datetime.now(),
             session_id=session_id
         )
-        self.messages[session_id].append(ai_message)
-        
+
         # Update session activity
         if session_id in self.sessions:
             self.sessions[session_id].last_activity = datetime.now()
-        
+
         yield ai_message
     
-    def _build_context(self, session_id: str) -> Dict[str, Any]:
-        """Build context from conversation history"""
+    def _build_enhanced_context(self, session_id: str) -> Dict[str, Any]:
+        """Build enhanced context from conversation memory with summarization"""
+        if session_id not in self.memories:
+            return {}
+
+        memory = self.memories[session_id]
+
+        # Get conversation summary from memory
+        conversation_summary = memory.get_conversation_summary()
+
+        # Extract key findings and context
         context = {
-            'previous_companies': [],
-            'previous_roles': [],
-            'previous_specializations': []
+            'conversation_summary': conversation_summary,
+            'current_topic': memory.current_context.get('last_specialization'),
+            'recent_companies': memory.current_context.get('last_companies_mentioned', []),
+            'recent_entities': memory.current_context.get('last_entities', []),
+            'key_findings': self._extract_key_findings(memory),
+            'reasoning_chain': self._build_reasoning_chain(memory)
         }
-        
-        if session_id in self.messages:
-            # Look at recent messages to extract entities
-            recent_messages = self.messages[session_id][-10:]  # Last 10 messages
-            
-            for message in recent_messages:
-                content = message.content.lower()
-                
-                # Extract company names (simple pattern matching)
-                companies = ['acuity', 'mill story', 'madison pr', 'masters union', 'target', 'tap academy', 'withum', 'accorian', 'wns', 'turtle shell']
-                for company in companies:
-                    if company in content and company not in context['previous_companies']:
-                        context['previous_companies'].append(company.title())
-                
-                # Extract roles (simple pattern matching)
-                roles = ['analyst', 'intern', 'associate', 'counselor', 'executive', 'assistant', 'trainee']
-                for role in roles:
-                    if role in content and role not in context['previous_roles']:
-                        context['previous_roles'].append(role.title())
-        
+
         return context
-    
+
+    def _extract_key_findings(self, memory: ConversationMemory) -> List[str]:
+        """Extract key findings from conversation history"""
+        findings = []
+
+        # Extract numbers and statistics mentioned
+        if 'last_numbers_mentioned' in memory.current_context:
+            numbers = memory.current_context['last_numbers_mentioned']
+            if 'total_companies' in numbers:
+                findings.append(f"Total companies: {numbers['total_companies']}")
+            if 'avg_min_salary' in numbers:
+                findings.append(f"Average minimum salary: ₹{numbers['avg_min_salary']} LPA")
+
+        # Extract recent companies discussed
+        if 'last_companies_mentioned' in memory.current_context:
+            companies = memory.current_context['last_companies_mentioned'][:3]  # Top 3
+            if companies:
+                findings.append(f"Recently discussed companies: {', '.join(companies)}")
+
+        # Extract specialization focus
+        if 'last_specialization' in memory.current_context:
+            spec = memory.current_context['last_specialization']
+            findings.append(f"Current specialization focus: {spec}")
+
+        return findings
+
+    def _build_reasoning_chain(self, memory: ConversationMemory) -> List[str]:
+        """Build a reasoning chain from conversation history"""
+        chain = []
+
+        # Look at recent Q&A pairs
+        recent_messages = memory.messages[-6:]  # Last 3 Q&A pairs
+
+        for i in range(0, len(recent_messages) - 1, 2):
+            if i + 1 < len(recent_messages):
+                user_msg = recent_messages[i]
+                ai_msg = recent_messages[i + 1]
+
+                if user_msg.role == 'user' and ai_msg.role == 'assistant':
+                    # Extract key insight from AI response
+                    insight = self._extract_insight_from_response(ai_msg.content)
+                    if insight:
+                        chain.append(f"Step {len(chain) + 1}: {user_msg.content[:50]}... → {insight}")
+
+        return chain
+
+    def _extract_insight_from_response(self, response: str) -> str:
+        """Extract key insight from AI response"""
+        # Look for patterns that indicate key findings
+        response_lower = response.lower()
+
+        # Extract company counts
+        import re
+        count_match = re.search(r'(\d+)\s+companies?\s+came\s+for', response_lower)
+        if count_match:
+            return f"Found {count_match.group(1)} companies"
+
+        # Extract salary information
+        salary_match = re.search(r'salary.*?(₹?\d+(?:\.\d+)?\s*lpa)', response_lower)
+        if salary_match:
+            return f"Salary insight: {salary_match.group(1)}"
+
+        # Extract key recommendations
+        if 'strategic' in response_lower or 'recommend' in response_lower:
+            return "Strategic recommendations provided"
+
+        # Default: extract first meaningful sentence
+        sentences = re.split(r'[.!?]+', response)
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if len(sentence) > 10 and not sentence.startswith('based on') and not sentence.startswith('as your'):
+                return sentence[:100] + "..." if len(sentence) > 100 else sentence
+
+        return ""
+
     async def _generate_rag_response(self, user_message: str, session_id: str, user_id: str, context: Dict[str, Any] = None) -> str:
         """Generate comprehensive response using the query router system"""
         print(f"🎓 Generating routed response for: '{user_message}'")
@@ -158,7 +239,7 @@ class ChatService:
                 return self._format_response(response, user_message)
             except Exception as fallback_error:
                 print(f"❌ Fallback also failed: {fallback_error}")
-                return f"I'm sorry, I encountered an error while processing your query. Please try rephrasing your question."
+                return f"Query processing failed. Check input and retry."
     
     async def _handle_structured_query(self, user_message: str) -> str:
         """Handle structured queries using LlamaIndex SQL engine"""
@@ -196,7 +277,7 @@ class ChatService:
                 
         except Exception as e:
             print(f"❌ Structured query error: {e}")
-            return f"I encountered an error processing this structured query: {str(e)}"
+            return f"Structured query failed: {str(e)}. Check database schema and retry."
     
     async def _handle_unstructured_query(self, user_message: str) -> str:
         """Handle unstructured queries using RAG system"""
@@ -217,7 +298,7 @@ class ChatService:
                 
         except Exception as e:
             print(f"❌ Unstructured query error: {e}")
-            return f"I encountered an error processing this unstructured query: {str(e)}"
+            return f"Unstructured query failed: {str(e)}. Check vector index and retry."
     
     async def _handle_hybrid_query(self, user_message: str) -> str:
         """Handle hybrid queries using both structured and unstructured data"""
@@ -246,7 +327,7 @@ class ChatService:
                 
         except Exception as e:
             print(f"❌ Hybrid query error: {e}")
-            return f"I encountered an error processing this hybrid query: {str(e)}"
+            return f"Hybrid query failed: {str(e)}. Check both structured and unstructured paths."
     
     async def _llm_driven_database_query(self, user_message: str) -> str:
         """Use LLM to understand intent and generate intelligent database responses"""
@@ -614,15 +695,30 @@ For more detailed information or specific questions, please ask follow-up questi
         return ""
     
     async def get_session_messages(self, session_id: str) -> List[ChatMessage]:
-        return self.messages.get(session_id, [])
-    
+        if session_id in self.memories:
+            # Convert ChatMessage objects from memory to ChatMessage dataclass
+            memory_messages = []
+            for msg in self.memories[session_id].messages:
+                chat_msg = ChatMessage(
+                    id=str(uuid.uuid4()),  # Generate ID since memory doesn't store it
+                    content=msg.content,
+                    sender=msg.role,
+                    timestamp=msg.timestamp,
+                    session_id=session_id
+                )
+                memory_messages.append(chat_msg)
+            return memory_messages
+        return []
+
     async def get_user_sessions(self, user_id: str) -> List[ChatSession]:
         return [session for session in self.sessions.values() if session.user_id == user_id]
-    
+
     async def delete_session(self, session_id: str) -> bool:
         if session_id in self.sessions:
             del self.sessions[session_id]
-            del self.messages[session_id]
+            if session_id in self.memories:
+                self.memories[session_id].clear_memory()
+                del self.memories[session_id]
             return True
         return False
 
