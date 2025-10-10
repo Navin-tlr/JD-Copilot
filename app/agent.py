@@ -761,7 +761,16 @@ def _is_no_data_result(result: str) -> bool:
         "could not find",
         "couldn't find",
         "no relevant information",
-        "no information available"
+        "no information available",
+        # roles/placements specific
+        "0 roles",
+        "no roles",
+        "0 placements",
+        "no placements",
+        "0 offers",
+        "no offers",
+        "0 consulting roles",
+        "no consulting roles",
     ]
     result_lower = (result or "").lower()
     if any(indicator in result_lower for indicator in no_data_indicators):
@@ -770,6 +779,11 @@ def _is_no_data_result(result: str) -> bool:
     if re.search(r"\bno\b[^\n\r\.!?]{0,60}\bcompanies\b", result_lower):
         return True
     if re.search(r"\b0\b[^\n\r\.!?]{0,60}\bcompanies\b", result_lower):
+        return True
+    # Extend regex for roles/placements/offers variants
+    if re.search(r"\bno\b[^\n\r\.!?]{0,60}\b(roles|placements|offers)\b", result_lower):
+        return True
+    if re.search(r"\b0\b[^\n\r\.!?]{0,60}\b(roles|placements|offers)\b", result_lower):
         return True
     return False
 

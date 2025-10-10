@@ -33,7 +33,7 @@ def _build_llamaindex_engine():
     try:
         engine = create_engine(f"sqlite:///{db_path}")
         sql_db = SQLDatabase(engine, include_tables=["companies", "roles", "offers", "skills", "requirements"])
-        model_name = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-r1-distill-llama-70b")
+        model_name = os.getenv("OPENROUTER_MODEL", "x-ai/grok-4-fast")
         llm = OpenAI(api_key=key, model=model_name, temperature=0.0, max_tokens=800)
         _query_engine = NLSQLTableQueryEngine(
             sql_database=sql_db,

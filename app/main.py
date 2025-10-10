@@ -8,6 +8,8 @@ import sqlite3
 
 from fastapi import FastAPI, HTTPException, Depends, Body, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import uvicorn
@@ -114,20 +116,10 @@ async def vector_chat_endpoint(request: QueryRequest):
 
         chat_memory.add_message(session_id, "assistant", answer)
         _sync_history_snapshot(user_id, session_id)
-        citations = []
-        for snip in snippets or []:
-            md = snip.get("metadata", {})
-            if md.get("company") or md.get("role"):
-                citations.append({
-                    "company": md.get("company", ""),
-                    "role": md.get("role", ""),
-                    "year": md.get("year", ""),
-                    "extracted_skills": md.get("extracted_skills", [])
-                })
         return ChatResponse(
             answer=answer,
             snippets=snippets or [],
-            citations=citations,
+            citations=[],
             needs_vector_approval=False,
             vector_reason=None,
             vector_used=True
@@ -173,12 +165,11 @@ async def query_endpoint(request: ChatRequest = Body(...)):
             # Extract snippets from the answer if available
             snippets = []
             try:
-                # Try to get relevant snippets for citations
                 temp_snippets = retrieve_snippets(request.query, top_k=50, filters={})
                 if temp_snippets:
                     snippets = temp_snippets
             except Exception as e:
-                print(f"Warning: Could not retrieve snippets for citations: {e}")
+                print(f"Warning: Could not retrieve snippets: {e}")
             
         else:
             print("⚠️ AI agent not available, falling back to basic RAG")
@@ -192,19 +183,6 @@ async def query_endpoint(request: ChatRequest = Body(...)):
         # Add assistant response to chat memory
         chat_memory.add_message(session_id, "assistant", answer)
         _sync_history_snapshot(user_id, session_id)
-        
-        # Prepare citations
-        citations = []
-        if snippets:
-            for snippet in snippets:
-                metadata = snippet.get("metadata", {})
-                if metadata.get("company") or metadata.get("role") or metadata.get("year"):
-                    citations.append({
-                        "company": metadata.get("company", ""),
-                        "role": metadata.get("role", ""),
-                        "year": metadata.get("year", ""),
-                        "extracted_skills": metadata.get("extracted_skills", [])
-                    })
         
         print(f"✅ Query processed successfully. Answer length: {len(answer)} chars")
         
@@ -229,7 +207,7 @@ async def query_endpoint(request: ChatRequest = Body(...)):
         return ChatResponse(
             answer=answer,
             snippets=snippets,
-            citations=citations,
+            citations=[],
             needs_vector_approval=needs_vector,
             vector_reason=reason,
             vector_used=False,
@@ -321,25 +299,13 @@ async def chat_endpoint(request: QueryRequest):
         # Extract snippets from the answer if available
         snippets = []
         try:
-            # Try to get relevant snippets for citations
             temp_snippets = retrieve_snippets(question, top_k=50, filters={})
             if temp_snippets:
                 snippets = temp_snippets
         except Exception as e:
-            print(f"Warning: Could not retrieve snippets for citations: {e}")
+            print(f"Warning: Could not retrieve snippets: {e}")
         
         # Prepare citations for the response object (but don't add to answer text)
-        citations = []
-        if snippets:
-            for snippet in snippets:
-                metadata = snippet.get("metadata", {})
-                if metadata.get("company") or metadata.get("role") or metadata.get("year"):
-                    citations.append({
-                        "company": metadata.get("company", ""),
-                        "role": metadata.get("role", ""),
-                        "year": metadata.get("year", ""),
-                        "extracted_skills": metadata.get("extracted_skills", [])
-                    })
         
         # Add assistant response to chat memory
         chat_memory.add_message(session_id, "assistant", answer)
@@ -352,7 +318,18 @@ async def chat_endpoint(request: QueryRequest):
         deep_dive_phrase = "deep-dive mode available" in lower_ans
         deep_dive_analysis = "deep-dive analysis complete" in lower_ans
         is_error_response = "i couldn't process your query" in lower_ans or "i apologize" in lower_ans
-        limited = len(answer) < 40 and ("no companies" in lower_ans or "couldn't" in lower_ans)
+        limited = (
+            len(answer) < 60 and (
+                "no companies" in lower_ans or
+                "couldn't" in lower_ans or
+                "0 roles" in lower_ans or
+                "no roles" in lower_ans or
+                "0 placements" in lower_ans or
+                "no placements" in lower_ans or
+                "0 consulting roles" in lower_ans or
+                "no consulting roles" in lower_ans
+            )
+        )
 
         deep_dive_offered = False
         deep_dive_consent_needed = False
@@ -376,7 +353,7 @@ async def chat_endpoint(request: QueryRequest):
         return ChatResponse(
             answer=answer,
             snippets=snippets,
-            citations=citations,
+            citations=[],
             needs_vector_approval=needs_vector,
             vector_reason=reason,
             vector_used=deep_dive_analysis,  # treat analysis completion as vector usage
@@ -445,25 +422,11 @@ async def enhanced_chat_endpoint(request: QueryRequest):
         # Extract snippets from the answer if available
         snippets = []
         try:
-            # Try to get relevant snippets for citations
             temp_snippets = retrieve_snippets(question, top_k=50, filters={})
             if temp_snippets:
                 snippets = temp_snippets
         except Exception as e:
-            print(f"Warning: Could not retrieve snippets for citations: {e}")
-        
-        # Prepare citations for the response object (but don't add to answer text)
-        citations = []
-        if snippets:
-            for snippet in snippets:
-                metadata = snippet.get("metadata", {})
-                if metadata.get("company") or metadata.get("role") or metadata.get("year"):
-                    citations.append({
-                        "company": metadata.get("company", ""),
-                        "role": metadata.get("role", ""),
-                        "year": metadata.get("year", ""),
-                        "extracted_skills": metadata.get("extracted_skills", [])
-                    })
+            print(f"Warning: Could not retrieve snippets: {e}")
         
         # Add assistant response with enhanced tracking
         await enhanced_session.add_message(
@@ -472,7 +435,7 @@ async def enhanced_chat_endpoint(request: QueryRequest):
             metadata={
                 "endpoint": "enhanced",
                 "snippets_count": len(snippets),
-                "citations_count": len(citations),
+                "citations_count": 0,
                 "timestamp": datetime.now().isoformat()
             }
         )
@@ -487,7 +450,7 @@ async def enhanced_chat_endpoint(request: QueryRequest):
         return ChatResponse(
             answer=answer,
             snippets=snippets,
-            citations=citations
+            citations=[]
         )
         
     except Exception as e:
@@ -670,6 +633,30 @@ def _is_deep_dive_consent(user_input: str) -> bool:
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+SPARK_UI_DIST = (Path(__file__).resolve().parent.parent / "spark-home-2" / "dist" / "spa").resolve()
+SPARK_INDEX_FILE = SPARK_UI_DIST / "index.html"
+
+if SPARK_INDEX_FILE.exists():
+    assets_dir = SPARK_UI_DIST / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="spark-ui-assets")
+
+    @app.get("/", include_in_schema=False)
+    async def serve_root() -> FileResponse:
+        return FileResponse(SPARK_INDEX_FILE)
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str) -> FileResponse:
+        candidate = (SPARK_UI_DIST / full_path).resolve()
+        try:
+            candidate.relative_to(SPARK_UI_DIST)
+        except ValueError:
+            return FileResponse(SPARK_INDEX_FILE)
+
+        if candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(SPARK_INDEX_FILE)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

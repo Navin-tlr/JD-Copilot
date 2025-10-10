@@ -28,15 +28,32 @@ cp env.example .env
 
 4) Put JD PDFs or .txt files in `data/jds/`
 
-5) Ingest and run API server
+5) Build the Spark Home UI (primary frontend)
 
 ```bash
-# Option A: one-liner helper
-bash run.sh
+cd spark-home-2
+pnpm install
+pnpm build
+cd ..
+```
 
-# Option B: manual (Pinecone cloud-first)
+This generates the production-ready SPA under `spark-home-2/dist/spa`, which the FastAPI backend now serves automatically.
+
+6) Ingest and run API server
+
+```bash
+# Option A: backend only
 python -m ingest.pipeline --pdf_dir data/jds
 uvicorn app.main:app --reload --port 8000
+
+# Option B: run backend + Spark UI in watch mode
+# Terminal 1 (backend)
+uvicorn app.main:app --reload --port 8000
+
+# Terminal 2 (Spark UI dev server with proxy to FastAPI)
+cd spark-home-2
+pnpm install
+pnpm dev
 ```
 
 ### Example API calls
@@ -162,6 +179,20 @@ pytest -q
 ```
 
 Tests use `dev_tools/sample_jd_texts/` to validate ingestion and API endpoints without requiring Docling or LangExtract. No network LLM calls are made during tests.
+
+### Frontend development (Spark Home UI)
+
+The production UI lives in `spark-home-2/`. During local development you can run the Vite dev server with backend proxying:
+
+```bash
+cd spark-home-2
+pnpm install
+pnpm dev
+```
+
+- Set `VITE_BACKEND_URL` in `spark-home-2/.env` to point at your FastAPI instance (defaults to `http://localhost:8000`).
+- The dev server proxies `/chat`, `/query`, and `/workflow` calls to the backend, so relative fetches continue to work.
+- A production build (`pnpm build`) writes to `spark-home-2/dist/spa`; the FastAPI app automatically serves this bundle when it exists.
 
 # Y² Mobile App
 

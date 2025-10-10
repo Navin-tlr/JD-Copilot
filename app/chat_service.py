@@ -965,7 +965,7 @@ For more detailed information or specific questions, please ask follow-up questi
             # Prepare comprehensive LLM request
             settings = get_settings()
             payload = {
-                "model": settings.OPENROUTER_MODEL or "deepseek/deepseek-r1-distill-llama-70b",  # High-capability model
+                "model": settings.OPENROUTER_MODEL or "x-ai/grok-4-fast",  # Use Grok-4 Fast as default
                 "messages": [
                     {
                         "role": "system", 
