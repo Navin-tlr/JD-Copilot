@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import CompanyDropdown from './CompanyDropdown';
 
 interface ChatInputProps {
   variant?: 'default' | 'rag' | 'benchmark';
@@ -8,6 +9,9 @@ interface ChatInputProps {
 
 export default function ChatInput({ variant = 'default', onSend }: ChatInputProps) {
   const [input, setInput] = useState('');
+  const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -70,6 +74,37 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
     // Handle whisper mode
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInput(value);
+
+    // Detect if # exists in the input and show dropdown
+    if (value.includes('#')) {
+      if (inputRef.current) {
+        const rect = inputRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + 5,
+          left: rect.left,
+        });
+      }
+      setShowCompanyDropdown(true);
+    } else {
+      // Close dropdown if # is removed
+      setShowCompanyDropdown(false);
+    }
+  };
+
+  const handleCompanySelect = (company: string) => {
+    // Find the last # and replace it with the company name
+    const lastHashIndex = input.lastIndexOf('#');
+    if (lastHashIndex !== -1) {
+      const newInput = input.substring(0, lastHashIndex) + company + input.substring(lastHashIndex + 1);
+      setInput(newInput);
+    }
+    setShowCompanyDropdown(false);
+    inputRef.current?.focus();
+  };
+
   const handleSend = () => {
     if (!active) return;
     onSend?.(input.trim());
@@ -103,13 +138,14 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
 
       {/* Input Text */}
       <input
+        ref={inputRef}
         type="text"
         value={input}
-        onChange={(e) => setInput(e.target.value)}
+        onChange={handleInputChange}
         onKeyDown={(e) => {
           if (e.key === 'Enter') handleSend();
         }}
-        placeholder={variant === 'benchmark' ? 'Alright genius, spit out...' : 'Use fx() to activate'}
+        placeholder={variant === 'benchmark' ? 'Alright genius, spit out...' : 'Type # to select company...'}
         className="absolute left-[60px] top-[17px] bg-transparent outline-none text-[14px] font-normal w-[calc(100%-120px)]"
         style={{ color: colors.text, opacity: input ? 1 : 0.6 }}
       />
@@ -436,6 +472,16 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
             </clipPath>
           </defs>
         </svg>
+      )}
+
+      {/* Company Dropdown */}
+      {showCompanyDropdown && (
+        <CompanyDropdown
+          variant={variant}
+          position={dropdownPosition}
+          onSelect={handleCompanySelect}
+          onClose={() => setShowCompanyDropdown(false)}
+        />
       )}
     </div>
   );

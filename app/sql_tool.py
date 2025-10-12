@@ -81,6 +81,57 @@ CANONICAL_QUERIES = {
             "WHERE LOWER(r.specialization) = 'operations' ORDER BY c.company_name;"
         ),
     },
+    # Analytics
+    "count_analytics_companies": {
+        "keywords": ["companies came for analytics", "analytics role", "count companies for analytics", "for analytics"],
+        "query": (
+            "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'analytics';"
+        ),
+    },
+    "list_analytics_companies": {
+        "keywords": ["list companies for analytics", "analytics companies list"],
+        "query": (
+            "SELECT DISTINCT c.company_name FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'analytics' ORDER BY c.company_name;"
+        ),
+    },
+    # IT
+    "count_it_companies": {
+        "keywords": ["companies came for it", "it role", "count companies for it", "for it", "information technology"],
+        "query": (
+            "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'it';"
+        ),
+    },
+    "list_it_companies": {
+        "keywords": ["list companies for it", "it companies list"],
+        "query": (
+            "SELECT DISTINCT c.company_name FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'it' ORDER BY c.company_name;"
+        ),
+    },
+    # Strategy
+    "count_strategy_companies": {
+        "keywords": ["companies came for strategy", "strategy role", "count companies for strategy", "for strategy"],
+        "query": (
+            "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'strategy';"
+        ),
+    },
+    "list_strategy_companies": {
+        "keywords": ["list companies for strategy", "strategy companies list"],
+        "query": (
+            "SELECT DISTINCT c.company_name FROM roles r "
+            "JOIN companies c ON r.company_id = c.id "
+            "WHERE LOWER(r.specialization) = 'strategy' ORDER BY c.company_name;"
+        ),
+    },
     # Generic sales / business development role queries (covers B2B, BD, inside, field)
     "count_sales_related_companies": {
         "keywords": [
@@ -358,14 +409,22 @@ def run_sql_query(question: str) -> str:
             # Format the response based on query type
             if "COUNT" in canonical_sql.upper():
                 count = rows[0][0] if rows else 0
-                if "marketing" in question.lower():
+                # Detect specialization type from question
+                question_lower = question.lower()
+                if "marketing" in question_lower:
                     return f"There are {count} companies offering marketing roles."
-                elif "finance" in question.lower():
+                elif "finance" in question_lower:
                     return f"There are {count} companies offering finance roles."
-                elif "hr" in question.lower() or "human resources" in question.lower():
+                elif "hr" in question_lower or "human resources" in question_lower:
                     return f"There are {count} companies offering HR roles."
-                elif "operations" in question.lower():
+                elif "operations" in question_lower:
                     return f"There are {count} companies offering operations roles."
+                elif "analytics" in question_lower:
+                    return f"There are {count} companies offering analytics roles."
+                elif "it" in question_lower or "information technology" in question_lower:
+                    return f"There are {count} companies offering IT roles."
+                elif "strategy" in question_lower:
+                    return f"There are {count} companies offering strategy roles."
                 else:
                     return f"There are {count} companies in total."
             else:

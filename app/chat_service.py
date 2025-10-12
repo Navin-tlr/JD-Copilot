@@ -1,4 +1,6 @@
 import asyncio
+import os
+import re
 import uuid
 from datetime import datetime
 from typing import AsyncGenerator, Dict, List, Optional, Any
@@ -9,7 +11,7 @@ from .agent import route_query
 from .rag import retrieve_snippets, synthesize_answer
 from .database import PlacementDatabase
 from .config import get_settings
-from .chat_memory import ConversationMemory
+from .enhanced_chat_memory import EnhancedConversationMemory
 
 @dataclass
 class ChatMessage:
@@ -27,61 +29,125 @@ class ChatSession:
     created_at: datetime
     last_activity: datetime
     metadata: Optional[Dict] = None
+    name: Optional[str] = None  # Auto-generated session name
 
 class ChatService:
     def __init__(self):
         self.sessions: Dict[str, ChatSession] = {}
-        self.memories: Dict[str, ConversationMemory] = {}
+        self.memories: Dict[str, EnhancedConversationMemory] = {}
 
         # Initialize your existing RAG components
         self.db = PlacementDatabase()
+        
+        # Memory limits (configurable via env)
+        # Maximum concurrent sessions to keep in memory (default: 10)
+        self.session_memory_limit: int = int(os.getenv("CHAT_SESSION_MEMORY_LIMIT", "10"))
+        # Maximum messages to keep per session memory (default: 200)
+        self.session_message_limit: int = int(os.getenv("CHAT_SESSION_MESSAGE_LIMIT", "200"))
     
-    async def create_session(self, user_id: str) -> str:
-        session_id = str(uuid.uuid4())
+    def _generate_session_name(self, first_message: str) -> str:
+        """Generate a descriptive name from the first user message (ChatGPT-style)"""
+        # Take first 40 chars and clean up
+        name = first_message[:40].strip()
+        # Remove trailing incomplete words
+        if len(first_message) > 40:
+            words = name.split()
+            if len(words) > 1:
+                name = ' '.join(words[:-1]) + "..."
+        # Fallback if message is too short
+        if len(name) < 5:
+            name = f"Chat {datetime.now().strftime('%b %d')}"
+        return name
+    
+    async def create_session(self, user_id: str, session_id: Optional[str] = None) -> str:
+        """Create a new chat session. Allows explicit session IDs for external callers."""
+        # Evict oldest session if we exceed configured session_memory_limit
+        if len(self.sessions) >= self.session_memory_limit:
+            # find oldest by last_activity
+            oldest_session_id = min(self.sessions.items(), key=lambda kv: kv[1].last_activity)[0]
+            print(f"🗑️ Session memory limit reached ({self.session_memory_limit}). Evicting oldest session: {oldest_session_id}")
+            await self.delete_session(oldest_session_id)
+
+        session_id = session_id or str(uuid.uuid4())
         session = ChatSession(
             id=session_id,
             user_id=user_id,
             created_at=datetime.now(),
-            last_activity=datetime.now()
+            last_activity=datetime.now(),
+            name=None  # Will be set after first message
         )
         self.sessions[session_id] = session
-        self.memories[session_id] = ConversationMemory(session_id)
+        # Use enhanced memory with bounded messages to avoid unbounded growth
+        self.memories[session_id] = EnhancedConversationMemory(session_id, max_messages=self.session_message_limit, user_id=user_id)
+        return session_id
+
+    async def ensure_session(self, session_id: Optional[str], user_id: str) -> str:
+        """Guarantee that a session exists and return the active session ID."""
+        if not session_id:
+            return await self.create_session(user_id)
+
+        if session_id not in self.sessions:
+            await self.create_session(user_id, session_id=session_id)
+
         return session_id
     
     async def send_message(self, session_id: str, content: str, user_id: str) -> AsyncGenerator[ChatMessage, None]:
         print(f"🔍 Backend received query: '{content}' from user {user_id}")
 
         # Create session if it doesn't exist
-        if session_id not in self.sessions:
-            new_session_id = await self.create_session(user_id)
-            # Use the new session ID if one was created
-            if new_session_id != session_id:
-                session_id = new_session_id
+        session_id = await self.ensure_session(session_id, user_id)
 
         memory = self.memories[session_id]
+
+        # Auto-generate session name from first message (ChatGPT behavior)
+        if self.sessions[session_id].name is None and len(memory.messages) == 0:
+            self.sessions[session_id].name = self._generate_session_name(content)
+            print(f"📝 Auto-generated session name: '{self.sessions[session_id].name}'")
+
+        # Enforce per-session message threshold (defensive trim)
+        max_msgs = getattr(memory, "max_messages", None)
+        if isinstance(max_msgs, int) and max_msgs > 0:
+            try:
+                while len(memory.messages) > max_msgs:
+                    # remove oldest message
+                    memory.messages.pop(0)
+            except Exception:
+                # If memory shape is unexpected, ignore and continue
+                pass
+
+        original_query = content
+        context_info: Dict[str, Any] = {}
 
         # Check if query needs context resolution
         if memory.is_contextual_query(content):
             resolved_query, context_info = memory.resolve_context(content)
-            print(f"🔄 Resolved contextual query: '{content}' → '{resolved_query}'")
-            content = resolved_query
+            if resolved_query != content:
+                print(f"🔄 Resolved contextual query: '{content}' → '{resolved_query}'")
+                content = resolved_query
 
-        # Store user message in memory
-        memory.add_message(
+        # Store user message in memory with enhanced tracking
+        await memory.add_message(
             role='user',
             content=content,
-            metadata={'user_id': user_id, 'original_query': content if 'resolved_query' in locals() else None}
+            metadata={
+                'user_id': user_id,
+                'original_query': original_query if content != original_query else None,
+                'context_resolution': context_info if context_info else None
+            },
+            query_type=self._detect_query_type(content),
+            specialization=self._detect_specialization(content),
+            entities_mentioned=self._extract_entities(content)
         )
 
         # Generate AI response using your RAG system with enhanced context
-        context = self._build_enhanced_context(session_id)
+        context = await self._build_enhanced_context(session_id)
         ai_response = await self._generate_rag_response(content, session_id, user_id, context)
 
-        # Store AI response in memory
-        memory.add_message(
+        # Store AI response in memory with enhanced tracking
+        await memory.add_message(
             role='assistant',
             content=ai_response,
-            metadata={'context_used': bool(context)}
+            metadata={'context_used': bool(context), 'enhanced_memory': True}
         )
 
         # Create response message
@@ -99,29 +165,43 @@ class ChatService:
 
         yield ai_message
     
-    def _build_enhanced_context(self, session_id: str) -> Dict[str, Any]:
-        """Build enhanced context from conversation memory with summarization"""
+    async def _build_enhanced_context(self, session_id: str) -> Dict[str, Any]:
+        """Build ChatGPT-like context with full conversation history"""
         if session_id not in self.memories:
             return {}
 
         memory = self.memories[session_id]
 
-        # Get conversation summary from memory
-        conversation_summary = memory.get_conversation_summary()
+        # Get full conversation history for ChatGPT-like context
+        full_conversation = []
+        for msg in memory.messages:
+            full_conversation.append({
+                'role': msg.role,
+                'content': msg.content,
+                'timestamp': msg.timestamp.isoformat()
+            })
 
-        # Extract key findings and context
+        # Get enhanced context metadata
+        enhanced_context = await memory.get_enhanced_context()
+
+        # Build comprehensive context
         context = {
-            'conversation_summary': conversation_summary,
+            'full_conversation_history': full_conversation,  # Send complete history to LLM
+            'conversation_summary': enhanced_context.get('base_context', ''),
             'current_topic': memory.current_context.get('last_specialization'),
             'recent_companies': memory.current_context.get('last_companies_mentioned', []),
             'recent_entities': memory.current_context.get('last_entities', []),
             'key_findings': self._extract_key_findings(memory),
-            'reasoning_chain': self._build_reasoning_chain(memory)
+            'reasoning_chain': self._build_reasoning_chain(memory),
+            'workflow_stage': enhanced_context.get('context_state', {}).get('workflow_stage'),
+            'conversation_depth': enhanced_context.get('message_count', 0),
+            'session_health': enhanced_context.get('session_health', {}),
+            'context_window_type': 'unlimited'  # Indicate ChatGPT-like behavior
         }
 
         return context
 
-    def _extract_key_findings(self, memory: ConversationMemory) -> List[str]:
+    def _extract_key_findings(self, memory) -> List[str]:
         """Extract key findings from conversation history"""
         findings = []
 
@@ -146,7 +226,135 @@ class ChatService:
 
         return findings
 
-    def _build_reasoning_chain(self, memory: ConversationMemory) -> List[str]:
+    def _detect_query_type(self, content: str) -> Optional[str]:
+        """Detect the type of query for better context tracking"""
+        content_lower = content.lower()
+
+        if any(word in content_lower for word in ['how many', 'count', 'total', 'number of']):
+            return 'count_query'
+        elif any(word in content_lower for word in ['salary', 'pay', 'compensation', 'lpa']):
+            return 'salary_query'
+        elif any(word in content_lower for word in ['company', 'companies', 'organization']):
+            return 'company_query'
+        elif any(word in content_lower for word in ['role', 'position', 'job']):
+            return 'role_query'
+        elif any(word in content_lower for word in ['specialization', 'field', 'domain']):
+            return 'specialization_query'
+        elif any(word in content_lower for word in ['compare', 'vs', 'versus', 'difference']):
+            return 'comparison_query'
+        elif any(word in content_lower for word in ['advice', 'recommend', 'suggest']):
+            return 'advice_query'
+        else:
+            return 'general_query'
+
+    def _detect_specialization(self, content: str) -> Optional[str]:
+        """Detect specialization mentioned in the query"""
+        content_lower = content.lower()
+
+        specializations = [
+            'finance', 'accounting', 'marketing', 'sales', 'hr', 'human resources',
+            'operations', 'technology', 'it', 'engineering', 'consulting', 'analytics'
+        ]
+
+        for spec in specializations:
+            if spec in content_lower:
+                return spec.title()
+
+        return None
+
+    def _extract_entities(self, content: str) -> List[str]:
+        """Extract entities like company names from the query"""
+        # Simple entity extraction - can be enhanced with NLP later
+        known_companies = [
+            'masters', 'mill story', 'tap academy', 'accorian', 'madison', 'target',
+            'google', 'microsoft', 'amazon', 'apple', 'meta', 'netflix'
+        ]
+
+        content_lower = content.lower()
+        entities = []
+
+        for company in known_companies:
+            if company in content_lower:
+                entities.append(company.title())
+
+        return entities
+
+    def _clean_and_complete_snippet(self, snippet: str) -> str:
+        """Clean and complete snippet text to avoid incomplete chunks"""
+        if not snippet or len(snippet.strip()) < 10:
+            return ""
+
+        # Remove incomplete sentences at the end
+        snippet = snippet.strip()
+
+        # Check if snippet ends with incomplete sentence patterns
+        incomplete_patterns = [
+            r'\s*\([^)]*$',  # Incomplete parentheses
+            r'\s*\[[^\]]*$',  # Incomplete brackets
+            r'\s*\{[^}]*$',  # Incomplete braces
+            r'\s*[^.!?]*$',  # No ending punctuation (but allow if it's a complete phrase)
+        ]
+
+        for pattern in incomplete_patterns:
+            if re.search(pattern, snippet) and not re.search(r'[.!?]\s*$', snippet):
+                # Try to find the last complete sentence
+                sentences = re.split(r'(?<=[.!?])\s+', snippet)
+                if len(sentences) > 1:
+                    # Keep all but the last incomplete sentence
+                    snippet = ' '.join(sentences[:-1]).strip()
+                else:
+                    # If no complete sentences, truncate at reasonable length
+                    words = snippet.split()
+                    if len(words) > 20:
+                        snippet = ' '.join(words[:20]) + '...'
+
+        # Ensure reasonable length (200-300 chars for meaningful context)
+        if len(snippet) > 300:
+            # Try to cut at sentence boundary
+            sentences = re.split(r'(?<=[.!?])\s+', snippet[:300])
+            if len(sentences) > 1:
+                snippet = ' '.join(sentences[:-1])
+            else:
+                snippet = snippet[:250] + '...'
+
+        return snippet.strip()
+
+    def _is_valid_snippet(self, snippet: str) -> bool:
+        """Validate that a snippet is complete and meaningful"""
+        if not snippet or len(snippet.strip()) < 50:
+            return False
+
+        snippet = snippet.strip()
+
+        # Reject snippets with incomplete patterns
+        invalid_patterns = [
+            r'\s*\([^)]*$',  # Incomplete parentheses
+            r'\s*\[[^\]]*$',  # Incomplete brackets
+            r'\s*\{[^}]*$',  # Incomplete braces
+            r'^\s*\.\.\..*',  # Starts with ellipsis
+            r'.*\.\.\.\s*$',  # Ends with ellipsis (indicating truncation)
+            r'^\s*[a-z]',     # Starts with lowercase (likely fragment)
+            r'.*\s+$',        # Ends with space (incomplete)
+            r'following\s+rol',  # Specific pattern from the error
+            r'the\s+following\s*$',  # Incomplete "the following"
+        ]
+
+        for pattern in invalid_patterns:
+            if re.search(pattern, snippet, re.IGNORECASE):
+                return False
+
+        # Must have at least one complete sentence or meaningful phrase
+        if not re.search(r'[.!?]\s', snippet) and len(snippet.split()) < 10:
+            return False
+
+        # Check for minimum word count and reasonable length
+        words = snippet.split()
+        if len(words) < 8 or len(snippet) < 100:
+            return False
+
+        return True
+
+    def _build_reasoning_chain(self, memory) -> List[str]:
         """Build a reasoning chain from conversation history"""
         chain = []
 
@@ -233,21 +441,19 @@ class ChatService:
             
         except Exception as e:
             print(f"❌ Routed response error: {e}")
-            # Fallback to placement cell LLM if routing fails
+            # Fallback to unstructured RAG to avoid legacy persona overrides
             try:
-                response = await self._placement_cell_llm_response(user_message)
+                print("↩️ Falling back to unstructured RAG path")
+                response = await self._handle_unstructured_query(user_message)
                 return self._format_response(response, user_message)
             except Exception as fallback_error:
                 print(f"❌ Fallback also failed: {fallback_error}")
-                return f"Query processing failed. Check input and retry."
+                return "I hit an error while processing that. Try rephrasing or ask a smaller piece of the question."
     
     async def _handle_structured_query(self, user_message: str) -> str:
         """Handle structured queries using LlamaIndex SQL engine"""
         try:
-            # Check if this is a query that needs comprehensive reporting (like HR roles)
-            if any(keyword in user_message.lower() for keyword in ["hr role", "hr position", "human resources", "people operations"]):
-                print(f"🔍 HR role query detected, using placement cell LLM for comprehensive report")
-                return await self._placement_cell_llm_response(user_message)
+            # Removed legacy detour to placement cell LLM to preserve conversational persona
             
             from .agent import get_llama_index_engine, normalize_query_with_schema_helper
             
@@ -284,8 +490,8 @@ class ChatService:
         try:
             from .rag import retrieve_snippets, synthesize_answer
             
-            # Use existing RAG system
-            snippets = retrieve_snippets(user_message, top_k=15, filters={})
+            # Use existing RAG system with increased context for strategic analysis
+            snippets = retrieve_snippets(user_message, top_k=30, filters={})
             if snippets:
                 answer = synthesize_answer(user_message, snippets, {})
                 # CRITICAL FIX: Don't fallback to generic message - use the actual answer
@@ -582,82 +788,61 @@ class ChatService:
             return f"Error retrieving data summary: {str(e)}"
     
     def _format_response(self, response: str, user_message: str = "") -> str:
-        """Format responses into structured, visually appealing layout matching Notion document style"""
+        """Format responses for clean visual presentation while preserving Markdown.
+
+        - Preserve existing headings and bold text
+        - Convert plain section lines like "Title:" into Markdown subheadings "### **Title**"
+        - Highlight labels (IMPORTANT, CRITICAL, NOTE, KEY, TAKEAWAY) by bolding the label
+        - Use bullets and short paragraphs (spacing handled by client renderer)
+        """
         if not response:
             return response
-        
-        # Remove markdown formatting
-        response = response.replace('**', '').replace('###', '').replace('##', '').replace('#', '')
-        
-        # Clean up extra whitespace but preserve line breaks
-        lines = response.split('\n')
-        cleaned_lines = []
-        
+
+        import re
+
+        text = response.strip()
+        # Normalize line endings and collapse excessive blank lines
+        text = re.sub(r"\r\n?|\r", "\n", text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+
+        lines = text.split("\n")
+        out_lines: List[str] = []
+
+        section_pattern = re.compile(r"^([A-Z][A-Za-z0-9 /&\-]{2,}):\s*$")
+        label_pattern = re.compile(r"^(\s*)(IMPORTANT|CRITICAL|NOTE|KEY|TAKEAWAY)(\s*:?)(\s*)(.*)$", re.IGNORECASE)
+
         for line in lines:
-            line = line.strip()
-            if line:
-                cleaned_lines.append(line)
-        
-        # Join with proper spacing
-        formatted_response = '\n\n'.join(cleaned_lines)
-        
-        # Generate dynamic, query-specific heading based on user message
-        heading = self._generate_query_specific_heading(user_message)
-        
-        # Add structured formatting with dynamic heading
-        return f"""{heading}
+            raw = line.rstrip()
+            if not raw:
+                out_lines.append("")
+                continue
 
-{formatted_response}
+            # Keep existing markdown headings as-is
+            if raw.lstrip().startswith(("# ", "## ", "### ", "#### ")):
+                out_lines.append(raw)
+                continue
 
----
-For more detailed information or specific questions, please ask follow-up questions."""
+            # Convert plain section titles into bold subheadings
+            m = section_pattern.match(raw)
+            if m:
+                title = m.group(1).strip()
+                out_lines.append(f"### **{title}**")
+                continue
+
+            # Bold important labels
+            lm = label_pattern.match(raw)
+            if lm:
+                indent, label, colon, space, rest = lm.groups()
+                out_lines.append(f"{indent}**{label.upper()}**:{space}{rest}".rstrip())
+                continue
+
+            out_lines.append(raw)
+
+        return "\n".join(out_lines).strip()
     
     def _generate_query_specific_heading(self, user_message: str) -> str:
-        """Generate dynamic, query-specific heading based on user message"""
-        if not user_message:
-            return "CHRIST UNIVERSITY PLACEMENT CELL RESPONSE"
-        
-        user_message_lower = user_message.lower()
-        
-        # Full JD requests
-        if any(phrase in user_message_lower for phrase in [
-            "full jd", "complete jd", "entire jd", "full job description", 
-            "complete job description", "entire job description", "show me jd", "give jd"
-        ]):
-            # Extract company name for personalized heading
-            company_name = self._extract_company_name(user_message)
-            if company_name:
-                return f"CHRIST UNIVERSITY PLACEMENT CELL - FULL JOB DESCRIPTION: {company_name.upper()}"
-            else:
-                return "CHRIST UNIVERSITY PLACEMENT CELL - COMPLETE JOB DESCRIPTION"
-        
-        # Company-specific queries
-        elif any(word in user_message_lower for word in ["company", "role", "position", "job"]):
-            company_name = self._extract_company_name(user_message)
-            if company_name:
-                return f"CHRIST UNIVERSITY PLACEMENT CELL - COMPANY ANALYSIS: {company_name.upper()}"
-            else:
-                return "CHRIST UNIVERSITY PLACEMENT CELL - COMPANY INSIGHTS"
-        
-        # Skills queries
-        elif any(word in user_message_lower for word in ["skills", "requirements", "qualifications"]):
-            return "CHRIST UNIVERSITY PLACEMENT CELL - SKILLS & REQUIREMENTS ANALYSIS"
-        
-        # Salary/compensation queries
-        elif any(word in user_message_lower for word in ["salary", "compensation", "pay", "lpa"]):
-            return "CHRIST UNIVERSITY PLACEMENT CELL - COMPENSATION INSIGHTS"
-        
-        # Count/overview queries
-        elif any(word in user_message_lower for word in ["how many", "count", "list", "overview"]):
-            return "CHRIST UNIVERSITY PLACEMENT CELL - PLACEMENT OVERVIEW"
-        
-        # Strategic advice queries
-        elif any(word in user_message_lower for word in ["advice", "strategy", "recommendations", "insights"]):
-            return "CHRIST UNIVERSITY PLACEMENT CELL - STRATEGIC INSIGHTS"
-        
-        # Default heading
-        else:
-            return "CHRIST UNIVERSITY PLACEMENT CELL RESPONSE"
+        """Deprecated: We now preserve the model's headings and subheadings."""
+        return ""
     
     def _extract_company_name(self, user_message: str) -> str:
         """Extract company name from user message for personalized headings"""
@@ -696,7 +881,7 @@ For more detailed information or specific questions, please ask follow-up questi
     
     async def get_session_messages(self, session_id: str) -> List[ChatMessage]:
         if session_id in self.memories:
-            # Convert ChatMessage objects from memory to ChatMessage dataclass
+            # Convert ChatMessage objects from enhanced memory to ChatMessage dataclass
             memory_messages = []
             for msg in self.memories[session_id].messages:
                 chat_msg = ChatMessage(
@@ -710,8 +895,22 @@ For more detailed information or specific questions, please ask follow-up questi
             return memory_messages
         return []
 
-    async def get_user_sessions(self, user_id: str) -> List[ChatSession]:
-        return [session for session in self.sessions.values() if session.user_id == user_id]
+    async def get_user_sessions(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get all sessions for a user with metadata"""
+        sessions = []
+        for session in self.sessions.values():
+            if session.user_id == user_id:
+                message_count = len(self.memories.get(session.id).messages) if session.id in self.memories else 0
+                sessions.append({
+                    'id': session.id,
+                    'name': session.name or f"Chat {session.created_at.strftime('%b %d')}",
+                    'created_at': session.created_at.isoformat(),
+                    'last_activity': session.last_activity.isoformat(),
+                    'message_count': message_count
+                })
+        # Sort by last_activity descending
+        sessions.sort(key=lambda s: s['last_activity'], reverse=True)
+        return sessions
 
     async def delete_session(self, session_id: str) -> bool:
         if session_id in self.sessions:
@@ -725,9 +924,11 @@ For more detailed information or specific questions, please ask follow-up questi
     async def _handle_multi_hop_query(self, user_message: str) -> str:
         """Handle multi-hop queries requiring sequential reasoning"""
         try:
-            # For multi-hop queries, use the placement cell LLM as it can handle complex reasoning
-            print(f"🔍 Multi-hop query detected, using placement cell LLM for complex reasoning")
-            return await self._placement_cell_llm_response(user_message)
+            # Use agent's multi-hop decomposition and synthesis (conversational)
+            print(f"🔍 Multi-hop query detected, using agent multi-hop synthesis")
+            from .agent import decompose_multi_hop_query, execute_multi_hop_query
+            sub_qs = decompose_multi_hop_query(user_message)
+            return execute_multi_hop_query(sub_qs, user_message)
             
         except Exception as e:
             print(f"❌ Multi-hop query error: {e}")
@@ -743,7 +944,8 @@ For more detailed information or specific questions, please ask follow-up questi
             vector_snippets = await self._get_vector_snippets(user_message)
             
             # 3. Create comprehensive LLM prompt for placement cell representative
-            llm_prompt = self._create_placement_cell_prompt(user_message, db_data, vector_snippets)
+            context_snapshot: Dict[str, Any] = {}
+            llm_prompt = self._create_placement_cell_prompt(user_message, db_data, vector_snippets, context_snapshot)
             
             # 4. Call LLM with full capabilities
             response = await self._call_placement_cell_llm(llm_prompt)
@@ -832,47 +1034,69 @@ For more detailed information or specific questions, please ask follow-up questi
             return {}
     
     async def _get_vector_snippets(self, user_message: str) -> str:
-        """Get relevant vector snippets for enhanced context"""
+        """Get relevant vector snippets for enhanced context with improved chunk retrieval"""
         try:
             # Use your existing RAG system to get relevant snippets
             from .rag import retrieve_snippets
-            
+
             # Get more comprehensive snippets for better internal context
-            snippets = retrieve_snippets(user_message, top_k=15, filters={})
-            
+            # Increase top_k and add quality filtering for deep-dive strategic analysis
+            snippets = retrieve_snippets(user_message, top_k=60, filters={})
+
             if snippets:
                 snippet_text = "INTERNAL JOB DESCRIPTION CONTEXT (from vector database):\n"
-                snippet_text += "Use these snippets to understand role requirements, company culture, and specific details:\n\n"
-                
-                for i, snippet in enumerate(snippets, 1):
-                    # Get more context from each snippet - handle different snippet types
+                snippet_text += "Use these validated snippets to understand role requirements, company culture, and specific details:\n\n"
+
+                valid_snippets = []
+                for snippet in snippets:
+                    # Get more context from each snippet - handle different snippet types and avoid incomplete chunks
                     try:
                         if isinstance(snippet, str):
-                            snippet_content = snippet[:300] if len(snippet) > 300 else snippet
+                            snippet_content = self._clean_and_complete_snippet(snippet)
                         elif hasattr(snippet, 'text'):
-                            snippet_content = snippet.text[:300] if len(snippet.text) > 300 else snippet.text
+                            snippet_content = self._clean_and_complete_snippet(snippet.text)
                         elif hasattr(snippet, 'content'):
-                            snippet_content = snippet.content[:300] if len(snippet.content) > 300 else snippet.content
+                            snippet_content = self._clean_and_complete_snippet(snippet.content)
                         else:
-                            snippet_content = str(snippet)[:300]
-                        
-                        snippet_text += f"{i}. {snippet_content}...\n\n"
+                            snippet_content = self._clean_and_complete_snippet(str(snippet))
+
+                        # Only include if we have meaningful, complete content
+                        if self._is_valid_snippet(snippet_content):
+                            valid_snippets.append(snippet_content)
+
                     except Exception as e:
                         print(f"⚠️ Snippet processing error: {e}")
-                        snippet_text += f"{i}. {str(snippet)[:200]}...\n\n"
-                
-                snippet_text += "IMPORTANT: Base ALL strategic insights, recommendations, and career guidance on these internal snippets and the database information provided above. Do not reference external knowledge."
-                return snippet_text
+                        continue
+
+                # Limit to top 10 most relevant snippets to avoid token bloat
+                for i, snippet_content in enumerate(valid_snippets[:10], 1):
+                    snippet_text += f"{i}. {snippet_content}\n\n"
+
+                if valid_snippets:
+                    snippet_text += "IMPORTANT: Base ALL strategic insights, recommendations, and career guidance on these validated internal snippets and the database information provided above. Do not reference external knowledge or incomplete data."
+                    return snippet_text
+                else:
+                    return "INTERNAL JOB DESCRIPTION CONTEXT: Retrieved snippets were incomplete or invalid. Base all insights on the verified database company and role information provided above."
             else:
-                return "INTERNAL JOB DESCRIPTION CONTEXT: No specific job description snippets available for this query. Base all insights on the database company and role information provided above."
-                
+                return "INTERNAL JOB DESCRIPTION CONTEXT: No specific job description snippets available for this query. Base all insights on the verified database company and role information provided above."
+
         except Exception as e:
             print(f"❌ Vector snippets error: {e}")
-            return "INTERNAL JOB DESCRIPTION CONTEXT: Vector search not available for this query. Base all insights on the database company and role information provided above."
+            return "INTERNAL JOB DESCRIPTION CONTEXT: Vector search temporarily unavailable. Base all insights on the verified database company and role information provided above."
     
-    def _create_placement_cell_prompt(self, user_message: str, db_data: dict, vector_snippets: str) -> str:
-        """Create comprehensive prompt for placement cell representative"""
-        
+    def _create_placement_cell_prompt(self, user_message: str, db_data: dict, vector_snippets: str, context: Dict[str, Any] = None) -> str:
+        """Create comprehensive prompt for placement cell representative with full conversation history"""
+
+        # Include full conversation history for ChatGPT-like context
+        conversation_history = ""
+        if context and context.get('full_conversation_history'):
+            conversation_history = "CONVERSATION HISTORY (for context and follow-up questions):\n"
+            for msg in context['full_conversation_history'][-20:]:  # Last 20 messages to avoid token limits
+                role = "Student" if msg['role'] == 'user' else "Placement Cell"
+                timestamp = msg.get('timestamp', '')[:19]  # Format timestamp
+                conversation_history += f"[{timestamp}] {role}: {msg['content']}\n"
+            conversation_history += "\nCURRENT STUDENT QUERY: {user_message}\n\n"
+
         # Build company summary
         company_summary = ""
         if db_data.get('companies'):
@@ -882,7 +1106,7 @@ For more detailed information or specific questions, please ask follow-up questi
                 for role in info['roles']:
                     company_summary += f"  - {role['title']} ({role['specialization']})\n"
                 company_summary += "\n"
-        
+
         # Build industry insights
         industry_insights = ""
         if db_data.get('industries'):
@@ -890,7 +1114,7 @@ For more detailed information or specific questions, please ask follow-up questi
             for industry, companies in db_data['industries'].items():
                 industry_insights += f"• {industry}: {len(companies)} companies\n"
             industry_insights += "\n"
-        
+
         # Build specialization insights
         specialization_insights = ""
         if db_data.get('specializations'):
@@ -898,13 +1122,13 @@ For more detailed information or specific questions, please ask follow-up questi
             for spec, roles in db_data['specializations'].items():
                 specialization_insights += f"• {spec}: {len(roles)} roles\n"
             specialization_insights += "\n"
-        
+
         prompt = f"""
         You are a senior placement cell representative at Christ University, Bangalore. Your role is to provide comprehensive, strategic guidance to MBA students based EXCLUSIVELY on the internal placement data provided.
 
         CRITICAL INSTRUCTION: Use ONLY the data provided below. Do NOT use any external knowledge, industry trends, or web-based information. All insights, recommendations, and strategic advice must be derived from the internal database and vector snippets provided.
 
-        STUDENT QUERY: {user_message}
+        {conversation_history}
 
         INTERNAL PLACEMENT DATABASE INFORMATION:
         {company_summary}
@@ -920,30 +1144,53 @@ For more detailed information or specific questions, please ask follow-up questi
 
         IMPORTANT: Base ALL strategic insights, recommendations, and career guidance on these internal snippets and the database information provided above. Do not reference external knowledge.
 
-        AS A PLACEMENT CELL REPRESENTATIVE, PROVIDE:
+        AS A PLACEMENT CELL REPRESENTATIVE, PROVIDE PRECISE, STRATEGIC, AND JD-SPECIFIC ACTIONABLE GUIDANCE:
 
-        1. **QUERY ANALYSIS**: Understand what the student is really asking for
-        2. **STRATEGIC INSIGHTS**: Based ONLY on the internal company and role data provided
-        3. **SPECIFIC RECOMMENDATIONS**: Derived from actual available roles and companies in our database
-        4. **CAREER GUIDANCE**: How to approach these specific opportunities strategically
-        5. **PREPARATION TIPS**: Based on the actual role requirements and company information provided
-        6. **COMPANY INSIGHTS**: Analysis based ONLY on the internal company data (industry, location, company type)
-        7. **NEXT STEPS**: Actionable advice specific to the opportunities in our database
+        RESPONSE STRUCTURE (MANDATORY):
+        - **EXECUTIVE SUMMARY**: 2-3 bullet points of key strategic insights
+        - **COMPANY ANALYSIS**: Bullet points with precise data-driven insights
+        - **JD ANALYSIS**: Deep functional area identification and key competency extraction
+        - **CERTIFICATIONS & CREDENTIALS**: Specific certifications, courses, and credentials for competitive edge
+        - **TECHNICAL PREPARATION**: Role-specific knowledge areas, tools, and software proficiency
+        - **STRATEGIC ADVICES**: Competitive positioning, market timing, and differentiation strategies
+        - **PRACTICAL PREP STEPS**: JD-aligned simulations, case studies, and exercises
+        - **INTERVIEW READINESS**: Domain-specific questions and case formats
+        - **ACTION PLAN**: 5-7 precise, time-bound, measurable action items
+        - **RISK MITIGATION**: Specific risks and how to address them
+        - **FOLLOW-UP ACTIONS**: What to do next with our placement cell
+
+        JD ANALYSIS REQUIREMENTS (CRITICAL):
+        - **FUNCTIONAL AREA IDENTIFICATION**: Clearly identify the core functional area (FMCG Sales, Marketing Analytics, Supply Chain, etc.)
+        - **KEY COMPETENCY EXTRACTION**: Extract specific skills/competencies required
+        - **TECHNICAL KNOWLEDGE AREAS**: Route optimization, numeric distribution, trade coverage, etc.
+        - **CERTIFICATIONS/SHORT COURSES**: NielsenIQ FMCG Analytics, Coursera Channel Management, etc.
+        - **TOOLS/SOFTWARE PROFICIENCY**: Salesforce FMCG CRM, Power BI, Retailer Dashboards, etc.
+        - **PRACTICAL PREPARATION**: GT/MT sales simulations, distributor data analysis, trade negotiation cases
+        - **INTERVIEW GUIDANCE**: Domain-specific questions, case formats, performance metrics analysis
+        - **NO GENERIC ADVICE**: Every recommendation must map directly to the JD's functional expectations
 
         RESPONSE REQUIREMENTS:
-        - Professional, warm, and encouraging tone as Christ University placement cell
-        - Clear sections with bullet points
-        - ALL insights must be based on the internal data provided
-        - NO generic industry knowledge or web-based information
-        - Specific company and role recommendations from our database
-        - Strategic insights derived from the actual company and role data
-        - Actionable next steps
+        - **PURE LINUS TORVALDS PERSONA**: Blunt as Torvalds calling out incompetence, merciless assessment of placement realities
+        - **DRY PLACEMENT HUMOR**: Wit about MBA pretensions, placement politics, and career positioning follies
+        - **ARISTOTLE STRATEGIC LENS**: Every recommendation serves the telos (ultimate purpose) of career excellence
+        - **JD-SPECIFIC ANALYSIS**: Deep functional area identification with competency extraction
+        - **TECHNICAL PRECISION**: Role-specific knowledge areas, certifications, tools, and practical prep
+        - **INTERVIEW EXPERTISE**: Domain-specific questions and case formats for the exact JD
+        - **ULTRA-PRECISE**: Every bullet point must be specific, measurable, and actionable
+        - **STRATEGIC DEPTH**: Include competitive positioning, market timing, and opportunity cost analysis
+        - **DATA-DRIVEN**: Base ALL insights on verified placement data only - NEVER mention incomplete data or gaps
+        - **NO GENERIC ADVICE**: Every recommendation must map directly to the JD's functional expectations
+        - **TIME-BOUND ACTIONS**: Include specific deadlines and measurable outcomes
+        - **RISK-AWARE**: Address potential rejection points and mitigation strategies
+        - **PLACEMENT CELL INTEGRATION**: Reference specific cell resources and next steps
+        - **CONVERSATION AWARE**: Consider full conversation history for contextual follow-ups
+        - **COMPLETE DATA ONLY**: Work with available verified data - no references to missing information
 
         REMEMBER: You are analyzing and providing insights based ONLY on Christ University's internal placement database. Do not reference external market trends, industry knowledge, or any information not provided in the data above.
 
         Generate your comprehensive placement cell response now:
         """
-        
+
         return prompt
     
     async def _call_placement_cell_llm(self, prompt: str) -> str:
@@ -968,17 +1215,17 @@ For more detailed information or specific questions, please ask follow-up questi
                 "model": settings.OPENROUTER_MODEL or "x-ai/grok-4-fast",  # Use Grok-4 Fast as default
                 "messages": [
                     {
-                        "role": "system", 
-                        "content": "You are a senior placement cell representative at Christ University, Bangalore. You provide comprehensive, strategic guidance to MBA students based EXCLUSIVELY on internal placement data. You do NOT use external knowledge, industry trends, or web-based information. All insights, recommendations, and strategic advice must be derived from the internal database and vector snippets provided. You are an expert at analyzing internal data and providing actionable career guidance based on real opportunities available in Christ University's placement database."
+                        "role": "system",
+                        "content": "You are Linus Torvalds reincarnated as a senior placement cell representative at Christ University, Bangalore. You channel pure Torvalds bluntness - merciless, dry humor, surgical precision, and zero tolerance for MBA pretensions. You cut through career fluff like Torvalds cuts through bad code: direct, unforgiving, and ruthlessly practical. Your responses are blunt assessments of market realities, with dry wit about placement politics and strategic positioning. You NEVER reference technical concepts, kernels, or code metaphors. You focus purely on placement realities: company demands, candidate positioning, competitive edges, and merit-based outcomes. Every insight serves the ultimate purpose (telos) of career success through strategic excellence. You deliver ULTRA-PRECISE, data-driven guidance based EXCLUSIVELY on verified placement data. You NEVER mention incomplete data or data gaps - if information is missing, you work with what's available and state clear limitations. Your tone: Blunt as Torvalds calling out incompetence, humorous about placement follies, surgical in analysis, and relentlessly focused on results."
                     },
                     {"role": "user", "content": prompt}
                 ],
-                "temperature": 0.4,  # Balanced creativity and accuracy
-                "max_tokens": 1200,  # Longer response for comprehensive guidance
+                "temperature": 0.4,  # Balanced temperature for utility-rich strategic insights
+                "max_tokens": 1500,  # Longer response for detailed strategic guidance
                 "stream": False,
-                "top_p": 0.9,
-                "frequency_penalty": 0.1,
-                "presence_penalty": 0.1
+                "top_p": 0.9,  # Allow diverse utility-rich strategic insights
+                "frequency_penalty": 0.2,  # Reduce repetition
+                "presence_penalty": 0.2  # Encourage diverse strategic insights
             }
             
             headers = {

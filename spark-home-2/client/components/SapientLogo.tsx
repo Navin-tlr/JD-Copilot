@@ -60,7 +60,7 @@ export default function SapientLogo({ variant = 'default' }: SapientLogoProps) {
         className="text-[11px] font-normal"
         style={{ color: colors.text }}
       >
-        Sapient
+        Copilot
       </span>
     </div>
   );

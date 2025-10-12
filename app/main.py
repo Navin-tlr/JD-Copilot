@@ -26,6 +26,7 @@ from .chat_history_store import chat_history_store
 from .enhanced_chat_memory import enhanced_memory_manager
 from .sql_tool import run_sql_query
 from .chat_api import include_chat_router
+from .chat_service import chat_service
 from .workflow_api import include_workflow_router
 
 app = FastAPI(title="JD-Copilot API", version="1.0.0")
@@ -133,7 +134,7 @@ async def query_endpoint(request: ChatRequest = Body(...)):
     This endpoint receives a user query and uses the AI agent to generate a response.
     """
     user_id = (request.user_id or "anonymous").strip() or "anonymous"
-    session_id = request.session_id
+    session_id = await chat_service.ensure_session(request.session_id, user_id)
     print(f"Received query for session '{session_id}': {request.query}")
     chat_history_store.ensure_session(user_id, session_id)
     
@@ -143,42 +144,36 @@ async def query_endpoint(request: ChatRequest = Body(...)):
         _sync_history_snapshot(user_id, session_id)
         
         # Use the simple router to process the query
-        print("🚀 Using simple LLM router for query processing")
+        snippets: List[Dict[str, Any]] = []
+
+        print("🚀 Using conversational chat service for query processing")
         try:
-            answer = route_query(request.query)
-            print(f"🔍 Router answer: {answer}")
-            
-            if not answer or answer.strip() == "":
-                answer = "I couldn't process your query. Please try again."
-                
+            ai_message = None
+            async for generated in chat_service.send_message(session_id, request.query, user_id):
+                ai_message = generated
+
+            if not ai_message:
+                raise RuntimeError("Chat service returned no response")
+
+            answer = ai_message.content
+            session_id = ai_message.session_id  # Update in case chat service reassigned
             print(f"🔍 Final answer: {answer}")
         except Exception as router_error:
-            print(f"❌ Router error: {router_error}")
-            # Return a graceful error response instead of crashing
+            print(f"❌ Chat service error: {router_error}")
             return ChatResponse(
                 answer=f"Sorry, I encountered an error while processing your query: {str(router_error)}",
                 snippets=[],
                 citations=[],
                 error=True
             )
-            
-            # Extract snippets from the answer if available
-            snippets = []
-            try:
-                temp_snippets = retrieve_snippets(request.query, top_k=50, filters={})
-                if temp_snippets:
-                    snippets = temp_snippets
-            except Exception as e:
-                print(f"Warning: Could not retrieve snippets: {e}")
-            
-        else:
-            print("⚠️ AI agent not available, falling back to basic RAG")
-            # Fallback to basic RAG if agent fails
-            snippets = retrieve_snippets(request.query, top_k=50, filters={})
-            if snippets:
-                answer = synthesize_answer(request.query, snippets, {})
-            else:
-                answer = "I couldn't find any relevant information to answer your question."
+
+        # Attempt to retrieve supporting snippets for the frontend view
+        try:
+            temp_snippets = retrieve_snippets(request.query, top_k=50, filters={})
+            if temp_snippets:
+                snippets = temp_snippets
+        except Exception as e:
+            print(f"Warning: Could not retrieve snippets: {e}")
         
         # Add assistant response to chat memory
         chat_memory.add_message(session_id, "assistant", answer)
@@ -186,7 +181,7 @@ async def query_endpoint(request: ChatRequest = Body(...)):
         
         print(f"✅ Query processed successfully. Answer length: {len(answer)} chars")
         
-        # Heuristic: if answer suggests no data or is very short, request vector approval
+    # Heuristic: if answer suggests no data or is very short, request vector approval
         lower_ans = answer.lower().strip() if answer else ""
         needs_vector = False
         reason = None
@@ -236,8 +231,8 @@ async def chat_endpoint(request: QueryRequest):
     """
     try:
         question = request.question.strip()
-        session_id = request.session_id
         user_id = (request.user_id or "anonymous").strip() or "anonymous"
+        session_id = await chat_service.ensure_session(request.session_id, user_id)
         chat_history_store.ensure_session(user_id, session_id)
         
         print(f"🤖 Processing query: {question}")
@@ -276,19 +271,21 @@ async def chat_endpoint(request: QueryRequest):
                 print("❌ Not enough messages in chat history")
                 answer = "I need the original question to perform deep-dive analysis. Please ask your question again."
         else:
-            # Use the simple router to process the query
-            print("🚀 Using simple LLM router for query processing")
+            # Use the conversational chat service to process the query with full context
+            print("🚀 Using conversational chat service for query processing")
             try:
-                answer = route_query(question)
-                print(f"🔍 Router answer: {answer}")
+                ai_message = None
+                async for generated in chat_service.send_message(session_id, question, user_id):
+                    ai_message = generated
 
-                if not answer or answer.strip() == "":
-                    answer = "I couldn't process your query. Please try again."
+                if not ai_message:
+                    raise RuntimeError("Chat service returned no response")
 
+                answer = ai_message.content
+                session_id = ai_message.session_id
                 print(f"🔍 Final answer: {answer}")
             except Exception as router_error:
-                print(f"❌ Router error: {router_error}")
-                # Return a direct error response
+                print(f"❌ Chat service error: {router_error}")
                 return ChatResponse(
                     answer=f"Query processing failed: {str(router_error)}. Check input syntax or system status.",
                     snippets=[],
@@ -378,8 +375,8 @@ async def enhanced_chat_endpoint(request: QueryRequest):
     """
     try:
         question = request.question.strip()
-        session_id = request.session_id
         user_id = (request.user_id or "anonymous").strip() or "anonymous"
+        session_id = await chat_service.ensure_session(request.session_id, user_id)
         chat_history_store.ensure_session(user_id, session_id)
         
         print(f"🤖 Enhanced processing query: {question}")
@@ -399,19 +396,23 @@ async def enhanced_chat_endpoint(request: QueryRequest):
         except Exception as exc:
             print(f"⚠️ Failed to sync enhanced chat history after user message for session {session_id}: {exc}")
         
-        # Use the simple router to process the query
-        print("🚀 Using simple LLM router for enhanced query processing")
+        snippets: List[Dict[str, Any]] = []
+
+        # Use the conversational chat service to process the query with full context
+        print("🚀 Using conversational chat service for enhanced query processing")
         try:
-            answer = route_query(question)
-            print(f"🔍 Router answer: {answer}")
-            
-            if not answer or answer.strip() == "":
-                answer = "I couldn't process your query. Please try again."
-                
+            ai_message = None
+            async for generated in chat_service.send_message(session_id, question, user_id):
+                ai_message = generated
+
+            if not ai_message:
+                raise RuntimeError("Chat service returned no response")
+
+            answer = ai_message.content
+            session_id = ai_message.session_id
             print(f"🔍 Final answer: {answer}")
         except Exception as router_error:
-            print(f"❌ Router error: {router_error}")
-            # Return a direct error response
+            print(f"❌ Chat service error: {router_error}")
             return ChatResponse(
                 answer=f"Query processing failed: {str(router_error)}. Check input syntax or system status.",
                 snippets=[],
@@ -420,7 +421,6 @@ async def enhanced_chat_endpoint(request: QueryRequest):
             )
         
         # Extract snippets from the answer if available
-        snippets = []
         try:
             temp_snippets = retrieve_snippets(question, top_k=50, filters={})
             if temp_snippets:
@@ -534,6 +534,48 @@ async def get_chat_transcript(session_id: str, user_id: str = Query("anonymous")
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving chat transcript: {str(e)}")
+
+# Chat Service Session Management Endpoints
+@app.get("/sessions/{user_id}")
+async def get_user_chat_sessions(user_id: str):
+    """Get all chat sessions for a user"""
+    try:
+        sessions = await chat_service.get_user_sessions(user_id)
+        return {"sessions": sessions}
+    except Exception as e:
+        print(f"❌ Error fetching sessions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/sessions/{session_id}")
+async def delete_chat_session(session_id: str):
+    """Delete a chat session"""
+    try:
+        success = await chat_service.delete_session(session_id)
+        if success:
+            return {"message": "Session deleted successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Session not found")
+    except Exception as e:
+        print(f"❌ Error deleting session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/sessions/{session_id}/messages")
+async def get_chat_session_messages(session_id: str):
+    """Get all messages for a specific session"""
+    try:
+        messages = await chat_service.get_session_messages(session_id)
+        return {"messages": [
+            {
+                "id": msg.id,
+                "content": msg.content,
+                "sender": msg.sender,
+                "timestamp": msg.timestamp.isoformat()
+            }
+            for msg in messages
+        ]}
+    except Exception as e:
+        print(f"❌ Error fetching messages: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Legacy endpoints for backward compatibility
 @app.get("/companies")

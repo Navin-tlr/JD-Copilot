@@ -6,6 +6,7 @@ import DeepDiveConsentCard from '@/components/DeepDiveConsentCard';
 import ModalPortal from '@/components/ModalPortal';
 import SapientLogo from '@/components/SapientLogo';
 import ChatInput from '@/components/ChatInput';
+import ChatHistory from '@/components/ChatHistory';
 import { buildApiUrl, BACKEND_BASE_URL } from '@/lib/api';
 
 type Message = {
@@ -19,6 +20,9 @@ export default function RAGMode() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingDeepDive, setPendingDeepDive] = useState<{ question: string; reason?: string } | null>(null);
+  const [sessionId, setSessionId] = useState<string>('');
+  const [userId] = useState('student-123'); // Replace with actual user ID from auth
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const handleSend = async (value: string) => {
     // fade the welcome message
@@ -28,15 +32,15 @@ export default function RAGMode() {
     setIsLoading(true);
 
     try {
-  const response = await fetch(buildApiUrl('/chat'), {
+      const response = await fetch(buildApiUrl('/chat'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           question: value,
-          session_id: 'rag-session',
-          user_id: 'frontend-user'
+          session_id: sessionId || 'rag-session',
+          user_id: userId
         }),
       });
 
@@ -54,7 +58,14 @@ export default function RAGMode() {
         setPendingDeepDive({ question: value, reason: data?.vector_reason });
       } else {
         // Frontend fallback: parse answer for common no-data patterns and open consent
+        // Skip if answer contains phrases like "MBA Placement Cell Briefing" (indicates structured summary)
         const lower = (data?.answer || '').toLowerCase();
+        const hasStructuredSummary = (
+          lower.includes('placement cell briefing') ||
+          lower.includes('market snapshot') ||
+          lower.includes('verified company count')
+        );
+        
         const looksNoData = (
           /\b0\b[^\n\r.!?]{0,60}\b(companies|roles|placements|offers)\b/.test(lower) ||
           /\bno\b[^\n\r.!?]{0,60}\b(companies|roles|placements|offers)\b/.test(lower) ||
@@ -63,10 +74,12 @@ export default function RAGMode() {
           lower.includes("couldn't find") ||
           lower.includes('could not find')
         );
-        if (looksNoData) {
+        
+        // Only show modal if no data AND no structured summary
+        if (looksNoData && !hasStructuredSummary) {
           setPendingDeepDive({
             question: value,
-            reason: data?.vector_reason || 'Structured query returned zero/limited results. Deep‑Dive can scan unstructured documents for answers.'
+            reason: data?.vector_reason || 'Query returned no results. Offer deep-dive search of unstructured job descriptions.'
           });
         }
       }
@@ -80,8 +93,43 @@ export default function RAGMode() {
     }
   };
 
+  const handleNewChat = () => {
+    setSessionId(''); // Clear session to create new one
+    setMessages([]);
+    setWelcomeVisible(true);
+  };
+
+  const handleSessionSelect = async (newSessionId: string) => {
+    setSessionId(newSessionId);
+    setWelcomeVisible(false);
+    // Fetch messages for this session
+    try {
+      const response = await fetch(buildApiUrl(`/sessions/${newSessionId}/messages`));
+      const data = await response.json();
+      const formatted = data.messages.map((msg: any) => ({
+        role: msg.sender,
+        content: msg.content
+      }));
+      setMessages(formatted);
+    } catch (error) {
+      console.error('Failed to fetch session messages:', error);
+      setMessages([]);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#313131] flex flex-col items-center py-12 px-4 relative animate-fade-in">
+      {/* Chat History Sidebar */}
+      <ChatHistory
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        currentSessionId={sessionId}
+        userId={userId}
+        onSessionSelect={handleSessionSelect}
+        onNewChat={handleNewChat}
+        variant="rag"
+      />
+
       {/* Header */}
       <div className="w-full max-w-[1280px] flex items-center justify-between">
         <div className="pl-4">
@@ -90,7 +138,7 @@ export default function RAGMode() {
 
         {/* Chat History Arrow */}
         <button
-          onClick={() => navigate('/history')}
+          onClick={() => setIsHistoryOpen(true)}
           className="pr-4 transition-transform hover:scale-110"
         >
           <svg
@@ -156,7 +204,7 @@ export default function RAGMode() {
                           <path d="M8.90625 4.28125L11.6562 9.625" stroke="#464646" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </div>
-                      <span className="text-[12px] text-[#C8C6C4] font-semibold">Sapient</span>
+                      <span className="text-[12px] text-[#C8C6C4] font-semibold">Analyst</span>
                     </div>
                     {/* Assistant content */}
                     <div className="max-w-[95%] bg-[#2f2f2f] text-[#E0E0E0] px-5 py-4 rounded-2xl text-[14px] leading-[1.8] shadow rag-response prose prose-invert max-w-none">
@@ -181,7 +229,7 @@ export default function RAGMode() {
                       <path d="M8.90625 4.28125L11.6562 9.625" stroke="#464646" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </div>
-                  <span className="text-[12px] text-[#C8C6C4] font-semibold">Sapient</span>
+                  <span className="text-[12px] text-[#C8C6C4] font-semibold">Analyst</span>
                 </div>
                 <div className="text-[#E0E0E0] text-[14px] leading-[1.8]">
                   <div className="flex items-center gap-2">

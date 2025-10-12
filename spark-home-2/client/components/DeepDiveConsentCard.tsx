@@ -10,7 +10,7 @@ type Props = {
 // Renders the exact Figma layout with absolute positioning and pixel-precise styles
 export default function DeepDiveConsentCard({
   title = 'Deep Dive ?',
-  description = 'The structured database gave 0 results, shall I proceed with deep-dive',
+  description = 'Query returned no results. Offer deep-dive search of unstructured job descriptions.',
   onActivate,
 }: Props) {
   return (
@@ -89,7 +89,7 @@ export default function DeepDiveConsentCard({
       {/* Activate button background rectangle */}
       <button
         type="button"
-        aria-label="Activate"
+        aria-label="Activate Deep Dive"
         onClick={onActivate}
         style={{
           width: 88,
@@ -103,25 +103,23 @@ export default function DeepDiveConsentCard({
           border: 'none',
           cursor: 'pointer',
           padding: 0,
-        }}
-      />
-      <div
-        data-layer="Activate"
-        className="Activate"
-        style={{
-          left: 166,
-          top: 200,
-          position: 'absolute',
-          color: 'white',
-          fontSize: 11.59,
-          fontFamily: 'BlinkMacSystemFont, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
-          fontWeight: 400,
-          whiteSpace: 'pre-wrap',
-          pointerEvents: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
-        Activate
-      </div>
+        <span
+          style={{
+            color: 'white',
+            fontSize: 11.59,
+            fontFamily: 'BlinkMacSystemFont, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
+            fontWeight: 400,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Activate
+        </span>
+      </button>
 
       {/* SVG icon */}
       <div
