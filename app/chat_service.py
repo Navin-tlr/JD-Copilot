@@ -422,10 +422,10 @@ class ChatService:
                     response = await self._handle_structured_query(user_message)
                 elif routing_decision == "UNSTRUCTURED":
                     print(f"🔍 Processing as UNSTRUCTURED query")
-                    response = await self._handle_unstructured_query(user_message)
+                    response = await self._handle_unstructured_query(user_message, context)
                 elif routing_decision == "HYBRID":
                     print(f"🔍 Processing as HYBRID query")
-                    response = await self._handle_hybrid_query(user_message)
+                    response = await self._handle_hybrid_query(user_message, context)
                 elif routing_decision == "MULTI_HOP":
                     print(f"🔍 Processing as MULTI_HOP query")
                     response = await self._handle_multi_hop_query(user_message)
@@ -444,7 +444,7 @@ class ChatService:
             # Fallback to unstructured RAG to avoid legacy persona overrides
             try:
                 print("↩️ Falling back to unstructured RAG path")
-                response = await self._handle_unstructured_query(user_message)
+                response = await self._handle_unstructured_query(user_message, context)
                 return self._format_response(response, user_message)
             except Exception as fallback_error:
                 print(f"❌ Fallback also failed: {fallback_error}")
@@ -485,15 +485,16 @@ class ChatService:
             print(f"❌ Structured query error: {e}")
             return f"Structured query failed: {str(e)}. Check database schema and retry."
     
-    async def _handle_unstructured_query(self, user_message: str) -> str:
-        """Handle unstructured queries using RAG system"""
+    async def _handle_unstructured_query(self, user_message: str, context: Dict[str, Any] = None) -> str:
+        """Handle unstructured queries using RAG system with conversation context"""
         try:
             from .rag import retrieve_snippets, synthesize_answer
             
             # Use existing RAG system with increased context for strategic analysis
             snippets = retrieve_snippets(user_message, top_k=30, filters={})
             if snippets:
-                answer = synthesize_answer(user_message, snippets, {})
+                # Pass context to synthesis for conversation continuity
+                answer = synthesize_answer(user_message, snippets, {}, context)
                 # CRITICAL FIX: Don't fallback to generic message - use the actual answer
                 if answer:
                     return answer
@@ -506,14 +507,14 @@ class ChatService:
             print(f"❌ Unstructured query error: {e}")
             return f"Unstructured query failed: {str(e)}. Check vector index and retry."
     
-    async def _handle_hybrid_query(self, user_message: str) -> str:
+    async def _handle_hybrid_query(self, user_message: str, context: Dict[str, Any] = None) -> str:
         """Handle hybrid queries using both structured and unstructured data"""
         try:
             # Get structured data first
             structured_answer = await self._handle_structured_query(user_message)
             
-            # Get RAG insights
-            rag_answer = await self._handle_unstructured_query(user_message)
+            # Get RAG insights with context
+            rag_answer = await self._handle_unstructured_query(user_message, context)
             
             # Combine results
             if structured_answer and rag_answer:

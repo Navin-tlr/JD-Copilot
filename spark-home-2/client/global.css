@@ -361,6 +361,103 @@
   background: #5A5A5A;
 }
 
+/* Thinking indicator microinteraction */
+.thinking-indicator {
+  position: fixed;
+  top: 28px;
+  left: 50%;
+  transform: translate(-50%, -12px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  background: rgba(41, 41, 41, 0.92);
+  border-radius: 999px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  color: #F0F0F0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1100;
+}
+
+.thinking-indicator__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #D38B21;
+  opacity: 0.55;
+  animation: thinking-pulse 1.3s ease-in-out infinite;
+}
+
+.thinking-indicator__text {
+  white-space: nowrap;
+}
+
+.thinking-indicator--enter {
+  animation: thinking-enter 0.18s ease-out forwards;
+}
+
+.thinking-indicator--active {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  animation: thinking-body-pulse 1.3s ease-in-out infinite;
+}
+
+.thinking-indicator--exit {
+  animation: thinking-exit 0.14s ease-in forwards;
+}
+
+@keyframes thinking-enter {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes thinking-exit {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+}
+
+@keyframes thinking-pulse {
+  0%, 100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes thinking-body-pulse {
+  0% {
+    opacity: 0.72;
+    transform: translate(-50%, 0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0.72;
+    transform: translate(-50%, 0);
+  }
+}
+
 /* --- Reusable UI Utilities for Modals/Cards --- */
 .glass-card {
   background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));

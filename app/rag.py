@@ -314,6 +314,8 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
     # Always retrieve many candidates for quality filtering
     candidate_count = 500 if comprehensive_mode else 300  # High candidate pool
 
+    # Context filtering removed - no longer needed
+
     # Try Pinecone first, fall back to local database if not configured
     try:
         index = get_pinecone_index()
@@ -470,6 +472,7 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
     target_filtered_count = 150 if comprehensive_mode else 100
     filtered_results = filter_noise_candidates(candidates, question, target_filtered_count)
 
+
     # Sort final results by relevance score
     filtered_results.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
 
@@ -493,13 +496,29 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
     return filtered_results[:top_k]
 
 
-def synthesize_answer(question: str, snippets: List[Dict[str, Any]], filters: Dict[str, Any] = None) -> str | None:
+def synthesize_answer(question: str, snippets: List[Dict[str, Any]], filters: Dict[str, Any] = None, context: Dict[str, Any] = None) -> str | None:
     settings = get_settings()
     
+    # Build conversation context section if available
+    conversation_context = ""
+    if context:
+        full_history = context.get('full_conversation_history', [])
+        if full_history:
+            # Get last 4 messages (2 Q&A pairs) for context
+            recent = full_history[-4:]
+            conversation_context = "\n\n**CONVERSATION HISTORY (reference when relevant):**\n"
+            for msg in recent:
+                role = "Student" if msg.get('role') == 'user' else "You"
+                content = msg.get('content', '')[:200]  # Limit to 200 chars
+                conversation_context += f"{role}: {content}...\n"
+            conversation_context += "\n**CRITICAL:** If current query references previous discussion (e.g., 'I'm from finance' after discussing companies), explicitly connect it. Say things like 'Given that you're in finance, let me refocus on the companies I mentioned...'\n"
+    
     # Strategic Intelligence Analyst - conversational flow with self-forming reasoning
-    system_prompt = """You are a STRATEGIC INTELLIGENCE ANALYST engaged in a live strategic dialogue with someone navigating career positioning.
+    system_prompt = f"""You are a STRATEGIC INTELLIGENCE ANALYST engaged in a live strategic dialogue with someone navigating career positioning.
 
 This is not a report. This is a conversation.
+
+{conversation_context}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CONVERSATIONAL INTELLIGENCE MANDATE
@@ -511,7 +530,7 @@ Your role is to decode job descriptions, extract strategic intelligence, and pro
 
 1. **Evidence Discipline** — Every claim must be traceable to specific JD text or structured data. Quote exact phrases when revealing hidden requirements or company culture signals. Say "No data on that" when context is insufficient.
 
-2. **Context-Aware Reasoning** — When users say "they" or "their" or "other roles", infer from conversation flow. If discussing one company, "their roles" means that company's positions. If ambiguous, briefly clarify by considering both readings.
+2. **Context-Aware Reasoning** — When users say "they" or "their" or "other roles", infer from conversation flow. If discussing one company, "their roles" means that company's positions. If ambiguous, briefly clarify by considering both readings. **WHEN USER PROVIDES CONTEXT ABOUT THEMSELVES (like "I'm from finance"), this is a follow-up that requires recontextualizing previous answers with their profile.**
 
 3. **Adaptive Structure** — Don't force templates. Short queries get tight answers (2-3 bullets). Strategic deep-dives unfold organically with invented section names as needed. Comparisons might use a table, narrative flow, or numbered insights—whatever fits.
 

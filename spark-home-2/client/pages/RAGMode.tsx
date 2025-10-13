@@ -8,6 +8,7 @@ import SapientLogo from '@/components/SapientLogo';
 import ChatInput from '@/components/ChatInput';
 import ChatHistory from '@/components/ChatHistory';
 import { buildApiUrl, BACKEND_BASE_URL } from '@/lib/api';
+import ThinkingIndicator from '@/components/ThinkingIndicator';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -119,6 +120,7 @@ export default function RAGMode() {
 
   return (
     <div className="min-h-screen bg-[#313131] flex flex-col items-center py-12 px-4 relative animate-fade-in">
+      <ThinkingIndicator active={isLoading} message="Working on that for you" />
       {/* Chat History Sidebar */}
       <ChatHistory
         isOpen={isHistoryOpen}
@@ -218,7 +220,7 @@ export default function RAGMode() {
             ))}
             {isLoading && (
               <div className="flex flex-col items-start w-full animate-fade-in">
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-2">
                   <div className="w-6 h-6 rounded-full bg-[#D38B21] flex items-center justify-center">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M3.5 9.625H1C0.72386 9.625 0.5 9.84886 0.5 10.125V13C0.5 13.2761 0.72386 13.5 1 13.5H3.5C3.77614 13.5 4 13.2761 4 13V10.125C4 9.84886 3.77614 9.625 3.5 9.625Z" stroke="#464646" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
@@ -231,11 +233,8 @@ export default function RAGMode() {
                   </div>
                   <span className="text-[12px] text-[#C8C6C4] font-semibold">Analyst</span>
                 </div>
-                <div className="text-[#E0E0E0] text-[14px] leading-[1.8]">
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#D38B21]"></div>
-                    Analyzing your query...
-                  </div>
+                <div className="text-[#D0D0D0] text-[13px] leading-[1.7] italic">
+                  Gathering context for the best possible answer…
                 </div>
               </div>
             )}

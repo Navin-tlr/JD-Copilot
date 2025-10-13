@@ -4,6 +4,8 @@ import argparse
 import json
 import os
 import re
+import base64
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
@@ -11,6 +13,7 @@ from datetime import datetime
 import certifi
 import ssl
 import urllib3
+import httpx
 from llama_parse import LlamaParse
 from pinecone import Pinecone, ServerlessSpec
 from tqdm import tqdm
@@ -93,6 +96,226 @@ def _is_placeholder_company(name: str | None) -> bool:
     return not slug or slug in _PLACEHOLDER_COMPANY_SLUGS
 
 
+def _is_valid_company_name(name: str | None) -> bool:
+    """
+    Validate that extracted company name is real, not garbage like 'pdf', 'document', etc.
+    Returns True if the name looks like a legitimate company name.
+    """
+    if not name:
+        return False
+    
+    cleaned = name.strip()
+    if not cleaned or len(cleaned) < 2:
+        return False
+    
+    # Reject if it's a placeholder
+    if _is_placeholder_company(cleaned):
+        return False
+    
+    # Normalize for pattern matching
+    normalized = cleaned.lower().replace("_", " ").replace("-", " ").strip()
+    
+    # Reject common file-related garbage patterns
+    garbage_patterns = [
+        r'^pdf\b',           # 'pdf', 'pdf_123'
+        r'\bpdf$',           # 'document_pdf'
+        r'\bpdf\d+',         # 'pdf123', 'pdf456'
+        r'^doc\b',           # 'doc', 'document'
+        r'^file\b',          # 'file', 'file_123'
+        r'^jd\b',            # 'jd', 'jd_final'
+        r'\bjd$',            # 'company_jd'
+        r'^\d+$',            # Pure numbers like '123'
+        r'^[a-z]_\d+$',      # Pattern like 'a_123', 'x_456'
+        r'^\d+[a-z]+\d+$',   # Pattern like '123abc456'
+        r'^temp\b',          # 'temp', 'temporary'
+        r'^test\b',          # 'test', 'testing'
+        r'^sample\b',        # 'sample'
+        r'^draft\b',         # 'draft'
+        r'^untitled\b',      # 'untitled'
+        r'^copy\b',          # 'copy', 'copy of'
+        r'\bcopy$',          # 'final_copy'
+        r'^unnamed\b',       # 'unnamed'
+        r'^new\b',           # 'new', 'new document'
+        r'^final\b',         # 'final', 'final_version'
+        r'\bfinal$',         # 'doc_final'
+        r'placeholder',      # 'placeholder'
+        r'^page\s',          # 'page 1', 'page number'
+        r'document\s+id',    # 'document id 123'
+        r'_v\d+$',           # 'doc_v1', 'file_v2'
+        r'version',          # 'version 1', 'final version'
+    ]
+    
+    for pattern in garbage_patterns:
+        if re.search(pattern, normalized):
+            print(f"⚠️ Rejected garbage company name: '{cleaned}' (matched pattern: {pattern})")
+            return False
+    
+    # Reject if it's too generic (single common word)
+    generic_words = {
+        'document', 'file', 'paper', 'text', 'page', 'content',
+        'company', 'organization', 'business', 'firm', 'enterprise',
+        'job', 'role', 'position', 'opening', 'vacancy',
+        'description', 'details', 'information', 'data'
+    }
+    
+    if normalized in generic_words:
+        print(f"⚠️ Rejected generic company name: '{cleaned}'")
+        return False
+    
+    # Must contain at least one letter
+    if not re.search(r'[a-zA-Z]', cleaned):
+        print(f"⚠️ Rejected non-alphabetic company name: '{cleaned}'")
+        return False
+    
+    # If it contains numbers, must have meaningful text too (e.g., "Adobe 2024" is OK, "123_pdf" is not)
+    if re.search(r'\d', cleaned):
+        # Count alphabetic characters
+        alpha_chars = len(re.findall(r'[a-zA-Z]', cleaned))
+        digit_chars = len(re.findall(r'\d', cleaned))
+        
+        # If more digits than letters, probably garbage
+        if digit_chars > alpha_chars:
+            print(f"⚠️ Rejected number-heavy company name: '{cleaned}'")
+            return False
+    
+    return True
+
+
+async def _extract_company_from_logo_vision(pdf_path: Path) -> Optional[str]:
+    """
+    Use vision model to recognize company logo in PDF.
+    Only called as last resort when all other methods fail.
+    Returns company name or None.
+    """
+    try:
+        # Check if pdf2image is available
+        try:
+            import pdf2image
+        except ImportError:
+            print("⚠️ pdf2image not installed, skipping vision-based logo detection")
+            print("   Install with: pip install pdf2image")
+            return None
+        
+        print(f"🔍 Attempting vision-based logo recognition for {pdf_path.name}...")
+        
+        # Convert first page to image (logos typically on page 1)
+        try:
+            images = pdf2image.convert_from_path(
+                pdf_path,
+                first_page=1,
+                last_page=1,
+                dpi=150,  # Good balance between quality and file size
+                fmt='PNG'
+            )
+        except Exception as e:
+            print(f"⚠️ Failed to convert PDF to image: {e}")
+            return None
+        
+        if not images:
+            print("⚠️ No images extracted from PDF")
+            return None
+        
+        # Save image to temporary file and encode to base64
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+            tmp_path = tmp_file.name
+            images[0].save(tmp_path, 'PNG')
+        
+        try:
+            with open(tmp_path, 'rb') as img_file:
+                image_b64 = base64.b64encode(img_file.read()).decode('utf-8')
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
+        
+        # Call OpenRouter with vision-capable model
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        if not api_key:
+            print("⚠️ OPENROUTER_API_KEY not set, cannot use vision model")
+            return None
+        
+        print("🤖 Calling vision model to analyze logo...")
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "anthropic/claude-3.5-sonnet",  # Vision-capable model
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": """Analyze this job description document and identify the company name from any logos, headers, or branding.
+
+CRITICAL RULES:
+1. Return ONLY the company name, nothing else
+2. If you see a company logo, return the company name
+3. If no clear company branding is visible, return "NONE"
+4. Do NOT return generic words like "document", "pdf", "file", "company"
+5. Do NOT return file naming patterns like "pdf_123", "doc_456"
+6. Do NOT make up or guess company names
+7. Only return real, identifiable company names from visible branding
+
+Examples of VALID responses:
+- Google
+- Microsoft
+- Deloitte
+- KPMG
+
+Examples of INVALID responses (return "NONE" instead):
+- document
+- pdf
+- company
+- file_123
+- unknown
+
+Return ONLY the company name or "NONE":"""
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{image_b64}"
+                                }
+                            }
+                        ]
+                    }],
+                    "max_tokens": 50,
+                    "temperature": 0.1  # Low temperature for factual extraction
+                },
+            )
+        
+        if response.status_code != 200:
+            print(f"⚠️ Vision API returned status {response.status_code}: {response.text[:200]}")
+            return None
+        
+        result = response.json()
+        company = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        
+        # Validate the response
+        if not company or company.upper() == "NONE":
+            print("❌ Vision model found no company logo")
+            return None
+        
+        # Additional validation against garbage responses
+        if not _is_valid_company_name(company):
+            print(f"❌ Vision model returned invalid company name: '{company}'")
+            return None
+        
+        print(f"✅ Vision model identified company logo: {company}")
+        return company
+        
+    except Exception as e:
+        print(f"❌ Vision-based logo recognition failed: {e}")
+        return None
+
+
 def _fallback_company_from_filename(path: Path) -> str:
     stem = path.stem.replace("_", " ")
     # Drop common noise tokens that appear in filenames
@@ -106,19 +329,31 @@ def _fallback_company_from_filename(path: Path) -> str:
 
 
 def _read_text_from_path(path: Path) -> str:
-    """Return raw text for a file. For PDFs, use LlamaParse (LLAMA_CLOUD_API_KEY)."""
-    if path.suffix.lower() == ".txt":
+    """
+    Return raw text for a file. Supports .txt, .pdf, .docx, .doc
+    For PDFs and Office docs, use LlamaParse (LLAMA_CLOUD_API_KEY).
+    """
+    suffix = path.suffix.lower()
+    
+    # Plain text files - direct read
+    if suffix == ".txt":
         txt = path.read_text(errors="ignore")
         if not txt.strip():
             raise RuntimeError(f"Empty text in {path}")
         return txt
 
+    # For PDF, DOCX, DOC - use LlamaParse which supports all formats
+    supported_formats = {".pdf", ".docx", ".doc"}
+    if suffix not in supported_formats:
+        raise RuntimeError(f"Unsupported file format: {suffix}. Supported: .txt, .pdf, .docx, .doc")
 
     # Prefer LLAMA_CLOUD_API_KEY; fallback to LLAMAPARSE_API_KEY if present
     api_key = os.getenv("LLAMA_CLOUD_API_KEY") or os.getenv("LLAMAPARSE_API_KEY") or get_settings().LLAMAPARSE_API_KEY
     if not api_key:
-        raise RuntimeError("LLAMA_CLOUD_API_KEY is required for PDF ingestion with LlamaParse")
+        raise RuntimeError("LLAMA_CLOUD_API_KEY is required for PDF/DOCX ingestion with LlamaParse")
 
+    print(f"📄 Parsing {suffix} file with LlamaParse: {path.name}")
+    
     parser = LlamaParse(
         api_key=api_key,
         result_type="markdown",
@@ -127,6 +362,7 @@ def _read_text_from_path(path: Path) -> str:
         verbose=True,
         check_local_models=False,
     )
+    
     # Harden SSL with certifi
     try:
         urllib3.util.ssl_.DEFAULT_CIPHERS += "HIGH:!DH:!aNULL"
@@ -138,14 +374,18 @@ def _read_text_from_path(path: Path) -> str:
     docs = parser.load_data(str(path))
     if not docs:
         raise RuntimeError(f"LlamaParse produced no documents for {path}")
+    
     parts: List[str] = []
     for d in docs:
         t = (getattr(d, "text", None) or "").strip()
         if t:
             parts.append(t)
+    
     text = "\n\n".join(parts).strip()
     if not text:
         raise RuntimeError(f"LlamaParse returned empty text for {path}")
+    
+    print(f"✅ Successfully parsed {len(text)} characters from {path.name}")
     return text
 
 
@@ -296,20 +536,26 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
     preview = text[:500]
     print(f"Preview for {path.name}:\n{preview}\n{'-'*80}")
 
-    # Extract company once per document using LangExtract (with robust prompt)
-    company_name: Optional[str] = extract_company(text)
-    if company_name:
-        print(f"✅ company={company_name} file={path.name}")
-    else:
-        print(f"❌ no company extracted file={path.name}")
+    # PRIORITY 1: Try to get company from filename first (most reliable for user-named files)
+    filename_company = _fallback_company_from_filename(path)
+    print(f"📝 Filename suggests company: {filename_company}")
 
-    # NEW: Structured extraction using LLM
+    # PRIORITY 2: Extract company from document content using LangExtract
+    content_company: Optional[str] = extract_company(text)
+    if content_company:
+        print(f"📄 Content extraction found: {content_company}")
+    else:
+        print(f"⚠️ No company extracted from content")
+
+    # PRIORITY 3: Structured extraction using LLM
     print(f"🔍 Performing structured extraction for {path.name}...")
     structured_extractor = StructuredExtractor()
     extraction = structured_extractor.extract_structured_data(text)
     
+    structured_company: Optional[str] = None
     if extraction and extraction.company_name:
-        print(f"✅ Structured extraction successful: {extraction.company_name}")
+        structured_company = extraction.company_name
+        print(f"✅ Structured extraction successful: {structured_company}")
         # Save structured data to JSON
         json_path = structured_extractor.save_structured_data(extraction, path.name)
         if json_path:
@@ -364,19 +610,61 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
     else:
         print(f"⚠️ Structured extraction failed for {path.name}")
 
-    # Determine the best company name to use
-    final_company_name = company_name or None
-    if extraction and extraction.company_name:
-        final_company_name = extraction.company_name  # Override with structured extraction if available
-
-    if _is_placeholder_company(final_company_name):
-        final_company_name = None
-
-    if final_company_name:
-        final_company_name = canonicalize_company(final_company_name)
-
-    if not final_company_name:
-        final_company_name = _fallback_company_from_filename(path)
+    # SMART COMPANY NAME RESOLUTION
+    # Priority order: Structured > Content > Filename > Vision (Logo Detection)
+    # Use the most reliable source available
+    
+    print("\n🎯 Company Name Resolution:")
+    print(f"   1. Structured extraction: {structured_company or 'None'}")
+    print(f"   2. Content extraction: {content_company or 'None'}")
+    print(f"   3. Filename suggests: {filename_company}")
+    
+    # Decide final company name with priority logic
+    final_company_name = None
+    
+    # If structured extraction succeeded, trust it most (it's LLM-verified)
+    if structured_company and not _is_placeholder_company(structured_company):
+        final_company_name = structured_company
+        print(f"   ✅ Using structured extraction: {final_company_name}")
+    
+    # Otherwise, use content extraction if valid
+    elif content_company and not _is_placeholder_company(content_company):
+        final_company_name = content_company
+        print(f"   ✅ Using content extraction: {final_company_name}")
+    
+    # Try filename if it looks valid (not "Unknown" or placeholder)
+    elif filename_company and not _is_placeholder_company(filename_company) and filename_company.lower() != "unknown":
+        final_company_name = filename_company
+        print(f"   ✅ Using filename fallback: {final_company_name}")
+    
+    # LAST RESORT: Vision-based logo detection (only for PDFs)
+    # Only attempt if all other methods failed or returned placeholders
+    else:
+        if path.suffix.lower() == ".pdf":
+            print(f"   ⚠️ All text-based methods failed. Attempting vision-based logo detection...")
+            import asyncio
+            try:
+                # Run async vision extraction
+                vision_company = asyncio.run(_extract_company_from_logo_vision(path))
+                if vision_company and _is_valid_company_name(vision_company):
+                    final_company_name = vision_company
+                    print(f"   ✅ Using vision-detected logo: {final_company_name}")
+                else:
+                    # Ultimate fallback: use filename even if it's "Unknown"
+                    final_company_name = filename_company
+                    print(f"   ⚠️ Vision detection failed. Using filename: {final_company_name}")
+            except Exception as e:
+                print(f"   ❌ Vision detection error: {e}")
+                final_company_name = filename_company
+                print(f"   ⚠️ Falling back to filename: {final_company_name}")
+        else:
+            # Non-PDF files: use filename as final fallback
+            final_company_name = filename_company
+            print(f"   ✅ Using filename fallback: {final_company_name}")
+    
+    # Canonicalize for consistency
+    final_company_name = canonicalize_company(final_company_name) or final_company_name
+    print(f"   🏢 Final canonicalized company: {final_company_name}\n")
 
     # Chunk using RecursiveCharacterTextSplitter
     chunk_size = int(os.getenv("CHUNK_SIZE", "700"))
@@ -410,36 +698,67 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pdf_dir", type=str, required=True, help="Directory of PDFs or .txt files")
+    parser.add_argument("--pdf_dir", type=str, required=True, help="Directory containing job description files")
     args = parser.parse_args()
 
+    # Support all common document formats
+    supported_extensions = [
+        "*.pdf", "*.PDF",           # PDF documents
+        "*.txt", "*.TXT",           # Plain text
+        "*.docx", "*.DOCX",         # Word documents (modern)
+        "*.doc", "*.DOC"            # Word documents (legacy)
+    ]
+    
     files: List[Path] = []
-    for ext in ("*.pdf", "*.PDF", "*.txt", "*.docx", "*.DOCX"):
-        files.extend(sorted(Path(args.pdf_dir).glob(ext)))
+    for ext in supported_extensions:
+        found = sorted(Path(args.pdf_dir).glob(ext))
+        files.extend(found)
+        if found:
+            print(f"📁 Found {len(found)} {ext.replace('*', '')} file(s)")
+    
     if not files:
-        print("No files found to ingest.")
+        print(f"⚠️ No supported files found in {args.pdf_dir}")
+        print(f"Supported formats: PDF, TXT, DOCX, DOC")
         return
+
+    print(f"\n🚀 Starting ingestion of {len(files)} file(s)...")
+    print(f"Supported formats: .pdf, .txt, .docx, .doc")
+    print(f"Company detection: Structured extraction → Content analysis → Filename fallback\n")
 
     total_chunks = 0
     companies: Set[str] = set()
+    failed_files: List[Tuple[Path, str]] = []
+    
     for f in tqdm(files, desc="Ingesting"):
-        n, comp = process_file(f)
-        total_chunks += n
-        if comp:
-            companies.add(comp)
+        try:
+            n, comp = process_file(f)
+            total_chunks += n
+            if comp:
+                companies.add(comp)
+        except Exception as e:
+            error_msg = str(e)
+            print(f"\n❌ Failed to process {f.name}: {error_msg}\n")
+            failed_files.append((f, error_msg))
 
     # Write companies.json at project root
     try:
         companies_path = Path("companies.json")
         companies_path.write_text(json.dumps(sorted(companies), ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"Saved {len(companies)} companies to {companies_path.resolve()}")
+        print(f"\n💾 Saved {len(companies)} companies to {companies_path.resolve()}")
     except Exception as e:
-        print(f"Could not write companies.json: {e}")
+        print(f"\n⚠️ Could not write companies.json: {e}")
 
-    print(f"Upserted {total_chunks} chunks to Pinecone.")
+    print(f"\n✅ Successfully upserted {total_chunks} chunks to Pinecone")
+    print(f"📊 Processed {len(files) - len(failed_files)}/{len(files)} files")
+    
+    if failed_files:
+        print(f"\n⚠️ {len(failed_files)} file(s) failed:")
+        for failed_file, error in failed_files:
+            print(f"   - {failed_file.name}: {error[:100]}")
 
 
 if __name__ == "__main__":
     main()
+
 
 

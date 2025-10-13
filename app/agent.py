@@ -570,6 +570,8 @@ def route_single_query(user_question: str, context: Optional[Dict[str, Any]] = N
 
     previous_context_text: Optional[str] = None
     enhanced_context_info: Optional[Dict[str, Any]] = None
+    conversation_history: List[Dict[str, str]] = []
+    
     if context:
         # Handle multi-hop context (previous_answers)
         previews = context.get("previous_answers")
@@ -578,6 +580,12 @@ def route_single_query(user_question: str, context: Optional[Dict[str, Any]] = N
             clipped = [str(p).strip() for p in previews[-3:] if str(p).strip()]
             if clipped:
                 previous_context_text = "\n\n".join(clipped)
+
+        # Extract full conversation history for context-aware routing
+        full_history = context.get('full_conversation_history', [])
+        if full_history:
+            # Keep last 6 messages (3 Q&A pairs) for routing context
+            conversation_history = full_history[-6:]
 
         # Handle enhanced context from chat memory
         if isinstance(context, dict):
@@ -627,14 +635,20 @@ HYBRID: Questions needing both data and explanation/analysis
 - Trends: "what trends do you see in skills demand?"
 - Analysis: "why do companies hire for this specialization?"
 - Contextual insights: "what makes this role attractive?"
+- Follow-up clarifications that reference previous discussion
 
 MULTI_HOP: Complex questions requiring sequential database operations
 - Multi-step queries: "find high-paying companies, then show their skills"
 - Conditional analysis: "among companies in Bangalore, what skills are most valued?"
 
+CRITICAL: If the user provides context about themselves (like "I'm from Finance specialization") 
+after asking a question, this is a HYBRID query that requires re-contextualizing the previous 
+answer with their personal profile.
+
 EXAMPLES:
 - "HOW MANY COMPANIES CAME FOR FMCG ROLE?" → STRUCTURED (count companies by FMCG specialization)
 - "HOW MANY COMPANIES FOR FINANCE?" → STRUCTURED (count companies by Finance specialization)
+- User asks "what companies came?" then says "I'm from finance" → HYBRID (recontextualize with their specialization)
 - "WHAT DOES A BUSINESS ANALYST DO?" → UNSTRUCTURED (role description)
 - "WHAT IS THE CULTURE AT GOOGLE?" → UNSTRUCTURED (company culture)
 - "WHY DO COMPANIES HIRE FOR FINANCE?" → HYBRID (analysis of hiring reasons)
@@ -646,6 +660,16 @@ Output ONLY the category word: STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
 
     # Build enhanced context for routing
     context_parts = []
+    
+    # Add conversation history if available
+    if conversation_history:
+        history_text = "RECENT CONVERSATION:\n"
+        for msg in conversation_history:
+            role = "Student" if msg.get('role') == 'user' else "Assistant"
+            content = msg.get('content', '')[:200]  # Limit to 200 chars per message
+            history_text += f"{role}: {content}...\n"
+        context_parts.append(history_text)
+    
     if previous_context_text:
         context_parts.append(f"Previous conversation:\n{previous_context_text}")
 
@@ -669,7 +693,7 @@ Output ONLY the category word: STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
     context_text = "\n\n".join(context_parts) if context_parts else None
 
     if context_text:
-        user_prompt = f"Query: {user_question}\n\nContext:\n{context_text}\n\nSchema: {schema_json}"
+        user_prompt = f"Current Query: {user_question}\n\n{context_text}\n\nSchema: {schema_json}"
     else:
         user_prompt = f"Query: {user_question}\n\nSchema: {schema_json}"
 
@@ -711,9 +735,9 @@ Output ONLY the category word: STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
                 routing_decision = "STRUCTURED"
         except Exception as e:
             print(f"❌ Routing API call failed: {e}")
-            routing_decision = "STRUCTURED"
+            raise RuntimeError(f"OpenRouter API is required but unavailable: {e}")
     else:
-        routing_decision = "UNSTRUCTURED"
+        raise RuntimeError("OPENROUTER_API_KEY is required for query routing")
 
     routing_ms = (time.perf_counter() - t_start) * 1000.0
     print(f"🔍 Routing decision: {routing_decision} (routing_ms={routing_ms:.1f})")

@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     # Deprecated Chroma local dir placeholder (no longer used)
     CHROMA_DIR: str = "data/chroma"
 
+
     model_config = SettingsConfigDict(
         env_file=("env.example", ".env.example", ".env"),
         case_sensitive=False,
