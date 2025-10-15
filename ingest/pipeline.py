@@ -65,6 +65,10 @@ def _load_repo_dotenv(dotenv_path: str | Path = None) -> None:
 # Auto-load repository .env so CLI runs pick up keys without manual export
 _load_repo_dotenv()
 
+# Import modules that need env variables AFTER loading .env
+from app.navigation_map import navigation_map  # Legacy map
+from app.hierarchical_navigation_map import hierarchical_navigation_map  # Enhanced map
+from app.specialization_classifier import specialization_classifier
 
 def normalize_company_name(name: str) -> str:
     """Normalize company name for consistent matching: lowercase, alphanumeric only."""
@@ -326,6 +330,75 @@ def _fallback_company_from_filename(path: Path) -> str:
     primary = re.split(r"[-–—|]", stem)[0].strip()
     candidate = primary or stem
     return canonicalize_company(candidate) or candidate.title()
+
+
+def _extract_specialization_from_text(text: str) -> Optional[str]:
+    """
+    Extract specialization from chunk text based on keywords.
+    Returns: Marketing, Finance, Operations, Data Analytics, HR, or None
+    """
+    text_lower = text.lower()
+    
+    # Specialization keyword patterns (weighted by specificity)
+    specializations = {
+        'Marketing': [
+            # Strong indicators
+            ('digital marketing', 3), ('brand management', 3), ('marketing strategy', 3),
+            ('content marketing', 3), ('social media marketing', 3), ('seo', 3), ('sem', 3),
+            # Medium indicators
+            ('marketing', 2), ('brand', 2), ('advertising', 2), ('campaign', 2),
+            ('growth hacking', 2), ('customer acquisition', 2)
+        ],
+        'Finance': [
+            # Strong indicators
+            ('financial analyst', 3), ('chartered accountant', 3), ('ca', 3), ('cma', 3),
+            ('financial planning', 3), ('audit', 3), ('taxation', 3), ('treasury', 3),
+            # Medium indicators
+            ('finance', 2), ('accounting', 2), ('financial', 2), ('investment', 2),
+            ('budget', 2), ('revenue', 2)
+        ],
+        'Operations': [
+            # Strong indicators
+            ('supply chain', 3), ('operations management', 3), ('logistics', 3),
+            ('procurement', 3), ('inventory management', 3), ('process optimization', 3),
+            # Medium indicators
+            ('operations', 2), ('ops', 2), ('production', 2), ('manufacturing', 2),
+            ('warehouse', 2)
+        ],
+        'Data Analytics': [
+            # Strong indicators
+            ('data analytics', 3), ('data science', 3), ('business intelligence', 3),
+            ('data analyst', 3), ('data engineer', 3), ('machine learning', 3),
+            ('sql', 3), ('python', 3), ('tableau', 3), ('power bi', 3),
+            # Medium indicators
+            ('analytics', 2), ('data', 2), ('reporting', 2), ('dashboard', 2)
+        ],
+        'HR': [
+            # Strong indicators
+            ('human resources', 3), ('talent acquisition', 3), ('recruitment', 3),
+            ('employee relations', 3), ('learning and development', 3), ('l&d', 3),
+            # Medium indicators
+            ('hr', 2), ('people', 2), ('hiring', 2), ('onboarding', 2)
+        ]
+    }
+    
+    # Calculate scores for each specialization
+    scores = {}
+    for specialization, patterns in specializations.items():
+        score = 0
+        for keyword, weight in patterns:
+            # Use word boundaries for accurate matching
+            if re.search(r'\b' + re.escape(keyword) + r'\b', text_lower):
+                score += weight
+        scores[specialization] = score
+    
+    # Return specialization with highest score (if score > 2)
+    if scores:
+        best_match = max(scores.items(), key=lambda x: x[1])
+        if best_match[1] >= 2:  # Minimum threshold
+            return best_match[0]
+    
+    return None
 
 
 def _read_text_from_path(path: Path) -> str:
@@ -664,7 +737,99 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
     
     # Canonicalize for consistency
     final_company_name = canonicalize_company(final_company_name) or final_company_name
+    company_norm = normalize_company_name(final_company_name)
     print(f"   🏢 Final canonicalized company: {final_company_name}\n")
+
+    # EXTRACT SPECIALIZATIONS VIA LLM (NEW)
+    print("🎯 Extracting specializations via LLM...")
+    import asyncio
+    try:
+        specializations = asyncio.run(
+            specialization_classifier.classify(
+                jd_text=text[:5000],  # First 5k chars for classification
+                company_name=final_company_name
+            )
+        )
+        is_general = "General" in specializations
+        print(f"   ✅ Specializations: {specializations}")
+    except Exception as e:
+        print(f"   ⚠️ Specialization classification failed: {e}")
+        specializations = ["General"]
+        is_general = True
+    
+    # HIERARCHICAL INDUSTRY CLASSIFICATION (NEW)
+    # Note: specializations already extracted above (Marketing, Finance, Operations, HR, Analytics)
+    # Now extract Level 1 (FMCG, Investment Banking, etc.) and Level 2 (specific details)
+    print("🏭 Extracting Level 1 & Level 2 industry classification...")
+    
+    industry_level1 = "General"
+    industry_level2 = "General"
+    industry_full = "General"
+    
+    # Only classify if we have a clear specialization (not General)
+    if specializations and len(specializations) == 1 and "General" not in specializations:
+        primary_specialization = list(specializations)[0]
+        
+        try:
+            from app.industry_classifier import industry_classifier
+            
+            # Prepare context for classification
+            classification_context = {
+                "company": final_company_name,
+                "industry": extraction.industry if extraction else None
+            }
+            
+            # If we have structured roles, use first role title
+            if extraction and extraction.roles:
+                classification_context["role_title"] = extraction.roles[0].title
+            
+            # Classify using LLM (takes specialization, infers Level 1 & Level 2)
+            industry_classification = industry_classifier.classify(
+                job_description=text[:3000],  # First 3k chars
+                specialization=primary_specialization,
+                context=classification_context
+            )
+            
+            industry_level1 = industry_classification.level1
+            industry_level2 = industry_classification.level2
+            industry_full = f"{primary_specialization} > {industry_level1} > {industry_level2}"
+            
+            print(f"   ✅ Specialization: {primary_specialization} (already extracted)")
+            print(f"   ✅ Level 1: {industry_level1}")
+            print(f"   ✅ Level 2: {industry_level2}")
+            print(f"   🎯 Confidence: {industry_classification.confidence:.2%}")
+            print(f"   💡 Reasoning: {industry_classification.reasoning}")
+            
+        except Exception as e:
+            print(f"   ⚠️ Level 1/2 classification failed: {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        print(f"   ⚠️ Skipping Level 1/2 classification (specialization is General or multi-spec)")
+
+    # ADD TO NAVIGATION MAPS
+    print("📍 Updating Navigation Maps...")
+    
+    # Update legacy navigation map (for backward compatibility)
+    navigation_map.add_entry(
+        company_name=final_company_name,
+        company_norm=company_norm,
+        specializations=specializations,
+        source='jd'
+    )
+    
+    # Update enhanced hierarchical navigation map
+    if not is_general and industry_level1 != "General":
+        primary_specialization = list(specializations)[0] if len(specializations) == 1 else "General"
+        if primary_specialization != "General":
+            hierarchical_navigation_map.add_entry(
+                company_name=final_company_name,
+                company_norm=company_norm,
+                specialization=primary_specialization,
+                level1=industry_level1,
+                level2=industry_level2,
+                source='jd'
+            )
 
     # Chunk using RecursiveCharacterTextSplitter
     chunk_size = int(os.getenv("CHUNK_SIZE", "700"))
@@ -681,13 +846,19 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
             start_char=0,
             end_char=0,
         )
+        
         meta: Dict[str, Any] = {
             "chunk_text": chunk_text,
             "text": chunk_text,
             "source": path.name,
             "chunk_index": idx,
             "company": final_company_name,
-            "company_norm": normalize_company_name(final_company_name),
+            "company_norm": company_norm,
+            "specializations": specializations,  # LLM-extracted specializations
+            "is_general": is_general,  # Flag for General roles
+            "industry_level1": industry_level1,  # Broad category (Marketing, Finance, etc.)
+            "industry_level2": industry_level2,  # Specific subcategory (FMCG Marketing, etc.)
+            "industry_full": industry_full,  # Full hierarchical path
             "year": datetime.now().year,
         }
         chunks.append({"_id": chunk_id, **meta})
@@ -747,6 +918,17 @@ def main() -> None:
         print(f"\n💾 Saved {len(companies)} companies to {companies_path.resolve()}")
     except Exception as e:
         print(f"\n⚠️ Could not write companies.json: {e}")
+
+    # SAVE NAVIGATION MAPS
+    print("\n📍 Saving Navigation Maps...")
+    
+    # Legacy map
+    navigation_map.save_to_cache()
+    navigation_map.print_summary()
+    
+    # Enhanced hierarchical map
+    hierarchical_navigation_map.save_to_cache()
+    hierarchical_navigation_map.print_summary()
 
     print(f"\n✅ Successfully upserted {total_chunks} chunks to Pinecone")
     print(f"📊 Processed {len(files) - len(failed_files)}/{len(files)} files")

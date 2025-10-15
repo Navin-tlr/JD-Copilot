@@ -12,6 +12,7 @@ from .rag import retrieve_snippets, synthesize_answer
 from .database import PlacementDatabase
 from .config import get_settings
 from .enhanced_chat_memory import EnhancedConversationMemory
+from .agents.orchestrator import agent_orchestrator
 
 @dataclass
 class ChatMessage:
@@ -406,6 +407,21 @@ class ChatService:
     async def _generate_rag_response(self, user_message: str, session_id: str, user_id: str, context: Dict[str, Any] = None) -> str:
         """Generate comprehensive response using the query router system"""
         print(f"🎓 Generating routed response for: '{user_message}'")
+        # First attempt: use the new agent orchestrator pipeline for consistent behavior across APIs
+        try:
+            agent_context = context or {}
+            agent_result = await agent_orchestrator.process_query(
+                query=user_message,
+                session_id=session_id,
+                user_id=user_id,
+                context=agent_context
+            )
+            response_text = agent_result.get('response') if isinstance(agent_result, dict) else None
+            if response_text:
+                return response_text
+        except Exception as agent_error:
+            print(f"❌ Agent orchestrator error: {agent_error}. Falling back to legacy routing stack.")
+
         try:
             # Step 1: Use query router to get the response with context
             router_response = route_query(user_message, context)
@@ -1195,62 +1211,30 @@ class ChatService:
         return prompt
     
     async def _call_placement_cell_llm(self, prompt: str) -> str:
-        """Call LLM with full capabilities for placement cell representative"""
+        """Call LLM with full capabilities for placement cell representative using Gemini."""
         try:
-            import requests
-            import os
-            from dotenv import load_dotenv
-            
-            # Load environment variables from .env file
-            load_dotenv()
-            
-            # Get API key from .env file
-            api_key = os.getenv('OPENROUTER_API_KEY')
-            if not api_key:
-                print("❌ No OpenRouter API key found in .env file")
-                return None
-            
-            # Prepare comprehensive LLM request
+            from .llm_client import get_gemini_client
             settings = get_settings()
-            payload = {
-                "model": settings.OPENROUTER_MODEL or "x-ai/grok-4-fast",  # Use Grok-4 Fast as default
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are Linus Torvalds reincarnated as a senior placement cell representative at Christ University, Bangalore. You channel pure Torvalds bluntness - merciless, dry humor, surgical precision, and zero tolerance for MBA pretensions. You cut through career fluff like Torvalds cuts through bad code: direct, unforgiving, and ruthlessly practical. Your responses are blunt assessments of market realities, with dry wit about placement politics and strategic positioning. You NEVER reference technical concepts, kernels, or code metaphors. You focus purely on placement realities: company demands, candidate positioning, competitive edges, and merit-based outcomes. Every insight serves the ultimate purpose (telos) of career success through strategic excellence. You deliver ULTRA-PRECISE, data-driven guidance based EXCLUSIVELY on verified placement data. You NEVER mention incomplete data or data gaps - if information is missing, you work with what's available and state clear limitations. Your tone: Blunt as Torvalds calling out incompetence, humorous about placement follies, surgical in analysis, and relentlessly focused on results."
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.4,  # Balanced temperature for utility-rich strategic insights
-                "max_tokens": 1500,  # Longer response for detailed strategic guidance
-                "stream": False,
-                "top_p": 0.9,  # Allow diverse utility-rich strategic insights
-                "frequency_penalty": 0.2,  # Reduce repetition
-                "presence_penalty": 0.2  # Encourage diverse strategic insights
-            }
-            
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            # Make API call
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=180
+            gemini = get_gemini_client()
+            system_msg = (
+                "You are Linus Torvalds reincarnated as a senior placement cell representative at Christ University, Bangalore. "
+                "You channel pure Torvalds bluntness - merciless, dry humor, surgical precision, and zero tolerance for MBA pretensions. "
+                "You cut through career fluff like Torvalds cuts through bad code: direct, unforgiving, and ruthlessly practical. "
+                "Your responses are blunt assessments of market realities, with dry wit about placement politics and strategic positioning. "
+                "You NEVER reference technical concepts, kernels, or code metaphors. You focus purely on placement realities: company demands, candidate positioning, competitive edges, and merit-based outcomes. "
+                "Every insight serves the ultimate purpose (telos) of career success through strategic excellence. You deliver ULTRA-PRECISE, data-driven guidance based EXCLUSIVELY on verified placement data. "
+                "You NEVER mention incomplete data or data gaps - if information is missing, you work with what's available and state clear limitations. "
+                "Your tone: Blunt as Torvalds calling out incompetence, humorous about placement follies, surgical in analysis, and relentlessly focused on results."
             )
-            
-            if response.status_code == 200:
-                result = response.json()
-                llm_response = result["choices"][0]["message"]["content"]
+            messages = [
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": prompt}
+            ]
+            llm_response = gemini.chat(messages, max_tokens=min(1500, settings.MAX_OUTPUT_TOKENS), temperature=0.4)
+            if llm_response:
                 print(f"✅ Placement cell LLM response generated: {len(llm_response)} characters")
                 return llm_response
-            else:
-                print(f"❌ OpenRouter API error: {response.status_code}")
-                return None
-                
+            return None
         except Exception as e:
             print(f"❌ Placement cell LLM call failed: {e}")
             return None

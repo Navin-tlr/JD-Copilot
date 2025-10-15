@@ -119,7 +119,7 @@ export default function RAGMode() {
   };
 
   return (
-    <div className="min-h-screen bg-[#313131] flex flex-col items-center py-12 px-4 relative animate-fade-in">
+    <div className="min-h-screen bg-[#1f1e1e] flex flex-col items-center py-12 px-4 relative animate-fade-in">
       <ThinkingIndicator active={isLoading} message="Working on that for you" />
       {/* Chat History Sidebar */}
       <ChatHistory
@@ -363,7 +363,7 @@ export default function RAGMode() {
       </div>
 
       {/* Chat Input - sticky at bottom */}
-      <div className="w-full flex justify-center sticky bottom-0 bg-[#313131]/80 backdrop-blur supports-[backdrop-filter]:bg-[#313131]/60 pt-4">
+      <div className="w-full flex justify-center sticky bottom-0 bg-[#1f1e1e]/80 backdrop-blur supports-[backdrop-filter]:bg-[#1f1e1e]/60 pt-4">
         <div className="w-full max-w-[1280px] flex justify-center">
           <ChatInput variant="rag" onSend={handleSend} />
         </div>

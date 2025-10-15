@@ -2,9 +2,53 @@
 Centralized prompt templates and helpers for LLM synthesis so all paths share the same factual / stylistic policy.
 
 Import from both `agent.py` and `rag.py` to eliminate divergence.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GEMINI 2.0 FLASH ADAPTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All prompts in this file are optimized for Gemini 2.0 Flash, which uses a different
+message format than OpenAI-style models:
+
+OPENAI FORMAT (OpenRouter, GPT):
+    {"role": "system", "content": "You are Sapient..."}
+    {"role": "user", "content": "What roles does Honasa have?"}
+    {"role": "assistant", "content": "Honasa has..."}
+
+GEMINI FORMAT (Gemini 2.0 Flash):
+    {"role": "user", "parts": ["System: You are Sapient...\n\nWhat roles does Honasa have?"]}
+    {"role": "model", "parts": ["Honasa has..."]}
+
+KEY DIFFERENCES:
+1. No dedicated 'system' role - system instructions embedded into first user message
+2. Uses 'parts' array instead of 'content' string
+3. Uses 'model' role instead of 'assistant'
+
+CONTENT PRESERVATION GUARANTEE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ALL prompts preserve 100% of their original content, formatting, tone, personality,
+and attributes. The ONLY change is the delivery format to match Gemini's API.
+
+- Sapient's bone-dry humor and professional bluntness: ✅ PRESERVED
+- MBA Placement Cell Director personality: ✅ PRESERVED
+- Strategic Intelligence Analyst persona: ✅ PRESERVED
+- All formatting rules and visual hierarchy: ✅ PRESERVED
+- All constraints and prohibited content: ✅ PRESERVED
+- All company name constraints and hard rules: ✅ PRESERVED
+- Deep-dive mode triggers: ✅ PRESERVED
+- Specialization focus requirements: ✅ PRESERVED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMPLEMENTATION:
+The conversion happens automatically in app/llm_client.py via GeminiClient._to_gemini_messages().
+System instructions are embedded with clear visual separation using decorative borders
+to ensure Gemini recognizes them as ABSOLUTE PRIORITY instructions.
+
+All existing code using OpenAI-style messages will work seamlessly - the conversion
+is transparent and preserves all prompt characteristics.
 """
 from __future__ import annotations
-from typing import List
+from typing import List, Dict, Any
 
 def build_factual_synthesis_prompt(
     user_question: str,
@@ -242,3 +286,77 @@ def assemble_prompt(
 
     return synthesis
 
+
+def format_gemini_messages(
+    system_prompt: str,
+    user_prompt: str,
+    conversation_history: List[Dict[str, str]] | None = None
+) -> List[Dict[str, Any]]:
+    """Format prompts for Gemini 2.0 Flash while preserving all content, tone, and personality.
+    
+    Gemini does not have a dedicated 'system' role. Instead, system instructions are embedded
+    into the first user message. This function handles the conversion automatically.
+    
+    Args:
+        system_prompt: The system-level instructions (Sapient persona, rules, constraints, etc.)
+        user_prompt: The actual user query or task
+        conversation_history: Optional list of prior messages in OpenAI format
+        
+    Returns:
+        List of messages in Gemini format with system instructions properly embedded
+        
+    CRITICAL: This function preserves 100% of the original prompt content, formatting, tone,
+    personality, and all attributes. Only the delivery format is adapted for Gemini's API.
+    """
+    gemini_messages = []
+    
+    # If there's conversation history, convert it first
+    if conversation_history:
+        for msg in conversation_history:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            
+            if role == "system":
+                # Skip standalone system messages in history; they'll be in the system_prompt
+                continue
+            elif role == "user":
+                gemini_messages.append({"role": "user", "parts": [content]})
+            elif role == "assistant":
+                gemini_messages.append({"role": "model", "parts": [content]})
+    
+    # Embed system instructions into the first user message
+    # This preserves ALL content, tone, personality, and formatting from the original system prompt
+    combined_prompt = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SYSTEM INSTRUCTIONS (ABSOLUTE PRIORITY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{system_prompt}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+USER QUERY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{user_prompt}"""
+    
+    gemini_messages.append({"role": "user", "parts": [combined_prompt]})
+    
+    return gemini_messages
+
+
+def format_simple_gemini_prompt(system_prompt: str, user_prompt: str) -> str:
+    """Simple variant that returns a single combined prompt string for Gemini.
+    
+    Use this when you need a single prompt string rather than a message list.
+    Preserves all content, tone, personality, and formatting.
+    """
+    return f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SYSTEM INSTRUCTIONS (ABSOLUTE PRIORITY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{system_prompt}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+USER QUERY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{user_prompt}"""

@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from typing import Optional
+from typing import Any, Dict, List, Optional, Union
 from sqlalchemy import create_engine, text
 
 # --- LAYER 1: CANONICAL (PRE-DEFINED) QUERIES ---
@@ -453,3 +453,76 @@ def run_deterministic_sql_query(query: str) -> str:
     Public wrapper expected by the final agent. Delegates to run_sql_query.
     """
     return run_sql_query(query)
+
+
+def execute_canonical_query(question: str) -> Optional[Dict[str, Any]]:
+    """Execute a canonical SQL query and return structured results.
+
+    Returns None when the question does not map to a canonical query.
+    """
+    canonical_sql = get_canonical_query(question)
+    if not canonical_sql:
+        return None
+
+    db_path = os.getenv('DATABASE_PATH', 'data/placement_data.db')
+
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(canonical_sql)
+            rows = cursor.fetchall()
+    except Exception as exc:
+        return {
+            'query': canonical_sql,
+            'error': str(exc),
+            'result': None
+        }
+
+    sql_lower = canonical_sql.lower()
+    is_count_query = 'count(' in sql_lower
+
+    if is_count_query:
+        count_value: Union[int, float] = 0
+        if rows:
+            first_row = rows[0]
+            if len(first_row.keys()) == 1:
+                count_value = first_row[0] or 0
+            else:
+                # If additional columns exist, look for the first column containing 'count'
+                for key in first_row.keys():
+                    if 'count' in key.lower():
+                        count_value = first_row[key] or 0
+                        break
+                else:
+                    count_value = first_row[0] or 0
+
+        result: Dict[str, Any] = {'count': int(count_value)}
+
+        # Include additional columns (e.g., company lists) when present
+        if rows and len(rows[0].keys()) > 1:
+            supplementary: List[Dict[str, Any]] = []
+            for row in rows:
+                row_dict = {key: row[key] for key in row.keys() if 'count' not in key.lower()}
+                if row_dict:
+                    supplementary.append(row_dict)
+            if supplementary:
+                result['records'] = supplementary
+
+        return {
+            'query': canonical_sql,
+            'result': result
+        }
+
+    # Non-count queries → return list of rows (dict when multiple columns)
+    formatted_rows: List[Any] = []
+    for row in rows:
+        keys = row.keys()
+        if len(keys) == 1:
+            formatted_rows.append(row[0])
+        else:
+            formatted_rows.append({key: row[key] for key in keys})
+
+    return {
+        'query': canonical_sql,
+        'result': formatted_rows
+    }

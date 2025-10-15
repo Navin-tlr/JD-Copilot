@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str | None = None
 
     GEMINI_API_KEY: str | None = None
-    GEMINI_MODEL: str | None = None
+    GEMINI_MODEL: str | None = "gemini-2.5-flash"
     
     # OpenRouter (alternative LLM provider)
     OPENROUTER_API_KEY: str | None = None
@@ -29,12 +29,14 @@ class Settings(BaseSettings):
 
     # Pinecone (cloud-first)
     PINECONE_API_KEY: str | None = None
-    PINECONE_INDEX_NAME: str | None = None
+    PINECONE_INDEX_NAME: str = "sapient"
     PINECONE_CLOUD: str = "aws"
     PINECONE_REGION: str = "us-east-1"
 
     # Embeddings
-    EMBED_MODEL: str = "all-MiniLM-L6-v2"
+    EMBED_MODEL: str = "gemini/text-embedding-004"
+    # Runtime generation
+    MAX_OUTPUT_TOKENS: int = 3000
 
     # Chunking
     CHUNK_SIZE: int = 700

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import CompanyDropdown from './CompanyDropdown';
+import SpecializationPopup, { SpecializationSelection } from './SpecializationPopup';
 
 interface ChatInputProps {
   variant?: 'default' | 'rag' | 'benchmark';
@@ -9,8 +9,10 @@ interface ChatInputProps {
 
 export default function ChatInput({ variant = 'default', onSend }: ChatInputProps) {
   const [input, setInput] = useState('');
-  const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const [isSpecializationPopupOpen, setIsSpecializationPopupOpen] = useState(false);
+  const [specializationTriggerIndex, setSpecializationTriggerIndex] = useState<number | null>(null);
+  const [lastHashHandled, setLastHashHandled] = useState<number | null>(null);
+  const [selectedSpecialization, setSelectedSpecialization] = useState<SpecializationSelection | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,7 +31,7 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
           placeholder: 'rgba(255, 255, 255, 0.6)',
           toolBg: '#393939',
           toolItemBg: '#4A4A4A',
-          ragActiveBg: '#D38B21',
+          ragActiveBg: '#EEA437',
           ragActiveStroke: '#464646',
         };
       case 'benchmark':
@@ -62,6 +64,17 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
   const colors = getColors();
   const active = input.trim().length > 0;
 
+  useEffect(() => {
+    if (!selectedSpecialization) {
+      return;
+    }
+
+    const token = selectedSpecialization.token.toLowerCase();
+    if (!input.toLowerCase().includes(token)) {
+      setSelectedSpecialization(null);
+    }
+  }, [input, selectedSpecialization]);
+
   const handleRagClick = () => {
     navigate('/rag');
   };
@@ -78,37 +91,69 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
     const value = e.target.value;
     setInput(value);
 
-    // Detect if # exists in the input and show dropdown
-    if (value.includes('#')) {
-      if (inputRef.current) {
-        const rect = inputRef.current.getBoundingClientRect();
-        setDropdownPosition({
-          top: rect.bottom + 5,
-          left: rect.left,
-        });
+    const lastHashIndex = value.lastIndexOf('#');
+
+    if (lastHashIndex !== -1) {
+      setSpecializationTriggerIndex(lastHashIndex);
+      if (lastHashHandled !== lastHashIndex) {
+        setIsSpecializationPopupOpen(true);
+        setLastHashHandled(lastHashIndex);
       }
-      setShowCompanyDropdown(true);
     } else {
-      // Close dropdown if # is removed
-      setShowCompanyDropdown(false);
+      if (isSpecializationPopupOpen) {
+        setIsSpecializationPopupOpen(false);
+      }
+      if (specializationTriggerIndex !== null) {
+        setSpecializationTriggerIndex(null);
+      }
+      if (lastHashHandled !== null) {
+        setLastHashHandled(null);
+      }
     }
   };
 
-  const handleCompanySelect = (company: string) => {
-    // Find the last # and replace it with the company name
-    const lastHashIndex = input.lastIndexOf('#');
-    if (lastHashIndex !== -1) {
-      const newInput = input.substring(0, lastHashIndex) + company + input.substring(lastHashIndex + 1);
-      setInput(newInput);
+  const handleSpecializationSelect = (selection: SpecializationSelection) => {
+    const triggerIndex =
+      specializationTriggerIndex !== null ? specializationTriggerIndex : input.lastIndexOf('#');
+
+    if (triggerIndex === -1) {
+      setIsSpecializationPopupOpen(false);
+      setSpecializationTriggerIndex(null);
+      setLastHashHandled(null);
+      return;
     }
-    setShowCompanyDropdown(false);
-    inputRef.current?.focus();
+
+    const before = input.slice(0, triggerIndex);
+    const after = input.slice(triggerIndex + 1);
+    const baseToken = selection.token.toLowerCase();
+    const needsLeadingSpace = before.length > 0 && !/\s$/.test(before);
+    const needsTrailingSpace = after.length > 0 && !/^\s/.test(after);
+    const tokenWithSpacing = `${needsLeadingSpace ? ' ' : ''}${baseToken}${needsTrailingSpace ? ' ' : ''}`;
+    const nextValue = `${before}${tokenWithSpacing}${after}`;
+
+    setInput(nextValue);
+    setSelectedSpecialization(selection);
+    setIsSpecializationPopupOpen(false);
+    setSpecializationTriggerIndex(null);
+    setLastHashHandled(null);
+
+    requestAnimationFrame(() => {
+      if (inputRef.current) {
+        const caretPosition = before.length + tokenWithSpacing.length;
+        inputRef.current.focus();
+        inputRef.current.setSelectionRange(caretPosition, caretPosition);
+      }
+    });
   };
 
   const handleSend = () => {
     if (!active) return;
     onSend?.(input.trim());
     setInput('');
+    setSelectedSpecialization(null);
+    setSpecializationTriggerIndex(null);
+    setLastHashHandled(null);
+    setIsSpecializationPopupOpen(false);
   };
 
   return (
@@ -145,7 +190,7 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
         onKeyDown={(e) => {
           if (e.key === 'Enter') handleSend();
         }}
-        placeholder={variant === 'benchmark' ? 'Alright genius, spit out...' : 'Type # to select company...'}
+  placeholder={variant === 'benchmark' ? 'Alright genius, spit out...' : 'Type # to select specialization...'}
         className="absolute left-[60px] top-[17px] bg-transparent outline-none text-[14px] font-normal w-[calc(100%-120px)]"
         style={{ color: colors.text, opacity: input ? 1 : 0.6 }}
       />
@@ -204,16 +249,16 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
         className="absolute left-5 top-[63px] w-[155px] h-10 rounded-[5px] flex items-center gap-1 px-2"
         style={{
           background: colors.toolBg,
-          boxShadow: '0 1px 4px 0 rgba(0, 0, 0, 0.10)',
+          boxShadow: '0px 1px 4px 0px rgba(0, 0, 0, 0.1)',
         }}
       >
         {/* Deep Research Icon */}
         <button
           disabled
-          className="w-[38px] h-[31px] rounded-md flex items-center justify-center transition-all duration-200 ease-out active:scale-95 opacity-50 cursor-not-allowed"
+          className="w-[38px] h-[31px] rounded-[6px] flex items-center justify-center transition-all duration-200 ease-out active:scale-95 opacity-50 cursor-not-allowed"
           style={{
             background: colors.toolItemBg,
-            boxShadow: '0 0 4px 0 rgba(0, 0, 0, 0.15)',
+            boxShadow: '0px 0px 4px 0px rgba(0, 0, 0, 0.15)',
           }}
         >
           <svg
@@ -269,10 +314,10 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
         {/* RAG Icon */}
         <button
           onClick={handleRagClick}
-          className="w-[38px] h-[31px] rounded-md flex items-center justify-center transition-all duration-200 ease-out active:scale-95"
+          className="w-[38px] h-[31px] rounded-[6px] flex items-center justify-center transition-all duration-200 ease-out active:scale-95"
           style={{
             background: ragMode && variant === 'rag' ? colors.ragActiveBg : colors.toolItemBg,
-            boxShadow: '0 0 4px 0 rgba(0, 0, 0, 0.15)',
+            boxShadow: '0px 0px 4px 0px rgba(0, 0, 0, 0.15)',
           }}
         >
           {/* svg omitted for brevity - unchanged */}
@@ -362,10 +407,10 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
         {/* Whisper Icon */}
         <button
           disabled
-          className="w-[38px] h-[31px] rounded-md flex items-center justify-center transition-all duration-200 ease-out active:scale-95 opacity-50 cursor-not-allowed"
+          className="w-[38px] h-[31px] rounded-[6px] flex items-center justify-center transition-all duration-200 ease-out active:scale-95 opacity-50 cursor-not-allowed"
           style={{
             background: colors.toolItemBg,
-            boxShadow: '0 0 4px 0 rgba(0, 0, 0, 0.15)',
+            boxShadow: '0px 0px 4px 0px rgba(0, 0, 0, 0.15)',
           }}
         >
           <svg
@@ -474,15 +519,18 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
         </svg>
       )}
 
-      {/* Company Dropdown */}
-      {showCompanyDropdown && (
-        <CompanyDropdown
-          variant={variant}
-          position={dropdownPosition}
-          onSelect={handleCompanySelect}
-          onClose={() => setShowCompanyDropdown(false)}
-        />
-      )}
+      <SpecializationPopup
+        isOpen={isSpecializationPopupOpen}
+        variant={variant}
+        currentSelection={selectedSpecialization?.id ?? null}
+        onSelect={handleSpecializationSelect}
+        onClose={() => {
+          setIsSpecializationPopupOpen(false);
+          if (specializationTriggerIndex !== null) {
+            setLastHashHandled(specializationTriggerIndex);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -28,6 +28,7 @@ from .sql_tool import run_sql_query
 from .chat_api import include_chat_router
 from .chat_service import chat_service
 from .workflow_api import include_workflow_router
+from .api.industry_hierarchy import router as industry_hierarchy_router
 
 app = FastAPI(title="JD-Copilot API", version="1.0.0")
 
@@ -48,6 +49,9 @@ include_chat_router(app)
 
 # Include workflow router for durable workflow features
 include_workflow_router(app)
+
+# Include industry hierarchy router for > trigger UI
+app.include_router(industry_hierarchy_router)
 
 # Simple LLM router system (no more complex agents)
 # The route_query function handles all query processing

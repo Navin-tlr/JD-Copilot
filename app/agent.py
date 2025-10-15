@@ -17,31 +17,16 @@ from .database import PlacementDatabase
 from .rag import retrieve_snippets, synthesize_answer, get_pinecone_index
 from .prompts import assemble_prompt, get_banned_patterns
 
-# LlamaIndex imports for intelligent Text-to-SQL
-try:
-    from llama_index.core.llms import CustomLLM, CompletionResponse, LLMMetadata
-    from llama_index.core.llms.callbacks import llm_completion_callback
-    from llama_index.core import SQLDatabase, Settings
-    from llama_index.core.query_engine import NLSQLTableQueryEngine
-    from llama_index.core.embeddings import BaseEmbedding
-    from sqlalchemy import create_engine
-    
-    # Disable default tokenization to avoid tiktoken dependency
-    Settings.tokenizer = None
-    
-    LLAMA_INDEX_AVAILABLE = True
-    print("✅ LlamaIndex core components loaded successfully")
-except ImportError as e:
-    print(f"⚠️ LlamaIndex not available: {e}")
-    LLAMA_INDEX_AVAILABLE = False
-    # Create dummy classes for type hints
-    class CustomLLM: pass
-    class CompletionResponse: pass
-    class LLMMetadata: pass
-    class SQLDatabase: pass
-    class NLSQLTableQueryEngine: pass
-    class HuggingFaceEmbedding: pass
-    class MockEmbedding: pass
+# LlamaIndex imports for intelligent Text-to-SQL (required)
+from llama_index.core.llms import CustomLLM, CompletionResponse, LLMMetadata
+from llama_index.core.llms.callbacks import llm_completion_callback
+from llama_index.core import SQLDatabase, Settings
+from llama_index.core.query_engine import NLSQLTableQueryEngine
+from llama_index.core.embeddings import BaseEmbedding
+from sqlalchemy import create_engine
+
+# Disable default tokenization to avoid tiktoken dependency
+Settings.tokenizer = None
 
 class OpenRouterLLM(CustomLLM):
     """
@@ -142,7 +127,7 @@ def get_sql_query_engine():
 
     init_start = None
     init_duration = 0.0
-    if _sql_query_engine is None and LLAMA_INDEX_AVAILABLE:
+    if _sql_query_engine is None:
         init_start = time.perf_counter()
         try:
             from sqlalchemy import create_engine

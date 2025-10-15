@@ -4,6 +4,7 @@ from fastapi.websockets import WebSocket, WebSocketDisconnect
 import json
 from typing import Dict, List
 from .chat_service import chat_service, ChatMessage, ChatSession
+from .agents.orchestrator import agent_orchestrator
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -101,6 +102,38 @@ async def send_message(data: dict = Body(...)):
         )
         
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/agent")
+async def send_message_agent(data: dict = Body(...)):
+    """
+    Send a message via Agent Pipeline (NEW).
+    This uses the multi-agent system with intent classification, planning, etc.
+    """
+    try:
+        session_id = data.get("session_id", "default-session")
+        content = data.get("content")
+        user_id = data.get("user_id", "student-123")
+        
+        if not content:
+            raise HTTPException(status_code=400, detail="content is required")
+        
+        # Process through agent pipeline
+        result = await agent_orchestrator.process_query(
+            query=content,
+            session_id=session_id,
+            user_id=user_id
+        )
+        
+        return {
+            "response": result['response'],
+            "metadata": result.get('metadata', {}),
+            "session_id": session_id
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 def include_chat_router(app):

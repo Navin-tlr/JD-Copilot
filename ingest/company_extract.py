@@ -65,9 +65,9 @@ def extract_company_raw(text: str) -> Optional[str]:
     if not api_key:
         return None
 
-    # LangExtract expects IDs like 'gemini-2.5-pro' (no 'models/' prefix)
-    configured = (os.getenv("GEMINI_MODEL") or "gemini-2.5-pro").replace("models/", "")
-    candidates = [configured, "gemini-2.5-flash"]
+    # LangExtract expects IDs like 'gemini-2.5-flash' (no 'models/' prefix)
+    configured = (os.getenv("GEMINI_MODEL") or "gemini-2.5-flash").replace("models/", "")
+    candidates = [configured]
     examples = _few_shot_examples()
 
     prompts = [SYSTEM_PROMPT, SIMPLE_PROMPT]

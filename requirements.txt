@@ -37,6 +37,7 @@ sqlglot>=24.0.0
 
 langchain
 langchain-openai
+openai>=1.40.0
 langchainhub
 langchain-community
 tiktoken

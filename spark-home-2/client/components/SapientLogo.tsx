@@ -7,8 +7,8 @@ export default function SapientLogo({ variant = 'default' }: SapientLogoProps) {
     switch (variant) {
       case 'rag':
         return {
-          asterisk: '#C9C8C8',
-          text: 'rgba(246, 159, 28, 0.8)',
+          asterisk: 'rgba(246, 159, 28, 0.8)',
+          text: '#c1c1c1',
         };
       case 'benchmark':
         return {
@@ -57,10 +57,13 @@ export default function SapientLogo({ variant = 'default' }: SapientLogoProps) {
         />
       </svg>
       <span
-        className="text-[11px] font-normal"
-        style={{ color: colors.text }}
+        className="text-[13.94px] font-normal"
+        style={{ 
+          color: colors.text,
+          fontFamily: 'Hack, monospace'
+        }}
       >
-        Copilot
+        Sapient
       </span>
     </div>
   );
