@@ -10,12 +10,16 @@ import requests
 import time
 import re
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple, AsyncIterator
+from typing import Any, Dict, List, Optional, Tuple, AsyncIterator, TypedDict
 
 from .config import get_settings
 from .database import PlacementDatabase
 from .rag import retrieve_snippets, synthesize_answer, get_pinecone_index
 from .prompts import assemble_prompt, get_banned_patterns
+
+# LangChain / LangGraph imports for adaptive workflow
+from langchain.tools import tool
+from langgraph.graph import StateGraph, END
 
 # LlamaIndex imports for intelligent Text-to-SQL (required)
 from llama_index.core.llms import CustomLLM, CompletionResponse, LLMMetadata
@@ -113,6 +117,526 @@ class OpenRouterLLM(CustomLLM):
     def stream_complete(self, prompt: str, **kwargs: Any):
         response = self.complete(prompt, **kwargs)
         yield response
+
+# ========= Adaptive Agentic Workflow (LangGraph) =========
+
+class AgentState(TypedDict):
+    # Inputs
+    original_query: str
+    conversation_history: List[str]
+    session_id: str
+
+    # Triage
+    intent: str
+    entities: Dict[str, Any]
+    complexity_score: int  # 0-10
+
+    # Plan
+    execution_plan: Optional[List[Dict[str, Any]]]
+
+    # Retrieval
+    retrieved_data: Optional[Dict[str, Any]]
+    data_source: Optional[str]
+    tool_request: Optional[Dict[str, Any]]
+    tool_query: Optional[str]
+
+    # Loops
+    feedback_message: Optional[str]
+    fallbacks_tried: int
+
+    # Output
+    final_response: str
+
+
+# ---- Tools ----
+
+@tool("sql_tool")
+def sql_tool(query: str, specialization: Optional[str] = None, company: Optional[str] = None) -> Dict[str, Any]:
+    """Query the SQLite placement database. If specialization is provided, MUST filter roles.specialization.
+    Returns a dict with keys: result_type ('count'|'list'|'raw'), rows (list), info (str).
+    """
+    db = PlacementDatabase()
+    try:
+        if query.lower().startswith("count_companies"):
+            if specialization:
+                rows = db.get_companies_by_specialization(specialization, batch_year=None)
+                unique = sorted({(r.get('company_name') or '').strip() for r in rows if (r.get('company_name') or '').strip()})
+                return {"result_type": "count", "rows": unique, "count": len(unique), "info": f"SQL companies by specialization={specialization}"}
+            else:
+                # Count ALL companies (no specialization filter)
+                all_companies = db.get_companies()
+                unique = sorted({(r.get('company_name') or '').strip() for r in all_companies if (r.get('company_name') or '').strip()})
+                return {"result_type": "count", "rows": unique, "count": len(unique), "info": "SQL total companies count"}
+        
+        if query.lower().startswith("list_companies"):
+            if specialization:
+                rows = db.get_companies_by_specialization(specialization, batch_year=None)
+                unique = sorted({(r.get('company_name') or '').strip() for r in rows if (r.get('company_name') or '').strip()})
+                return {"result_type": "list", "rows": unique, "count": len(unique), "info": f"SQL list by specialization={specialization}"}
+            else:
+                # List ALL companies
+                all_companies = db.get_companies()
+                unique = sorted({(r.get('company_name') or '').strip() for r in all_companies if (r.get('company_name') or '').strip()})
+                return {"result_type": "list", "rows": unique, "count": len(unique), "info": "SQL all companies list"}
+        
+        if query.lower().startswith("company_roles") and company:
+            rows = db.get_company_roles(company)
+            return {"result_type": "raw", "rows": rows, "info": f"SQL roles for company={company}"}
+        
+        # Generic stats fallback
+        stats = db.get_basic_stats()
+        return {"result_type": "raw", "rows": [stats], "info": "SQL basic stats"}
+    except Exception as e:
+        return {"error": str(e), "result_type": "error", "rows": []}
+
+
+@tool("vector_tool")
+def vector_tool(question: str, top_k: int = 30) -> Dict[str, Any]:
+    """Deep-dive semantic retrieval from Pinecone-backed index. Returns snippets and synthesized answer."""
+    try:
+        snippets = retrieve_snippets(question, top_k=top_k, filters={})
+        answer = synthesize_answer(question, snippets, {}) if snippets else None
+        return {"result_type": "rag", "snippets": snippets, "answer": answer}
+    except Exception as e:
+        return {"error": str(e), "result_type": "error"}
+
+
+# ---- Nodes ----
+
+def _extract_hashtag_specialization(q: str) -> Optional[str]:
+    m = re.search(r"#([a-z][a-z0-9_\- ]{1,40})", q.lower())
+    if not m:
+        return None
+    token = m.group(1).strip()
+    # Map token to canonical DB value without hardcoding large tables; keep minimal cases we know exist
+    if token in {"finance"}:
+        return "FINANCE"
+    if token in {"marketing"}:
+        return "MARKETING"
+    if token in {"hr", "human resources"}:
+        return "HR"
+    if token in {"operations", "ops"}:
+        return "LEAN OPERATION AND SYSTEMS"
+    if token in {"analytics", "business analytics"}:
+        return "BUSINESS ANALYTICS"
+    if token in {"strategy"}:
+        return "STRATEGY"
+    if token in {"it", "technology"}:
+        return "IT"
+    return token.upper()
+
+
+def triage_agent(state: AgentState) -> dict:
+    """
+    UPGRADED TRIAGE AGENT with ChatGPT-style contextual resolution.
+    
+    This is a TWO-STEP process:
+    1. CONTEXT RESOLUTION: Use LLM to rewrite query based on conversation history
+    2. INTENT CLASSIFICATION: Classify the resolved query
+    """
+    original_query = state.get("original_query", "")
+    history = state.get("conversation_history", []) or []
+
+    # ============================================================
+    # STEP 1: CONTEXTUAL RESOLUTION (The "ChatGPT" part)
+    # ============================================================
+    # Use LLM to resolve context from conversation history
+    resolved_query = original_query  # Default: no change
+    
+    if history and len(history) > 0:
+        # Build conversation context
+        history_text = "\n".join([f"- {msg}" for msg in history[-3:]])  # Last 3 messages
+        
+        context_prompt = f"""You are a query resolution assistant. Given a conversation history and a new user query,
+rewrite the user query to be a standalone, fully resolved question.
+
+Rules:
+1. If the query is already standalone (e.g., "how many companies for #hr"), return it as-is
+2. If the query is a follow-up (e.g., "count", "I need counts"), integrate the previous context
+3. If the previous AI response asked for clarification and user responds, interpret their intent
+4. Preserve hashtags and specific terms from the original query
+
+Examples:
+
+History:
+- How many companies for #finance?
+- AI: I found 15 companies for finance.
+New Query: What about #hr?
+Resolved Query: How many companies for #hr?
+
+History:
+- AI: I'm ready to help. Could you clarify if you want counts or a list?
+New Query: COUNT
+Resolved Query: How many companies came for placements?
+
+History:
+- AI: I'm ready to help. Could you clarify if you want counts or a list?
+New Query: I need counts
+Resolved Query: How many companies came for placements?
+
+---
+Recent History:
+{history_text}
+
+New Query: {original_query}
+
+Resolved Query (return ONLY the resolved query, no explanation):"""
+
+        # Synchronous LLM call using GeminiClient directly
+        try:
+            from .llm_client import get_gemini_client
+            
+            client = get_gemini_client()
+            messages = [{"role": "user", "content": context_prompt}]
+            
+            resolved_query = client.chat(
+                messages,
+                max_tokens=200,
+                temperature=0.2
+            )
+            
+            resolved_query = resolved_query.strip()
+            
+            # Log the resolution
+            if resolved_query.lower() != original_query.lower():
+                print(f"🔄 Contextual resolution: '{original_query}' → '{resolved_query}'")
+            else:
+                print(f"✓ Query already standalone: '{original_query}'")
+                
+        except Exception as e:
+            print(f"⚠️ Context resolution failed: {e}. Using original query.")
+            resolved_query = original_query
+    else:
+        print(f"✓ No history, using query as-is: '{original_query}'")
+
+    # ============================================================
+    # STEP 2: INTENT CLASSIFICATION (The "Manus" part)
+    # ============================================================
+    # Now classify the RESOLVED query, not the original
+    q = resolved_query
+    
+    # Detect hashtag specialization as explicit constraint
+    spec = _extract_hashtag_specialization(q)
+
+    # Detect simple intents
+    lower = q.lower()
+    is_count = any(p in lower for p in ["how many", "count", "number of"]) and ("company" in lower or "companies" in lower)
+
+    intent = "general"
+    if is_count and spec:
+        intent = "count_companies"
+    elif is_count:  # NEW: Handle count without specialization
+        intent = "count_companies"
+    elif spec:
+        intent = "list_companies"
+    else:
+        # fallback heuristic
+        intent = "general" if len(q) < 25 else "hybrid"
+
+    # Complexity scoring
+    complexity = 1
+    if any(k in lower for k in ["compare", "versus", "vs", "difference", "trend", "analyze", "why"]):
+        complexity = 5
+    if len(q) > 140:
+        complexity = max(complexity, 4)
+
+    entities = {"specialization": spec} if spec else {}
+
+    # IMPORTANT: Update state with resolved query for downstream agents
+    return {
+        "original_query": resolved_query,  # Overwrite with resolved query
+        "intent": intent,
+        "entities": entities,
+        "complexity_score": complexity
+    }
+
+
+def planning_agent(state: AgentState) -> dict:
+    intent = state.get("intent")
+    entities = state.get("entities", {})
+    plan: List[Dict[str, Any]] = []
+
+    if intent == "count_companies":
+        # Handle both with and without specialization
+        if entities.get("specialization"):
+            plan = [{"tool": "sql_tool", "args": {"query": "count_companies", "specialization": entities["specialization"]}}]
+        else:
+            # Count ALL companies
+            plan = [{"tool": "sql_tool", "args": {"query": "count_companies"}}]
+    elif intent == "list_companies":
+        if entities.get("specialization"):
+            plan = [{"tool": "sql_tool", "args": {"query": "list_companies", "specialization": entities["specialization"]}}]
+        else:
+            # List ALL companies
+            plan = [{"tool": "sql_tool", "args": {"query": "list_companies"}}]
+    else:
+        # Default simple plan: try SQL stats
+        plan = [{"tool": "sql_tool", "args": {"query": "stats"}}]
+
+    return {"execution_plan": plan}
+
+
+def tool_input_agent(state: AgentState) -> dict:
+    """Translate the current plan into a concrete tool invocation payload."""
+
+    plan = state.get("execution_plan") or []
+    intent = state.get("intent")
+    entities = state.get("entities", {}) or {}
+
+    tool_name: str
+    tool_kwargs: Dict[str, Any]
+
+    if plan:
+        step = plan[0]
+        tool_name = step.get("tool", "sql_tool")
+        tool_kwargs = dict(step.get("args", {}) or {})
+    else:
+        # Fallback to deterministic routing if no plan exists
+        if intent == "count_companies":
+            tool_name = "sql_tool"
+            if entities.get("specialization"):
+                tool_kwargs = {
+                    "query": "count_companies",
+                    "specialization": entities["specialization"],
+                }
+            else:
+                tool_kwargs = {"query": "count_companies"}
+        elif intent == "list_companies":
+            tool_name = "sql_tool"
+            if entities.get("specialization"):
+                tool_kwargs = {
+                    "query": "list_companies",
+                    "specialization": entities["specialization"],
+                }
+            else:
+                tool_kwargs = {"query": "list_companies"}
+        else:
+            tool_name = "sql_tool"
+            tool_kwargs = {"query": "stats"}
+
+    # Ensure specialization is propagated when the intent makes it explicit
+    spec = entities.get("specialization")
+    if tool_name == "sql_tool" and spec and "specialization" not in tool_kwargs:
+        tool_kwargs["specialization"] = spec
+
+    # Construct a natural language representation for downstream tools when needed
+    tool_query = state.get("original_query", "")
+    if tool_name == "sql_tool":
+        query_type = tool_kwargs.get("query", "")
+        spec_display = None
+        if spec:
+            spec_display = spec.replace("_", " ").title()
+        if query_type == "count_companies" and spec:
+            label = spec_display or spec
+            tool_query = f"How many companies are hiring for the {label} specialization?"
+        elif query_type == "list_companies" and spec:
+            label = spec_display or spec
+            tool_query = f"Which companies recruited for the {label} specialization?"
+        elif query_type == "company_roles" and tool_kwargs.get("company"):
+            company = tool_kwargs.get("company")
+            tool_query = f"What roles did {company} offer during placements?"
+    elif tool_name == "vector_tool":
+        tool_query = state.get("original_query", "")
+        tool_kwargs.setdefault("top_k", 40)
+
+    return {
+        "tool_request": {"name": tool_name, "kwargs": tool_kwargs},
+        "tool_query": tool_query,
+    }
+
+
+def retrieval_agent(state: AgentState) -> dict:
+    tool_request = state.get("tool_request") or {}
+    tool_name = tool_request.get("name")
+    tool_kwargs = dict(tool_request.get("kwargs") or {})
+    tool_query = state.get("tool_query") or state.get("original_query", "")
+
+    # Defensive fallback if no explicit tool was resolved
+    if not tool_name:
+        intent = state.get("intent")
+        entities = state.get("entities", {}) or {}
+        if intent == "count_companies":
+            tool_name = "sql_tool"
+            if entities.get("specialization"):
+                tool_kwargs = {
+                    "query": "count_companies",
+                    "specialization": entities["specialization"],
+                }
+            else:
+                tool_kwargs = {"query": "count_companies"}
+        else:
+            tool_name = "sql_tool"
+            tool_kwargs = {"query": "stats"}
+
+    if tool_name == "sql_tool":
+        try:
+            out = sql_tool.func(**tool_kwargs)
+        except Exception as exc:
+            out = {"error": str(exc), "result_type": "error", "rows": []}
+        return {"retrieved_data": out, "data_source": "SQL"}
+
+    if tool_name == "vector_tool":
+        try:
+            top_k = int(tool_kwargs.get("top_k", 40))
+        except (TypeError, ValueError):
+            top_k = 40
+        try:
+            out = vector_tool.func(tool_query, top_k=top_k)
+        except Exception as exc:
+            out = {"error": str(exc), "result_type": "error"}
+        return {"retrieved_data": out, "data_source": "Vector"}
+
+    return {
+        "retrieved_data": {"error": f"Unknown tool {tool_name}"},
+        "data_source": "Unknown",
+    }
+
+
+def reflection_agent(state: AgentState) -> dict:
+    data = state.get("retrieved_data") or {}
+    tried = int(state.get("fallbacks_tried") or 0)
+    # If SQL returned empty or error, escalate to vector
+    should_escalate = False
+    if isinstance(data, dict):
+        if data.get("result_type") in {"count", "list"} and data.get("count", 0) == 0:
+            should_escalate = True
+        if data.get("result_type") == "error":
+            should_escalate = True
+    if should_escalate and tried == 0:
+        return {
+            "execution_plan": [{"tool": "vector_tool", "args": {}}],
+            "tool_request": None,
+            "tool_query": None,
+            "retrieved_data": None,
+            "data_source": None,
+            "fallbacks_tried": tried + 1,
+            "feedback_message": "SQL returned no/poor data. Escalating to deep-dive vector search."
+        }
+    return {}
+
+
+def synthesis_agent(state: AgentState) -> dict:
+    data = state.get("retrieved_data") or {}
+    source = state.get("data_source") or "Unknown"
+    entities = state.get("entities", {})
+    intent = state.get("intent")
+    q = state.get("original_query", "")
+
+    spec = entities.get("specialization")
+
+    # SQL success - counts/lists
+    if data.get("result_type") == "count":
+        cnt = data.get("count", 0)
+        names = data.get("rows", [])
+        if spec:
+            base = f"I found **{cnt} companies** for the **{spec}** specialization."
+        else:
+            base = f"I found **{cnt} companies** that came for placements."
+        
+        # Show a sample of companies if available
+        if cnt and names:
+            if cnt <= 10:
+                base += f"\n\n**Companies:** {', '.join(names)}"
+            else:
+                base += f"\n\n**Sample Companies:** {', '.join(names[:10])}"
+                if cnt > 10:
+                    base += f" (and {cnt - 10} more)"
+        
+        return {"final_response": base + f"\n\n> Source: {source}"}
+
+    if data.get("result_type") == "list":
+        names = data.get("rows", [])
+        if spec:
+            base = f"Companies for {spec}: {', '.join(names) if names else 'None'}"
+        else:
+            base = f"Companies: {', '.join(names) if names else 'None'}"
+        return {"final_response": base + f"\n\n> Source: {source}"}
+
+    # Vector fallback
+    if data.get("result_type") == "rag":
+        ans = data.get("answer")
+        if ans:
+            return {"final_response": ans + f"\n\n> Source: {source}"}
+        return {"final_response": "I didn't find explicit SQL matches, but I can share related JD insights if you'd like."}
+
+    # Raw or error
+    if data.get("result_type") == "error":
+        return {"final_response": f"I hit an error retrieving data: {data.get('error')}"}
+
+    return {"final_response": "I'm ready to help. Could you clarify if you want counts or a list?"}
+
+
+# Build LangGraph
+_graph: Optional[Any] = None
+
+def _build_app_graph():
+    global _graph
+    if _graph is not None:
+        return _graph
+
+    workflow = StateGraph(AgentState)
+    workflow.add_node("triage", triage_agent)
+    workflow.add_node("plan", planning_agent)
+    workflow.add_node("tool_input", tool_input_agent)
+    workflow.add_node("retrieve", retrieval_agent)
+    workflow.add_node("reflect", reflection_agent)
+    workflow.add_node("synthesize", synthesis_agent)
+
+    workflow.set_entry_point("triage")
+
+    def should_plan(state: AgentState) -> str:
+        return "plan" if int(state.get("complexity_score") or 0) >= 4 else "tool_input"
+
+    def should_reflect(state: AgentState) -> str:
+        data = state.get("retrieved_data")
+        tried = int(state.get("fallbacks_tried") or 0)
+
+        if not data:
+            return "reflect" if tried == 0 else "synthesize"
+
+        if isinstance(data, dict):
+            result_type = data.get("result_type")
+
+            # Only escalate when count/list queries came back empty
+            if result_type in {"count", "list"} and data.get("count", 0) == 0 and tried == 0:
+                return "reflect"
+
+            # Escalate on explicit errors
+            if result_type == "error" and tried == 0:
+                return "reflect"
+
+        return "synthesize"
+
+    workflow.add_conditional_edges("triage", should_plan, {"plan": "plan", "tool_input": "tool_input"})
+    workflow.add_conditional_edges("retrieve", should_reflect, {"reflect": "reflect", "synthesize": "synthesize"})
+    workflow.add_edge("plan", "tool_input")
+    workflow.add_edge("tool_input", "retrieve")
+    workflow.add_edge("reflect", "tool_input")
+    workflow.add_edge("synthesize", END)
+
+    _graph = workflow.compile()
+    return _graph
+
+
+def run_adaptive_workflow(original_query: str, conversation_history: List[str], session_id: str) -> Dict[str, Any]:
+    app_graph = _build_app_graph()
+    initial_input: AgentState = {
+        "original_query": original_query,
+        "conversation_history": conversation_history or [],
+        "session_id": session_id,
+        "intent": "",
+        "entities": {},
+        "complexity_score": 0,
+        "execution_plan": None,
+        "retrieved_data": None,
+        "data_source": None,
+        "tool_request": None,
+        "tool_query": None,
+        "feedback_message": None,
+        "fallbacks_tried": 0,
+        "final_response": ""
+    }
+    return app_graph.invoke(initial_input)
 
 # Global query engines
 _sql_query_engine = None
@@ -1218,7 +1742,7 @@ Summary:"""
 # -------- Specialization correction guardrails --------
 
 MBA_SPECIALIZATIONS = [
-    "MARKETING", "FINANCE", "HR", "HUMAN RESOURCES", "OPERATIONS", "STRATEGY", "IT", "ANALYTICS"
+    "MARKETING", "FINANCE", "HR", "HUMAN RESOURCES", "LEAN OPERATION AND SYSTEMS", "STRATEGY", "IT", "ANALYTICS"
 ]
 
 def _extract_specialization_from_question(question: str) -> Optional[str]:
@@ -1228,7 +1752,7 @@ def _extract_specialization_from_question(question: str) -> Optional[str]:
         "finance": "FINANCE", 
         "human resources": "HR",
         "hr": "HR",
-        "operations": "OPERATIONS",
+        "operations": "LEAN OPERATION AND SYSTEMS",
         "strategy": "STRATEGY",
         "it": "IT",
         "analytics": "BUSINESS ANALYTICS",
@@ -1407,8 +1931,8 @@ def _normalize_specialization_word(word: str) -> Optional[str]:
         'marketing': 'MARKETING',
         'hr': 'HR',
         'human': 'HR',
-        'operations': 'OPERATIONS',
-        'ops': 'OPERATIONS',
+        'operations': 'LEAN OPERATION AND SYSTEMS',
+        'ops': 'LEAN OPERATION AND SYSTEMS',
         'strategy': 'STRATEGY',
         'strategic': 'STRATEGY',
         'it': 'IT',
