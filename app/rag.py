@@ -85,7 +85,10 @@ class EmbeddingBackend:
                         f"   Current GEMINI_API_KEY value: {repr(api_key)}"
                     )
 
-                genai.configure(api_key=api_key)
+                genai.configure(
+                    api_key=api_key,
+                    transport='rest'  # Use REST instead of gRPC to avoid DNS issues
+                )
                 self._client = genai
                 # Set dimension based on known Gemini embedding models
                 if "text-embedding-004" in self.model_name:
@@ -94,7 +97,7 @@ class EmbeddingBackend:
                     # Default to 768 for Gemini embedding models
                     self.dim = 768
                 self._provider = "gemini"
-                print(f"✅ Gemini embedding backend initialized: {self.model_name} (dimension={self.dim})")
+                print(f"✅ Gemini embedding backend initialized: {self.model_name} (dimension={self.dim}, transport=REST)")
                 return
             except Exception as exc:
                 raise RuntimeError(
@@ -125,23 +128,41 @@ class EmbeddingBackend:
                 print(f"⚠️ OpenAI embedding call failed ({exc}). Falling back to hashing backend.")
 
         if self._provider == "gemini" and self._client is not None:
-            try:
-                vectors = []
-                for text in texts:
-                    result = self._client.embed_content(
-                        model=f"models/{self.model_name}",
-                        content=text,
-                        task_type="retrieval_document"
-                    )
-                    vectors.append(result['embedding'])
-                return np.array(vectors, dtype=np.float32)
-            except Exception as exc:
-                raise RuntimeError(
-                    f"❌ Gemini embedding call failed: {exc}\n"
-                    f"   Model: {self.model_name}\n"
-                    f"   Texts count: {len(texts)}\n"
-                    f"   This is a hard failure - no fallback allowed."
-                ) from exc
+            import time
+            max_retries = 3
+            retry_delay = 1  # seconds
+            
+            for attempt in range(max_retries):
+                try:
+                    vectors = []
+                    for text in texts:
+                        # Set timeout configuration for Gemini API
+                        import google.generativeai as genai
+                        
+                        # Configure with timeout settings
+                        result = self._client.embed_content(
+                            model=f"models/{self.model_name}",
+                            content=text,
+                            task_type="retrieval_document",
+                            request_options={'timeout': 30}  # 30 second timeout
+                        )
+                        vectors.append(result['embedding'])
+                    return np.array(vectors, dtype=np.float32)
+                except Exception as exc:
+                    if attempt < max_retries - 1:
+                        print(f"⚠️ Gemini embedding attempt {attempt + 1} failed: {exc}. Retrying in {retry_delay}s...")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                    else:
+                        raise RuntimeError(
+                            f"❌ Gemini embedding failed after {max_retries} attempts: {exc}\n"
+                            f"   Model: {self.model_name}\n"
+                            f"   Texts count: {len(texts)}\n"
+                            f"   Please check:\n"
+                            f"   1. Network connectivity\n"
+                            f"   2. GEMINI_API_KEY is valid\n"
+                            f"   3. DNS resolution for generativelanguage.googleapis.com"
+                        ) from exc
 
         if self._model is not None:
             try:
@@ -344,7 +365,7 @@ def calculate_relevance_score(result: Dict[str, Any], question: str) -> float:
         metadata_bonus += 0.2
 
     # Specialization relevance
-    specializations = ['marketing', 'finance', 'hr', 'human resources', 'operations', 'analytics', 'strategy', 'it']
+    specializations = ['marketing', 'finance', 'hr', 'human resources', 'lean operation and systems', 'analytics', 'strategy', 'it']
     if any(spec in text for spec in specializations):
         metadata_bonus += 0.3
 
@@ -1003,20 +1024,28 @@ Remember: You're mapping the battlefield, not just analyzing one position.
     "Self-assemble the strategic scaffolding described in your system prompt and respond accordingly."
     )
 
-    # OpenRouter for synthesis (bypassing Gemini's restrictive safety filters)
-    # NOTE: OpenRouter uses OpenAI-compatible API, so messages are passed directly.
-    # This preserves 100% of the original prompt content, formatting, tone, and personality.
+    # Use Gemini for synthesis (primary LLM)
+    # Gemini handles the full prompt content with its native safety filters
     try:
-        from .openrouter_wrapper import get_openrouter_client
-        openrouter = get_openrouter_client()
+        from .llm_client import GeminiClient
+        gemini = GeminiClient()
+        
+        # Build messages in OpenAI format (GeminiClient.chat() expects this)
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": final_prompt},
+            {"role": "user", "content": final_prompt}
         ]
-        text = openrouter.chat(messages, max_tokens=3000, temperature=0.0)
+        
+        text = gemini.chat(
+            messages=messages,
+            max_tokens=3000,
+            temperature=0.0
+        )
+        
         cleaned = (text or "").strip()
         if not cleaned:
             return "The model generated an empty response. Please try rephrasing your question."
+        
         banned_patterns = get_banned_patterns()
         if any(re.search(p, cleaned) for p in banned_patterns):
             sentences = re.split(r'(?<=[.!?])\s+', cleaned)
@@ -1024,9 +1053,10 @@ Remember: You're mapping the battlefield, not just analyzing one position.
             merged = " ".join(kept).strip()
             if merged:
                 cleaned = merged
+        
         return cleaned
     except Exception as e:
-        print(f"❌ OpenRouter synthesis failed: {e}")
+        print(f"❌ Gemini synthesis failed: {e}")
         return "LLM generation failed. Please try again later."
 
 
@@ -1083,15 +1113,22 @@ def _llm_generate_sql(question: str, schema: str) -> str | None:
     settings = get_settings()
     prompt = TEXT2SQL_PROMPT.format(schema=schema, question=question)
     try:
-        from .openrouter_wrapper import get_openrouter_client
-        openrouter = get_openrouter_client()
+        from . import llm_client
+        gemini = llm_client.GeminiClient()
+        
         messages = [
             {"role": "system", "content": "You output only the SQL query or the fixed error sentence. No explanations."},
             {"role": "user", "content": prompt},
         ]
-        content = openrouter.chat(messages, max_tokens=300, temperature=0.0)
+        
+        content = gemini.chat(
+            messages=messages,
+            max_tokens=300,
+            temperature=0.0
+        )
         return (content or "").strip() if content else None
-    except Exception:
+    except Exception as e:
+        print(f"⚠️ Gemini SQL generation failed: {e}")
         return None
 
 
@@ -1118,13 +1155,14 @@ def _format_sql_result(question: str, columns: List[str], rows: List[tuple]) -> 
     if not rows:
         return "I could not find any matching results in the database."
 
-    # Ask LLM (OpenRouter) to format nicely
+    # Ask LLM (Gemini) to format nicely
     try:
-        from .openrouter_wrapper import get_openrouter_client
-        openrouter = get_openrouter_client()
+        from . import llm_client
+        gemini = llm_client.GeminiClient()
+        
         data = {"columns": columns, "rows": rows[:50]}
-        messages = [
-            {"role": "system", "content": """You are Linus Torvalds delivering a technical database analysis to MBA students.
+        
+        system_message = """You are Linus Torvalds delivering a technical database analysis to MBA students.
 
 Convert SQL results into a brutally direct, merciless, technically precise report using ONLY the provided data. You MUST incorporate bone-dry humor and merciless bluntness in EVERY RESPONSE without exception.
 
@@ -1137,16 +1175,27 @@ RULES:
 6. Bone-dry humor and merciless commentary MANDATORY in every response
 ENFORCEMENT: Include at least one instance of dry humor and merciless bluntness in each response.
 
-OUTPUT: Technical report with overwhelming evidence from the data provided."""},
-            {"role": "user", "content": (
-                f"**User Question:** {question}\n"
-                f"**SQL Results:** {json.dumps(data)}\n\n"
-                "Convert these SQL results into a clear, user-friendly answer following the guidelines above."
-            )},
+OUTPUT: Technical report with overwhelming evidence from the data provided."""
+        
+        user_message = (
+            f"**User Question:** {question}\n"
+            f"**SQL Results:** {json.dumps(data)}\n\n"
+            "Convert these SQL results into a clear, user-friendly answer following the guidelines above."
+        )
+        
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message}
         ]
-        text = openrouter.chat(messages, max_tokens=min(400, settings.MAX_OUTPUT_TOKENS), temperature=0.0)
+        
+        text = gemini.chat(
+            messages=messages,
+            max_tokens=min(400, settings.MAX_OUTPUT_TOKENS),
+            temperature=0.0
+        )
         return (text or "").strip() or "I could not find any matching results in the database."
-    except Exception:
+    except Exception as e:
+        print(f"⚠️ Gemini SQL result formatting failed: {e}")
         # Fallback: simple preview
         preview = []
         limit = min(len(rows), 10)

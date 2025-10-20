@@ -23,7 +23,7 @@ interface SpecializationPopupProps {
 const SPECIALIZATIONS: SpecializationSelection[] = [
   { 
     id: 'marketing', 
-    label: 'Marketing', 
+    label: 'MARKETING', 
     token: '#marketing',
     description: 'Brand strategy, campaigns, growth',
     color: '#F97316',
@@ -31,7 +31,7 @@ const SPECIALIZATIONS: SpecializationSelection[] = [
   },
   { 
     id: 'hr', 
-    label: 'Human Resources', 
+    label: 'HR', 
     token: '#hr',
     description: 'Talent, culture, people ops',
     color: '#10B981',
@@ -39,7 +39,7 @@ const SPECIALIZATIONS: SpecializationSelection[] = [
   },
   { 
     id: 'business-analytics', 
-    label: 'Business Analytics', 
+    label: 'BUSINESS ANALYTICS', 
     token: '#business-analytics',
     description: 'Data insights, metrics, KPIs',
     color: '#3B82F6',
@@ -47,7 +47,7 @@ const SPECIALIZATIONS: SpecializationSelection[] = [
   },
   { 
     id: 'operations', 
-    label: 'Operations', 
+    label: 'LEAN OPERATION AND SYSTEMS', 
     token: '#operations',
     description: 'Process optimization, logistics',
     color: '#8B5CF6',
@@ -55,7 +55,7 @@ const SPECIALIZATIONS: SpecializationSelection[] = [
   },
   { 
     id: 'finance', 
-    label: 'Finance', 
+    label: 'FINANCE', 
     token: '#finance',
     description: 'Financial planning, analysis',
     color: '#EC4899',

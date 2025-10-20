@@ -357,7 +357,7 @@ def _extract_specialization_from_text(text: str) -> Optional[str]:
             ('finance', 2), ('accounting', 2), ('financial', 2), ('investment', 2),
             ('budget', 2), ('revenue', 2)
         ],
-        'Operations': [
+        'LEAN OPERATION AND SYSTEMS': [
             # Strong indicators
             ('supply chain', 3), ('operations management', 3), ('logistics', 3),
             ('procurement', 3), ('inventory management', 3), ('process optimization', 3),

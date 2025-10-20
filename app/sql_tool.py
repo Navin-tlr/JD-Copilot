@@ -70,7 +70,7 @@ CANONICAL_QUERIES = {
         "query": (
             "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
             "JOIN companies c ON r.company_id = c.id "
-            "WHERE LOWER(r.specialization) = 'operations';"
+            "WHERE LOWER(r.specialization) = 'lean operation and systems';"
         ),
     },
     "list_operations_companies": {
@@ -78,7 +78,7 @@ CANONICAL_QUERIES = {
         "query": (
             "SELECT DISTINCT c.company_name FROM roles r "
             "JOIN companies c ON r.company_id = c.id "
-            "WHERE LOWER(r.specialization) = 'operations' ORDER BY c.company_name;"
+            "WHERE LOWER(r.specialization) = 'lean operation and systems' ORDER BY c.company_name;"
         ),
     },
     # Analytics

@@ -100,14 +100,14 @@ class AgentOrchestrator:
             "inside sales",
             "field sales",
         ],
-        "operations": [
+        "lean operation and systems": [
             "supply chain",
             "logistics",
             "procurement",
             "manufacturing",
         ],
         "supply chain": [
-            "operations",
+            "lean operation and systems",
             "logistics",
             "procurement",
             "inventory management",
@@ -156,7 +156,7 @@ class AgentOrchestrator:
                 "household products",
                 "food and beverages",
             },
-            "specializations": {"marketing", "operations", "general"},
+            "specializations": {"marketing", "lean operation and systems", "general"},
         },
         "consumer goods": {
             "industries": {
@@ -166,7 +166,7 @@ class AgentOrchestrator:
                 "retail consumer",
                 "d2c",
             },
-            "specializations": {"marketing", "operations", "general"},
+            "specializations": {"marketing", "lean operation and systems", "general"},
         },
         "investment banking": {
             "industries": {
@@ -213,15 +213,15 @@ class AgentOrchestrator:
             },
             "specializations": {"hr", "general"},
         },
-        "operations": {
+        "lean operation and systems": {
             "industries": {
-                "operations",
+                "lean operation and systems",
                 "supply chain",
                 "logistics",
                 "procurement",
                 "manufacturing",
             },
-            "specializations": {"operations"},
+            "specializations": {"lean operation and systems"},
         },
     }
 
@@ -668,14 +668,19 @@ class AgentOrchestrator:
                 print(f"   Filter ➕ industry_level1: {hierarchy_filter['level1']}")
             
             if hierarchy_filter.get('specialization'):
+                # Use raw specialization value directly (no normalization)
+                spec_raw = hierarchy_filter['specialization']
+                
                 base_filter['$or'] = [
-                    {'specializations': {'$in': [hierarchy_filter['specialization']]}},
+                    {'specializations': {'$in': [spec_raw]}},
                     {'is_general': True}
                 ]
-                print(f"   Filter ➕ specialization: {hierarchy_filter['specialization']} OR General")
+                print(f"   Filter ➕ specialization: {spec_raw} OR General")
         
         elif specialization and specialization_explicit:
             # ONLY add specialization filter if explicitly mentioned in query
+            # Use raw specialization value directly (no normalization)
+            
             # Add specialization filter using $or logic while preserving company constraint
             # Match if: (specialization in specializations array) OR (is_general = true)
             base_filter['$or'] = [

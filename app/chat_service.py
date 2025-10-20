@@ -140,9 +140,19 @@ class ChatService:
             entities_mentioned=self._extract_entities(content)
         )
 
-        # Generate AI response using your RAG system with enhanced context
+        # Generate AI response using adaptive agentic workflow, with orchestrator fallback
         context = await self._build_enhanced_context(session_id)
-        ai_response = await self._generate_rag_response(content, session_id, user_id, context)
+        try:
+            from .agent import run_adaptive_workflow
+            history_texts = [m['content'] for m in context.get('full_conversation_history', [])]
+            state = run_adaptive_workflow(content, history_texts, session_id)
+            ai_response = state.get('final_response') or ''
+            if not ai_response:
+                # fallback to orchestrator/legacy pipeline
+                ai_response = await self._generate_rag_response(content, session_id, user_id, context)
+        except Exception as wf_err:
+            print(f"❌ Adaptive workflow failed: {wf_err}. Falling back to legacy.")
+            ai_response = await self._generate_rag_response(content, session_id, user_id, context)
 
         # Store AI response in memory with enhanced tracking
         await memory.add_message(

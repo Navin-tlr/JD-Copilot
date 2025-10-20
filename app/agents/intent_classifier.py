@@ -282,15 +282,22 @@ class IntentClassifier:
         # Example: "how many companies for #Finance?" 
         # This prevents false matches like "FMCG" → "Finance"
         
-        explicit_specializations = [
-            'Marketing', 'Finance', 'Operations', 'Data Analytics', 
-            'HR', 'IT', 'Strategy', 'Analytics'
-        ]
+        # Map user-friendly names to DB values
+        specialization_mapping = {
+            'marketing': 'Marketing',
+            'finance': 'Finance',
+            'operations': 'LEAN OPERATION AND SYSTEMS',  # Map to DB value
+            'data analytics': 'Data Analytics',
+            'analytics': 'Analytics',
+            'hr': 'HR',
+            'it': 'IT',
+            'strategy': 'Strategy'
+        }
         
         # Check for explicit # mention (highest priority - user selected from popup)
-        for spec in explicit_specializations:
-            if f'#{spec.lower()}' in query_lower or f'# {spec.lower()}' in query_lower:
-                return spec, True
+        for user_name, db_value in specialization_mapping.items():
+            if f'#{user_name}' in query_lower or f'# {user_name}' in query_lower:
+                return db_value, True
         
         # REMOVED: Keyword-based auto-detection that caused false positives
         # Users must either:

@@ -36,6 +36,7 @@ pypdf==5.0.0
 sqlglot>=24.0.0
 
 langchain
+langgraph==0.2.26
 langchain-openai
 openai>=1.40.0
 langchainhub

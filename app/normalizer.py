@@ -62,9 +62,9 @@ DICTIONARY: Dict[str, Dict[str, str]] = {
     "finance": {"specialization": "Finance"},
     "hr": {"specialization": "HR"},
     "human resources": {"specialization": "HR"},
-    "operations": {"specialization": "Operations"},
-    "ops": {"specialization": "Operations"},
-    "supply chain": {"specialization": "Operations"},
+    "operations": {"specialization": "LEAN OPERATION AND SYSTEMS"},
+    "ops": {"specialization": "LEAN OPERATION AND SYSTEMS"},
+    "supply chain": {"specialization": "LEAN OPERATION AND SYSTEMS"},
     "analytics": {"specialization": "Analytics"},
     "business analytics": {"specialization": "Analytics"},
     "data science": {"specialization": "Analytics"},
@@ -151,7 +151,7 @@ class HybridNormalizer:
         allowed = {
             "industry": ["FMCG", "BFSI"],
             "company_type": ["B2B", "B2C"],
-            "specialization": ["Marketing", "Finance", "HR", "Operations", "Analytics", "IT", "Strategy"],
+            "specialization": ["Marketing", "Finance", "HR", "LEAN OPERATION AND SYSTEMS", "Analytics", "IT", "Strategy"],
             "role": ["Sales", "Inside Sales", "Field Sales", "Business Development"],
         }
         model = os.getenv("OPENROUTER_NORMALIZER_MODEL") or os.getenv("OPENROUTER_MODEL") or "mistralai/mistral-medium-3.1"

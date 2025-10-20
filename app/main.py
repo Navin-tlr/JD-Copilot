@@ -20,7 +20,7 @@ from datetime import datetime
 from .config import get_settings
 from .database import PlacementDatabase
 from .rag import retrieve_snippets, synthesize_answer
-from .agent import route_query, LAST_ROUTE_TYPE, get_last_timings, _is_no_data_result  # Import router and guardrail utils
+from .agent import route_query, LAST_ROUTE_TYPE, get_last_timings, _is_no_data_result, run_adaptive_workflow  # Import router and guardrail utils + adaptive workflow
 from .chat_memory import ChatMemory
 from .chat_history_store import chat_history_store
 from .enhanced_chat_memory import enhanced_memory_manager
@@ -231,7 +231,7 @@ async def query_endpoint(request: ChatRequest = Body(...)):
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: QueryRequest):
     """
-    Legacy chat endpoint that maintains backward compatibility.
+    Adaptive LangGraph-powered chat endpoint with intelligent workflow orchestration.
     """
     try:
         question = request.question.strip()
@@ -240,6 +240,7 @@ async def chat_endpoint(request: QueryRequest):
         chat_history_store.ensure_session(user_id, session_id)
         
         print(f"🤖 Processing query: {question}")
+        print(f"🚀 Using ADAPTIVE LANGGRAPH WORKFLOW")
         
         # Add user message to chat memory
         chat_memory.add_message(session_id, "user", question)
@@ -275,27 +276,59 @@ async def chat_endpoint(request: QueryRequest):
                 print("❌ Not enough messages in chat history")
                 answer = "I need the original question to perform deep-dive analysis. Please ask your question again."
         else:
-            # Use the conversational chat service to process the query with full context
-            print("🚀 Using conversational chat service for query processing")
+            # === NEW ADAPTIVE LANGGRAPH WORKFLOW ===
+            print("🎯 Invoking adaptive LangGraph workflow...")
             try:
-                ai_message = None
-                async for generated in chat_service.send_message(session_id, question, user_id):
-                    ai_message = generated
-
-                if not ai_message:
-                    raise RuntimeError("Chat service returned no response")
-
-                answer = ai_message.content
-                session_id = ai_message.session_id
-                print(f"🔍 Final answer: {answer}")
-            except Exception as router_error:
-                print(f"❌ Chat service error: {router_error}")
+                # 1. Get conversation history from chat memory
+                previous_messages = chat_memory.get_messages(session_id)
+                
+                # Extract user messages for context (convert to simple string list)
+                history_strings = []
+                for msg in previous_messages:
+                    if isinstance(msg, dict):
+                        role = msg.get("role", "")
+                        content = msg.get("content", "")
+                        if role == "user" and content:
+                            history_strings.append(content)
+                    else:
+                        # Handle object format
+                        role = getattr(msg, "role", "")
+                        content = getattr(msg, "content", "")
+                        if role == "user" and content:
+                            history_strings.append(content)
+                
+                # 2. Invoke the adaptive workflow
+                #    This runs triage → planning → tool_input → retrieve → reflect/synthesize
+                #    The workflow includes:
+                #    - triage_agent: Classifies intent and extracts entities (NO context resolution here)
+                #    - planning_agent: Creates execution plan
+                #    - tool_input_agent: Prepares tool invocation
+                #    - retrieval_agent: Executes data retrieval
+                #    - reflection_agent: Validates results and suggests fallbacks
+                #    - synthesis_agent: Generates final response
+                workflow_result = run_adaptive_workflow(
+                    original_query=question,
+                    conversation_history=history_strings,
+                    session_id=session_id
+                )
+                
+                # 3. Extract response from workflow
+                answer = workflow_result.get("final_response", "I'm sorry, I encountered an error processing your query.")
+                
+                print(f"✅ Adaptive workflow completed successfully")
+                print(f"🔍 Final answer: {answer[:100]}...")
+                
+            except Exception as workflow_error:
+                print(f"❌ Adaptive workflow error: {workflow_error}")
+                import traceback
+                traceback.print_exc()
                 return ChatResponse(
-                    answer=f"Query processing failed: {str(router_error)}. Check input syntax or system status.",
+                    answer=f"Adaptive workflow failed: {str(workflow_error)}. Please try rephrasing your question.",
                     snippets=[],
                     citations=[],
                     error=True
                 )
+            # === END ADAPTIVE WORKFLOW ===
         
         # Extract snippets from the answer if available
         snippets = []

@@ -95,11 +95,11 @@ class HierarchicalNavigationMap:
                 └── Level 2 (Beauty & Personal Care, M&A Capital Markets, etc.)
     """
     
-    # Fixed specialization taxonomy
+    # Fixed specialization taxonomy (use DB canonical values)
     VALID_SPECIALIZATIONS = {
         "Marketing",
         "Finance",
-        "Operations",
+        "LEAN OPERATION AND SYSTEMS",
         "Analytics",
         "HR",
         "General"
@@ -115,7 +115,7 @@ class HierarchicalNavigationMap:
             "Asset Management", "Portfolio Management", "Retail Banking",
             "Investment Banking", "Corporate Finance", "Wealth Management"
         ],
-        "Operations": [
+        "LEAN OPERATION AND SYSTEMS": [
             "IT & Technology", "Supply Chain", "Logistics", "Process Management",
             "Project Management", "ERP", "Manufacturing"
         ],

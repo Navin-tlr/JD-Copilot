@@ -39,7 +39,7 @@ async def get_specializations() -> Dict[str, int]:
         {
             "Marketing": 25,
             "Finance": 18,
-            "Operations": 30,
+            "LEAN OPERATION AND SYSTEMS": 30,
             ...
         }
     """
@@ -87,7 +87,7 @@ async def get_companies_by_hierarchy(
     Get companies matching hierarchy filters.
     
     Query parameters:
-        - specialization: Marketing, Finance, Operations, HR, Analytics
+        - specialization: Marketing, Finance, LEAN OPERATION AND SYSTEMS, HR, Analytics
         - level1: FMCG, Investment Banking, Supply Chain, etc.
         - level2: Partial match on Level 2 (e.g., "Beauty")
     

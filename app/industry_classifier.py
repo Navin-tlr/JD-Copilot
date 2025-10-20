@@ -44,7 +44,7 @@ class IndustryClassifier:
             "Corporate Finance",
             "Wealth Management"
         ],
-        "Operations": [
+        "LEAN OPERATION AND SYSTEMS": [
             "IT & Technology",
             "Supply Chain",
             "Logistics",
