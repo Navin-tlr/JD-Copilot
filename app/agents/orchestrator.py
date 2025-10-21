@@ -5,6 +5,8 @@ Agent Orchestrator - Coordinates all agents in the pipeline.
 import re
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
+
+from app.enhanced_chat_memory import EnhancedConversationMemory
 from .intent_classifier import intent_classifier
 from .planning_agent import planning_agent
 from .route_decider import route_decider
@@ -300,10 +302,54 @@ class AgentOrchestrator:
         print(f"Query: {query[:60]}{'...' if len(query) > 60 else ''}")
         print(f"{'='*70}\n")
         
+        memory: Optional[EnhancedConversationMemory] = None
+        resolved_query = query
+        extracted_context: Dict[str, Any] = {}
+
+        if context is None:
+            context = {}
+        else:
+            # Copy to avoid mutating caller-provided dict
+            context = dict(context)
+
         try:
+            # Stage -1: Context Resolution
+            try:
+                memory = EnhancedConversationMemory(
+                    session_id=session_id,
+                    user_id=user_id
+                )
+                resolved_output = memory.resolve_context(query)
+
+                if isinstance(resolved_output, tuple):
+                    candidate_query, extracted_context = resolved_output
+                else:
+                    candidate_query = resolved_output
+
+                candidate_query = (candidate_query or '').strip()
+                if candidate_query:
+                    resolved_query = candidate_query
+
+                if resolved_query.lower() != query.lower():
+                    print(f"🔄 Resolved contextual query → '{resolved_query}'")
+                else:
+                    print("✓ Query already contextually complete")
+
+            except Exception as resolution_error:
+                print(f"⚠️ Context resolution failed: {resolution_error}. Proceeding with original query.")
+                resolved_query = query
+                extracted_context = {}
+
+            # Merge extracted context hints (without overriding explicit inputs)
+            for key, value in (extracted_context or {}).items():
+                context.setdefault(key, value)
+
+            context['resolved_query'] = resolved_query
+            context['original_query'] = query
+
             # Stage 0: Intent Classification
             print("🎯 Stage 0: Classifying intent...")
-            intent = intent_classifier.classify(query, context=context)
+            intent = intent_classifier.classify(resolved_query, context=context)
             
             # Stage 0.5: Planning
             print(f"\n📋 Stage 0.5: Creating execution plan...")
@@ -313,10 +359,6 @@ class AgentOrchestrator:
             print(f"🚦 Stage 1: Determining route...")
             routing = route_decider.decide(intent, plan)
             print()
-            
-            # Build minimal context if not provided
-            if not context:
-                context = {}
             
             context['original_query'] = query
             context['intent'] = intent.primary_intent
@@ -328,30 +370,36 @@ class AgentOrchestrator:
             # Stage 2: Conversation Agent (if needed)
             if 'conversation' in routing.agent_pipeline:
                 print(f"📖 Stage 2: Processing conversation context...")
-                # Use existing conversation memory system
-                from app.enhanced_chat_memory import EnhancedConversationMemory
-                
-                memory = EnhancedConversationMemory(
-                    session_id=session_id,
-                    user_id=user_id
-                )
-                
-                # Resolve context - returns (resolved_query, extracted_context)
-                resolved_result = memory.resolve_context(query)
-                if isinstance(resolved_result, tuple):
-                    resolved_query, extracted_context = resolved_result
-                else:
-                    resolved_query = resolved_result
-                    extracted_context = {}
-                
-                context['resolved_query'] = resolved_query
-                
-                # Update company if found in context
+                if memory is None:
+                    memory = EnhancedConversationMemory(
+                        session_id=session_id,
+                        user_id=user_id
+                    )
+
+                if not extracted_context:
+                    try:
+                        refreshed = memory.resolve_context(query)
+                        if isinstance(refreshed, tuple):
+                            resolved_query, extracted_context = refreshed
+                        else:
+                            resolved_query = refreshed
+                            extracted_context = {}
+                        context['resolved_query'] = resolved_query
+                    except Exception as refresh_error:
+                        print(f"   ⚠️ Conversation context refresh failed: {refresh_error}")
+
+                for key, value in (extracted_context or {}).items():
+                    context.setdefault(key, value)
+
                 if not context.get('company') and memory.current_context.get('last_company'):
                     context['company'] = memory.current_context['last_company']
-                
+
                 print(f"   ✅ Resolved: {resolved_query[:60]}...")
-                print(f"   Company: {context.get('company', 'Not specified')}\n")
+                print(f"   Company: {context.get('company', 'Not specified')}")
+                if extracted_context:
+                    print(f"   Context hints: {list(extracted_context.keys())}\n")
+                else:
+                    print()
             
             # Check if navigation map validation failed (no data available)
             if plan.primary_strategy == 'suggestion_response':

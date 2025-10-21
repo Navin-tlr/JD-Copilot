@@ -152,7 +152,14 @@ class AgentState(TypedDict):
 
 @tool("sql_tool")
 def sql_tool(query: str, specialization: Optional[str] = None, company: Optional[str] = None) -> Dict[str, Any]:
-    """Query the SQLite placement database. If specialization is provided, MUST filter roles.specialization.
+    """Query the SQLite placement database.
+
+    CRITICAL RULES FOR CALLERS:
+    1. If `specialization` is provided, treat it as authoritative. Always filter `roles.specialization`
+       exactly (case-insensitive) and ignore any ambiguous phrasing in the natural-language query string.
+    2. When both `company` and `specialization` are provided, filter on both constraints.
+    3. Fall back to canonical heuristics ONLY when no specialization argument is supplied.
+
     Returns a dict with keys: result_type ('count'|'list'|'raw'), rows (list), info (str).
     """
     db = PlacementDatabase()

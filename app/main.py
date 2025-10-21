@@ -179,10 +179,6 @@ async def query_endpoint(request: ChatRequest = Body(...)):
         except Exception as e:
             print(f"Warning: Could not retrieve snippets: {e}")
         
-        # Add assistant response to chat memory
-        chat_memory.add_message(session_id, "assistant", answer)
-        _sync_history_snapshot(user_id, session_id)
-        
         print(f"✅ Query processed successfully. Answer length: {len(answer)} chars")
         
     # Heuristic: if answer suggests no data or is very short, request vector approval
@@ -233,10 +229,12 @@ async def chat_endpoint(request: QueryRequest):
     """
     Adaptive LangGraph-powered chat endpoint with intelligent workflow orchestration.
     """
+    question = request.question.strip()
+    user_id = (request.user_id or "anonymous").strip() or "anonymous"
+    session_id = request.session_id
+
     try:
-        question = request.question.strip()
-        user_id = (request.user_id or "anonymous").strip() or "anonymous"
-        session_id = await chat_service.ensure_session(request.session_id, user_id)
+        session_id = await chat_service.ensure_session(session_id, user_id)
         chat_history_store.ensure_session(user_id, session_id)
         
         print(f"🤖 Processing query: {question}")
@@ -244,7 +242,6 @@ async def chat_endpoint(request: QueryRequest):
         
         # Add user message to chat memory
         chat_memory.add_message(session_id, "user", question)
-        _sync_history_snapshot(user_id, session_id)
 
         # Check if user is consenting to deep-dive mode
         is_deep_dive_consent = _is_deep_dive_consent(question)
@@ -322,6 +319,7 @@ async def chat_endpoint(request: QueryRequest):
                 print(f"❌ Adaptive workflow error: {workflow_error}")
                 import traceback
                 traceback.print_exc()
+                _sync_history_snapshot(user_id, session_id)
                 return ChatResponse(
                     answer=f"Adaptive workflow failed: {str(workflow_error)}. Please try rephrasing your question.",
                     snippets=[],
@@ -329,6 +327,10 @@ async def chat_endpoint(request: QueryRequest):
                     error=True
                 )
             # === END ADAPTIVE WORKFLOW ===
+
+        # Immediately persist AI response so downstream agents have context
+        chat_memory.add_message(session_id, "assistant", answer)
+        _sync_history_snapshot(user_id, session_id)
         
         # Extract snippets from the answer if available
         snippets = []
@@ -399,6 +401,10 @@ async def chat_endpoint(request: QueryRequest):
         
     except Exception as e:
         # Log the error for debugging
+        try:
+            _sync_history_snapshot(user_id, session_id)
+        except Exception:
+            pass
         print(f"Processing error: {e}")
         import traceback
         traceback.print_exc()
