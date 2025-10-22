@@ -9,8 +9,12 @@ class OpenRouterWrapper:
         """
         self.api_key = os.getenv("OPENROUTER_API_KEY")
         if not self.api_key:
-            raise ValueError("OPENROUTER_API_KEY not found in .env file")
+            # Explicitly fail-fast with a helpful message. OpenRouter is optional; prefer Gemini
+            raise RuntimeError(
+                "OPENROUTER_API_KEY is not configured. OpenRouter features are optional — set OPENROUTER_API_KEY to enable, or use the Gemini client (GEMINI_API_KEY) as the primary LLM."
+            )
 
+        # Initialize HTTP client wrapper for OpenRouter-compatible endpoints
         self.client = openai.OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=self.api_key,

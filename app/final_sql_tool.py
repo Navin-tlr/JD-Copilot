@@ -15,15 +15,13 @@ def _build_llamaindex_engine():
         from sqlalchemy import create_engine
         from llama_index.core import SQLDatabase
         from llama_index.core.indices.struct_store import NLSQLTableQueryEngine
-        from llama_index.llms.openai import OpenAI
+        from .agent import GeminiLLM
     except Exception:
         return None
 
-    key = os.getenv("OPENROUTER_API_KEY")
+    key = os.getenv("GEMINI_API_KEY")
     if not key:
         return None
-    os.environ.setdefault("OPENAI_API_KEY", key)
-    os.environ.setdefault("OPENAI_API_BASE", "https://openrouter.ai/api/v1")
 
     db_path = os.getenv("DATABASE_PATH", "data/placement_data.db")
     if not os.path.exists(db_path):
@@ -33,8 +31,8 @@ def _build_llamaindex_engine():
     try:
         engine = create_engine(f"sqlite:///{db_path}")
         sql_db = SQLDatabase(engine, include_tables=["companies", "roles", "offers", "skills", "requirements"])
-        model_name = os.getenv("OPENROUTER_MODEL", "x-ai/grok-4-fast")
-        llm = OpenAI(api_key=key, model=model_name, temperature=0.0, max_tokens=800)
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        llm = GeminiLLM(api_key=key, model=model_name, temperature=0.0, max_tokens=800)
         _query_engine = NLSQLTableQueryEngine(
             sql_database=sql_db,
             tables=["companies", "roles", "offers", "skills", "requirements"],

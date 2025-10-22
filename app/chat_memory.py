@@ -186,6 +186,12 @@ class ConversationMemory:
             # Clarification requests
             r'^(what\s+do\s+you\s+mean|clarify|explain)',
             r'^(i\s+don\'t\s+understand|confused)',
+            # Ambiguous minimal follow-ups
+            r'^(list|show|give|enumerate)\s+(them|those|these)\.?$',
+            r'^(and\s+)?(for|in)\s+[a-z][\w &.\-]{2,}\??$',
+            r'^(what\s+about|how\s+about)\s+.+\??$',
+            r'^(details|more\s+details|expand|elaborate)\.?$',
+            r'^and\b.*',
         ]
         
         return any(re.search(pattern, query_lower) for pattern in contextual_patterns)
@@ -219,8 +225,75 @@ class ConversationMemory:
         # Handle comparative questions
         elif re.search(r'(compare|vs|versus)', query_lower):
             resolved_query, context_info = self._resolve_comparative_questions(query, recent_context)
+
+        # Handle ambiguous bare follow-ups like "list them", "and for finance?"
+        else:
+            resolved_query, context_info = self._resolve_ambiguous_followups(query)
         
         return resolved_query, context_info
+
+    def _resolve_ambiguous_followups(self, query: str) -> Tuple[str, Dict[str, Any]]:
+        """Rewrite ambiguous follow-ups into explicit queries using last known entities."""
+        q = query.strip()
+        q_low = q.lower()
+        info: Dict[str, Any] = {"request_type": "ambiguous_followup"}
+
+        # Pull last known signals
+        specialization = self.current_context.get('last_specialization')
+        companies = self.current_context.get('last_companies_mentioned', []) or []
+
+        # If nothing to anchor, return original
+        if not specialization and not companies:
+            info['strategy'] = 'no_context_available'
+            return query, info
+
+        # Pattern: "list them" / "show them"
+        if re.match(r'^(list|show|give|enumerate)\s+(them|those|these)\.?$', q_low):
+            if companies:
+                joined = ", ".join(companies[:10])
+                resolved = f"List details for these companies ({joined}) for {specialization + ' ' if specialization else ''}roles"
+                info.update({'companies': companies[:10], 'specialization': specialization, 'strategy': 'list_them_expand'})
+                return resolved, info
+            if specialization:
+                resolved = f"List companies that recruited for {specialization} roles"
+                info.update({'specialization': specialization, 'strategy': 'list_companies_for_spec'})
+                return resolved, info
+
+        # Pattern: "and for finance?" or "and in Bangalore?"
+        m_for = re.match(r'^(?:and\s+)?for\s+([a-z][\w &.\-]{2,})\??$', q_low)
+        m_in = re.match(r'^(?:and\s+)?in\s+([a-z][\w &.\-]{2,})\??$', q_low)
+        if m_for:
+            hint = m_for.group(1)
+            # treat as specialization pivot by default
+            resolved = f"How many companies recruited for {hint} roles?"
+            info.update({'pivot': 'specialization', 'to': hint})
+            return resolved, info
+        if m_in:
+            loc = m_in.group(1)
+            base = f"List companies"
+            if specialization:
+                base += f" hiring for {specialization} roles"
+            resolved = f"{base} in {loc}"
+            info.update({'pivot': 'location', 'to': loc})
+            return resolved, info
+
+        # Pattern: "what about X?" — prefer specialization pivot
+        m_what = re.match(r'^(?:what|how)\s+about\s+(.+?)\??$', q_low)
+        if m_what:
+            hint = m_what.group(1).strip()
+            resolved = f"Provide details for {hint} roles"
+            info.update({'pivot': 'hint', 'to': hint})
+            return resolved, info
+
+        # Fallback: if we have a specialization and the user asked something terse starting with 'and'
+        if q_low.startswith('and') and specialization:
+            resolved = f"Also, list companies that recruited for {specialization} roles"
+            info.update({'strategy': 'and_prefix_spec'})
+            return resolved, info
+
+        # Default no-op
+        info['strategy'] = 'fallback_no_rewrite'
+        return query, info
 
     def _resolve_direct_references(self, query: str, context: str) -> Tuple[str, Dict[str, Any]]:
         """Resolve direct references like 'that', 'this', 'it'"""

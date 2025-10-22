@@ -32,6 +32,87 @@ from sqlalchemy import create_engine
 # Disable default tokenization to avoid tiktoken dependency
 Settings.tokenizer = None
 
+class GeminiLLM(CustomLLM):
+    """
+    Gemini wrapper for LlamaIndex that replaces OpenAI wrapper in SQL tools.
+    Uses the existing GeminiClient for consistent integration.
+    """
+    model: str
+    api_key: str
+    temperature: float = 0.1
+    max_tokens: int = 512
+
+    @property
+    def metadata(self) -> LLMMetadata:
+        return LLMMetadata(
+            context_window=8192,
+            num_output=self.max_tokens,
+            model_name=self.model,
+            tokenizer=None,
+        )
+
+    def _is_sql_prompt(self, prompt: str) -> bool:
+        p = prompt.lower()
+        # Heuristic: LlamaIndex Text-to-SQL prompt contains per-table column summaries
+        return ("table 'roles' has columns" in p and "table 'companies' has columns" in p) or "write a sql" in p
+
+    def _sql_guardrails(self) -> str:
+        # Use local schema context and hard rules to avoid column confusion
+        try:
+            ctx = get_table_context_for_engine()
+        except Exception:
+            ctx = ""
+        rules = (
+            "You are generating SQL over the given schema.\n"
+            "Rules:\n"
+            "1) Map MBA domains like Marketing, Finance, HR, Operations, Analytics to roles.specialization (NOT companies.industry).\n"
+            "2) To count companies for a specialization, JOIN roles to companies and COUNT(DISTINCT companies.id).\n"
+            "3) Prefer explicit qualified columns (table.column).\n"
+            "4) Do not infer new columns; only use listed schema.\n\n"
+            "Examples:\n"
+            "- Q: How many companies came for Marketing?\n"
+            "  SQL: SELECT COUNT(DISTINCT c.id) FROM companies c JOIN roles r ON r.company_id = c.id WHERE r.specialization = 'Marketing';\n"
+            "- Q: List companies that recruited for Finance\n"
+            "  SQL: SELECT DISTINCT c.company_name FROM companies c JOIN roles r ON r.company_id = c.id WHERE r.specialization = 'Finance';\n"
+        )
+        return f"{ctx}\n\n{rules}"
+
+    @llm_completion_callback()
+    def complete(self, prompt: str, **kwargs: Any) -> CompletionResponse:
+        from .llm_client import get_gemini_client
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "JD-Copilot"
+        }
+        messages = [{"role": "user", "content": prompt}]
+        try:
+            if self._is_sql_prompt(prompt):
+                messages = [{"role": "system", "content": self._sql_guardrails()}, {"role": "user", "content": prompt}]
+        except Exception:
+            # Fallback to original single-message behavior
+            messages = [{"role": "user", "content": prompt}]
+
+        try:
+            client = get_gemini_client()
+            content = client.chat(
+                messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature
+            )
+            return CompletionResponse(text=content)
+        except Exception as e:
+            print(f"❌ Gemini LLM request failed: {e}")
+            return CompletionResponse(text=f"Error: {e}")
+
+    @llm_completion_callback()
+    def stream_complete(self, prompt: str, **kwargs: Any):
+        response = self.complete(prompt, **kwargs)
+        yield response
+
+
 class OpenRouterLLM(CustomLLM):
     """
     Proper OpenRouter wrapper that doesn't inherit from OpenAI class
@@ -215,7 +296,7 @@ def _extract_hashtag_specialization(q: str) -> Optional[str]:
     if not m:
         return None
     token = m.group(1).strip()
-    # Map token to canonical DB value without hardcoding large tables; keep minimal cases we know exist
+    # Map token to canonical DB value without hardcoding large tables; keep minimal cases we know exist.
     if token in {"finance"}:
         return "FINANCE"
     if token in {"marketing"}:
@@ -241,6 +322,7 @@ def triage_agent(state: AgentState) -> dict:
     1. CONTEXT RESOLUTION: Use LLM to rewrite query based on conversation history
     2. INTENT CLASSIFICATION: Classify the resolved query
     """
+    print("--- Entering triage_agent ---") # Diagnostic print
     original_query = state.get("original_query", "")
     history = state.get("conversation_history", []) or []
 
@@ -249,11 +331,12 @@ def triage_agent(state: AgentState) -> dict:
     # ============================================================
     # Use LLM to resolve context from conversation history
     resolved_query = original_query  # Default: no change
-    
+
     if history and len(history) > 0:
+        print("--- Triage: History found, attempting context resolution ---") # Diagnostic print
         # Build conversation context
         history_text = "\n".join([f"- {msg}" for msg in history[-3:]])  # Last 3 messages
-        
+
         context_prompt = f"""You are a query resolution assistant. Given a conversation history and a new user query,
 rewrite the user query to be a standalone, fully resolved question.
 
@@ -292,63 +375,107 @@ Resolved Query (return ONLY the resolved query, no explanation):"""
         # Synchronous LLM call using GeminiClient directly
         try:
             from .llm_client import get_gemini_client
-            
+
             client = get_gemini_client()
             messages = [{"role": "user", "content": context_prompt}]
-            
+
             resolved_query = client.chat(
                 messages,
                 max_tokens=200,
                 temperature=0.2
             )
-            
+
             resolved_query = resolved_query.strip()
-            
+
             # Log the resolution
             if resolved_query.lower() != original_query.lower():
                 print(f"🔄 Contextual resolution: '{original_query}' → '{resolved_query}'")
             else:
                 print(f"✓ Query already standalone: '{original_query}'")
-                
+
         except Exception as e:
             print(f"⚠️ Context resolution failed: {e}. Using original query.")
             resolved_query = original_query
     else:
+        print(f"--- Triage: No history, skipping context resolution ---") # Diagnostic print
         print(f"✓ No history, using query as-is: '{original_query}'")
 
     # ============================================================
     # STEP 2: INTENT CLASSIFICATION (The "Manus" part)
     # ============================================================
     # Now classify the RESOLVED query, not the original
+    print("--- Triage: Proceeding to intent classification ---") # Diagnostic print
     q = resolved_query
-    
-    # Detect hashtag specialization as explicit constraint
-    spec = _extract_hashtag_specialization(q)
 
-    # Detect simple intents
-    lower = q.lower()
-    is_count = any(p in lower for p in ["how many", "count", "number of"]) and ("company" in lower or "companies" in lower)
-
+    # Initialize variables
     intent = "general"
-    if is_count and spec:
-        intent = "count_companies"
-    elif is_count:  # NEW: Handle count without specialization
-        intent = "count_companies"
-    elif spec:
-        intent = "list_companies"
-    else:
-        # fallback heuristic
-        intent = "general" if len(q) < 25 else "hybrid"
-
-    # Complexity scoring
+    spec = None
     complexity = 1
+
+    # 1) Use LLM to classify routing decision: SQL vs Vector
+    routing = _classify_routing_with_llm(q)
+
+    if routing == "SQL":
+        # Try LLM-based intent+slot for structured queries
+        cls = _classify_intent_with_llm(q)
+        if cls:
+            try:
+                action = (cls.get("action") or "").strip().lower()
+                confidence = float(cls.get("confidence") or 0.0)
+                spec_cls = cls.get("specialization")
+                if spec_cls and isinstance(spec_cls, str):
+                    spec_cls_norm = spec_cls.strip().upper()
+                    if spec_cls_norm in MBA_SPECIALIZATIONS:
+                        spec = spec_cls_norm
+
+                if confidence >= 0.7:
+                    if action == "count":
+                        intent = "count_companies"
+                    elif action == "list":
+                        intent = "list_companies"
+                    elif action in {"compare", "hybrid"}:
+                        intent = "hybrid"
+            except Exception:
+                pass
+
+        # Minimal fallback for SQL path if LLM unavailable
+        if intent == "general" and not spec:
+            spec = _extract_hashtag_specialization(q) or _extract_specialization_from_question(q)
+            lower = q.lower()
+            is_count = any(p in lower for p in ["how many", "count", "number of"]) and ("company" in lower or "companies" in lower)
+            if is_count:
+                intent = "count_companies"
+            elif spec:
+                intent = "list_companies"
+
+    elif routing == "VECTOR":
+        # For semantic/deep-dive queries, route to vector tool
+        intent = "vector_search"
+        complexity = 3
+
+    else:
+        # HYBRID or uncertain: use existing hybrid logic
+        intent = "hybrid"
+        complexity = 4
+
+    # Complexity scoring - determine when full workflow is needed
+    lower = q.lower()
     if any(k in lower for k in ["compare", "versus", "vs", "difference", "trend", "analyze", "why"]):
         complexity = 5
     if len(q) > 140:
         complexity = max(complexity, 4)
 
+    # Additional complexity indicators for full workflow
+    if any(k in lower for k in ["what does", "describe", "explain", "how to", "why do", "what makes", "strategic", "analysis"]):
+        complexity = max(complexity, 3)
+    if any(k in lower for k in ["culture", "environment", "benefits", "perks", "interview", "process", "hiring"]):
+        complexity = max(complexity, 3)
+    if len(q.split()) > 15:  # Long, complex queries
+        complexity = max(complexity, 4)
+
     entities = {"specialization": spec} if spec else {}
 
+    print("--- Exiting triage_agent ---") # Diagnostic print
     # IMPORTANT: Update state with resolved query for downstream agents
     return {
         "original_query": resolved_query,  # Overwrite with resolved query
@@ -376,12 +503,12 @@ def planning_agent(state: AgentState) -> dict:
         else:
             # List ALL companies
             plan = [{"tool": "sql_tool", "args": {"query": "list_companies"}}]
+    elif intent == "vector_search":
+        plan = [{"tool": "vector_tool", "args": {"top_k": 60}}]
     else:
-        # Default simple plan: try SQL stats
         plan = [{"tool": "sql_tool", "args": {"query": "stats"}}]
 
     return {"execution_plan": plan}
-
 
 def tool_input_agent(state: AgentState) -> dict:
     """Translate the current plan into a concrete tool invocation payload."""
@@ -417,6 +544,9 @@ def tool_input_agent(state: AgentState) -> dict:
                 }
             else:
                 tool_kwargs = {"query": "list_companies"}
+        elif intent == "vector_search":
+            tool_name = "vector_tool"
+            tool_kwargs = {"top_k": 60}
         else:
             tool_name = "sql_tool"
             tool_kwargs = {"query": "stats"}
@@ -721,17 +851,17 @@ SEMANTIC MAPPING:
 
             sql_database = SQLDatabase(engine, custom_table_info=custom_table_info)
 
-            # Initialize OpenRouter LLM using CustomLLM wrapper
+            # Initialize Gemini LLM using CustomLLM wrapper
             settings = get_settings()
-            if settings.OPENROUTER_API_KEY:
-                llm = OpenRouterLLM(
-                    model=settings.OPENROUTER_SQL_MODEL,
-                    api_key=settings.OPENROUTER_API_KEY,
+            if settings.GEMINI_API_KEY:
+                llm = GeminiLLM(
+                    model=settings.GEMINI_MODEL or "gemini-2.5-flash",
+                    api_key=settings.GEMINI_API_KEY,
                     temperature=0.0
                 )
-                print(f"✅ OpenRouter LLM for SQL initialized with model: {llm.model}")
+                print(f"✅ Gemini LLM for SQL initialized with model: {llm.model}")
             else:
-                print("❌ No OpenRouter API key available")
+                print("❌ No Gemini API key available")
                 return None
 
             # Create mock embedding to avoid external dependencies
@@ -767,7 +897,7 @@ DATABASE SCHEMA WITH INTENT MAPPING:
 CRITICAL RULES:
 1.  **Strict Schema Adherence**: Only use the tables and columns provided in the schema. Do not invent columns or assume relationships.
 2.  **Intent Mapping**:
-    *   **Job Domains** (e.g., Marketing, Finance, HR): Map to `roles.specialization`. These are stored in UPPERCASE. Use `UPPER()` for matching.
+    *   **Job Domains** (e.g., Marketing, Finance, HR, Operations, IT, Analytics): Map to `roles.specialization`. These are stored in UPPERCASE. Use `UPPER()` for matching.
     *   **Company Industries** (e.g., Tech, Healthcare): Map to `companies.industry`.
 3.  **Counting Companies**: When counting companies for a job domain, you MUST `JOIN roles` to `companies` and `COUNT(DISTINCT companies.id)`.
 4.  **Error Condition**: If the user's question CANNOT be answered using the provided schema (e.g., asking for "B2B companies" when there is no 'B2B' category), you MUST return the single phrase **QUERY_ERROR** and nothing else.
@@ -853,7 +983,7 @@ FOREIGN KEY RELATIONSHIPS:
 def get_vector_index():
     """Initialize and return a Pinecone-backed query adapter for unstructured queries.
 
-    This returns an object with `.as_query_engine()` which returns an object with `.query(question)`.
+    This returns an object with `.as_query_engine()` which returns an object with a `query(question)`.
     The returned `.query()` returns an object with a `response` attribute (string) so it integrates with
     the existing `execute_unstructured_query()` logic.
     """
@@ -995,13 +1125,8 @@ def execute_multi_hop_query(sub_questions: List[str], original_question: str, en
     # Synthesize results into a conversational response using LLM
     settings = get_settings()
 
-    if not settings.OPENROUTER_API_KEY:
-        # Fallback: simple concatenation if no LLM available
-        combined = "\n\n".join([f"Step {i+1}: {result}" for i, result in enumerate(step_results)])
-        return f"Multi-question analysis:\n\n{combined}"
-
-    from .prompts import build_multi_hop_synthesis_prompt
-
+    # Prefer OpenRouter when explicitly configured. Otherwise use Gemini if available.
+    from .prompts import build_multi_hop_synthesis_prompt, get_banned_patterns
     synthesis_prompt = build_multi_hop_synthesis_prompt(
         original_question=original_question,
         sub_questions=sub_questions,
@@ -1009,55 +1134,56 @@ def execute_multi_hop_query(sub_questions: List[str], original_question: str, en
         mode="direct"
     )
 
-    try:
-        headers = {
-            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-            "Content-Type": "application/json"
-        }
+    # Try OpenRouter first if configured
+    if settings.OPENROUTER_API_KEY:
+        try:
+            headers = {
+                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            }
 
-        payload = {
-            "model": settings.OPENROUTER_UNSTRUCTURED_MODEL,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": """You are synthesizing multi-step reasoning into a coherent, conversational response.
+            payload = {
+                "model": settings.OPENROUTER_UNSTRUCTURED_MODEL,
+                "messages": [
+                    {"role": "system", "content": "You are synthesizing multi-step reasoning into a coherent, conversational response."},
+                    {"role": "user", "content": synthesis_prompt}
+                ],
+                "temperature": 0.1,
+                "max_tokens": 2000,
+            }
 
-MANDATORY FORMATTING REQUIREMENTS:
-• Use ### for main section headings
-• Use **bold** for key terms, company names, important insights
-• Use bullet points (• or -) for lists of 3+ items
-• Add blank lines between paragraphs
-• Keep paragraphs short (3-4 lines max)
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
 
-EXAMPLE:
-### Here's the Complete Picture
+            if response.status_code == 200:
+                result = response.json()
+                synthesized_answer = result["choices"][0]["message"]["content"].strip()
+                banned_patterns = get_banned_patterns()
+                if any(re.search(p, synthesized_answer) for p in banned_patterns):
+                    sentences = re.split(r'(?<=[.!?])\s+', synthesized_answer)
+                    cleaned = [s for s in sentences if not any(re.search(p, s) for p in banned_patterns)]
+                    cleaned_answer = " ".join(cleaned).strip()
+                    if cleaned_answer:
+                        synthesized_answer = cleaned_answer
+                print("✅ Successfully synthesized multi-hop response (OpenRouter)")
+                return synthesized_answer
+        except Exception as e:
+            print(f"⚠️ Multi-hop synthesis via OpenRouter failed: {e}")
 
-Based on the data, **Honasa Consumer** shows...
-
-**Key insights:**
-• First point here
-• Second point here
-
-You MUST include Markdown structure (headings, bold, bullets) in every response. Maintain factual accuracy while creating natural conversational flow."""
-                },
+    # Fallback to Gemini if configured
+    if settings.GEMINI_API_KEY:
+        try:
+            from .llm_client import get_gemini_client
+            client = get_gemini_client()
+            messages = [
+                {"role": "system", "content": "You are synthesizing multi-step reasoning into a coherent, conversational response."},
                 {"role": "user", "content": synthesis_prompt}
-            ],
-            "temperature": 0.1,
-            "max_tokens": 2000,
-        }
-
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=30
-        )
-
-        if response.status_code == 200:
-            result = response.json()
-            synthesized_answer = result["choices"][0]["message"]["content"].strip()
-            # Apply banned patterns filtering
-            from .prompts import get_banned_patterns
+            ]
+            synthesized_answer = client.chat(messages, max_tokens=2000, temperature=0.1)
             banned_patterns = get_banned_patterns()
             if any(re.search(p, synthesized_answer) for p in banned_patterns):
                 sentences = re.split(r'(?<=[.!?])\s+', synthesized_answer)
@@ -1065,19 +1191,14 @@ You MUST include Markdown structure (headings, bold, bullets) in every response.
                 cleaned_answer = " ".join(cleaned).strip()
                 if cleaned_answer:
                     synthesized_answer = cleaned_answer
-            print("✅ Successfully synthesized multi-hop response")
+            print("✅ Successfully synthesized multi-hop response (Gemini)")
             return synthesized_answer
-        else:
-            print(f"⚠️ Multi-hop synthesis failed: {response.status_code}")
-            # Fallback to simple combination
-            combined = "\n\n".join([f"Step {i+1}: {result}" for i, result in enumerate(step_results)])
-            return f"Multi-question analysis:\n\n{combined}"
+        except Exception as e:
+            print(f"⚠️ Multi-hop synthesis via Gemini failed: {e}")
 
-    except Exception as e:
-        print(f"⚠️ Multi-hop synthesis failed: {e}")
-        # Fallback to simple combination
-        combined = "\n\n".join([f"Step {i+1}: {result}" for i, result in enumerate(step_results)])
-        return f"Multi-question analysis:\n\n{combined}"
+    # Final fallback: simple concatenation
+    combined = "\n\n".join([f"Step {i+1}: {result}" for i, result in enumerate(step_results)])
+    return f"Multi-question analysis:\n\n{combined}"
 
 def route_single_query(user_question: str, context: Optional[Dict[str, Any]] = None) -> str:
     """Route a single query to the appropriate engine. Captures routing latency."""
@@ -1213,7 +1334,7 @@ Output ONLY the category word: STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
     else:
         user_prompt = f"Query: {user_question}\n\nSchema: {schema_json}"
 
-    # Use OpenRouter for routing decision
+    # Prefer OpenRouter when explicitly configured. Otherwise, use Gemini if available.
     if settings.OPENROUTER_API_KEY:
         try:
             headers = {
@@ -1251,9 +1372,28 @@ Output ONLY the category word: STRUCTURED, UNSTRUCTURED, HYBRID, or MULTI_HOP"""
                 routing_decision = "STRUCTURED"
         except Exception as e:
             print(f"❌ Routing API call failed: {e}")
-            raise RuntimeError(f"OpenRouter API is required but unavailable: {e}")
+            # Fall through to try Gemini or default
     else:
-        raise RuntimeError("OPENROUTER_API_KEY is required for query routing")
+        # Try using Gemini for routing classification if configured
+        if settings.GEMINI_API_KEY:
+            try:
+                from .llm_client import get_gemini_client
+                client = get_gemini_client()
+                messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+                raw_response = client.chat(messages, max_tokens=10, temperature=0.0).strip().upper()
+                valid_categories = {"STRUCTURED", "UNSTRUCTURED", "HYBRID", "MULTI_HOP"}
+                if raw_response in valid_categories:
+                    routing_decision = raw_response
+                else:
+                    print(f"⚠️ Gemini routing response invalid: '{raw_response}', defaulting to STRUCTURED")
+                    routing_decision = "STRUCTURED"
+            except Exception as e:
+                print(f"⚠️ Gemini routing classification failed: {e}")
+                routing_decision = "STRUCTURED"
+        else:
+            # No LLM configured for routing - default to STRUCTURED
+            print("⚠️ No LLM configured for routing (OPENROUTER_API_KEY or GEMINI_API_KEY missing). Defaulting to STRUCTURED.")
+            routing_decision = "STRUCTURED"
 
     routing_ms = (time.perf_counter() - t_start) * 1000.0
     print(f"🔍 Routing decision: {routing_decision} (routing_ms={routing_ms:.1f})")
@@ -1396,11 +1536,6 @@ def execute_structured_query(user_question: str) -> str:
                         raw_response = f"No data found for {spec} specialization."
 
             summary = _summarize_sql_with_llm(user_question, raw_response)
-            summary = _postprocess_specialization_answer(user_question, summary)
-            summarization_ms = (time.perf_counter() - summary_start) * 1000.0
-            LAST_TIMINGS['summarization_ms'] = summarization_ms
-            LAST_TIMINGS['total_ms'] = sum(v for v in LAST_TIMINGS.values())
-
             return summary
         except Exception as e:
             print(f"❌ SQL query failed: {e}")
@@ -1479,8 +1614,8 @@ def execute_hybrid_query(user_question: str, previous_context: Optional[str] = N
     # Use LLM to blend both results into one homogeneous solution
     settings = get_settings()
 
-    if not settings.OPENROUTER_API_KEY:
-        # Fallback: simple concatenation if no LLM available
+    # If neither OpenRouter nor Gemini is available, fallback to concatenation
+    if not settings.OPENROUTER_API_KEY and not settings.GEMINI_API_KEY:
         return f"{structured_result}\n\n{contextual_unstructured}"
 
     # Build Strategic Intelligence Analyst system prompt (conversational intelligence)
@@ -1649,29 +1784,54 @@ Design a bespoke strategic scaffold (name the sections you create) and weave str
             "max_tokens": 2000,
         }
 
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=30
-        )
+        # Try OpenRouter if configured
+        if settings.OPENROUTER_API_KEY:
+            try:
+                response = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=30
+                )
 
-        if response.status_code == 200:
-            result = response.json()
-            synthesized_answer = result["choices"][0]["message"]["content"].strip()
-            # Lightweight post-processing guard to reduce residual hallucination/hype
-            banned_patterns = get_banned_patterns()
-            if any(re.search(p, synthesized_answer) for p in banned_patterns):
-                sentences = re.split(r'(?<=[.!?])\s+', synthesized_answer)
-                cleaned = [s for s in sentences if not any(re.search(p, s) for p in banned_patterns)]
-                cleaned_answer = " ".join(cleaned).strip()
-                if cleaned_answer:
-                    synthesized_answer = cleaned_answer
-            print("✅ Successfully synthesized hybrid response (factual mode)")
-            return synthesized_answer
-        else:
-            print(f"⚠️ OpenRouter synthesis failed: {response.status_code}")
-            return f"{structured_result}\n\nAdditional insights: {contextual_unstructured}"
+                if response.status_code == 200:
+                    result = response.json()
+                    synthesized_answer = result["choices"][0]["message"]["content"].strip()
+                    banned_patterns = get_banned_patterns()
+                    if any(re.search(p, synthesized_answer) for p in banned_patterns):
+                        sentences = re.split(r'(?<=[.!?])\s+', synthesized_answer)
+                        cleaned = [s for s in sentences if not any(re.search(p, s) for p in banned_patterns)]
+                        cleaned_answer = " ".join(cleaned).strip()
+                        if cleaned_answer:
+                            synthesized_answer = cleaned_answer
+                    print("✅ Successfully synthesized hybrid response (OpenRouter)")
+                    return synthesized_answer
+                else:
+                    print(f"⚠️ OpenRouter synthesis failed: {response.status_code}")
+            except Exception as e:
+                print(f"⚠️ OpenRouter hybrid synthesis failed: {e}")
+
+        # Fall back to Gemini if available
+        if settings.GEMINI_API_KEY:
+            try:
+                from .llm_client import get_gemini_client
+                client = get_gemini_client()
+                messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+                synthesized_answer = client.chat(messages, max_tokens=2000, temperature=0.1)
+                banned_patterns = get_banned_patterns()
+                if any(re.search(p, synthesized_answer) for p in banned_patterns):
+                    sentences = re.split(r'(?<=[.!?])\s+', synthesized_answer)
+                    cleaned = [s for s in sentences if not any(re.search(p, s) for p in banned_patterns)]
+                    cleaned_answer = " ".join(cleaned).strip()
+                    if cleaned_answer:
+                        synthesized_answer = cleaned_answer
+                print("✅ Successfully synthesized hybrid response (Gemini)")
+                return synthesized_answer
+            except Exception as e:
+                print(f"⚠️ Gemini hybrid synthesis failed: {e}")
+
+        # If both failed, return concatenation
+        return f"{structured_result}\n\nAdditional insights: {contextual_unstructured}"
 
     except Exception as e:
         print(f"⚠️ Hybrid synthesis failed: {e}")
@@ -1695,6 +1855,148 @@ def get_database_schema() -> Dict[str, List[str]]:
     except Exception as e:
         print(f"Error getting database schema: {e}")
         return {}
+
+def _classify_routing_with_llm(query: str) -> str:
+    """LLM decides: SQL (count/list structured data) vs VECTOR (semantic/descriptive) vs HYBRID.
+    Returns one of: SQL, VECTOR, HYBRID
+    """
+    settings = get_settings()
+    
+    system = (
+        "You route queries to the right system. Respond with one word: SQL, VECTOR, or HYBRID.\n\n"
+        "SQL: counts, lists, factual structured data (how many companies, which companies, salary queries, skill counts)\n"
+        "VECTOR: descriptive questions, job descriptions, qualifications, role details, 'what does X do', culture, interview process\n"
+        "HYBRID: comparisons, trends, analysis requiring both data + context"
+    )
+    user = f"Query: {query}\n\nRoute to:"
+    
+    # Try OpenRouter if configured
+    if settings.OPENROUTER_API_KEY:
+        try:
+            headers = {
+                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": settings.OPENROUTER_UNSTRUCTURED_MODEL,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user}
+                ],
+                "temperature": 0.0,
+                "max_tokens": 10,
+            }
+            resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=15)
+            resp.raise_for_status()
+            txt = resp.json()["choices"][0]["message"]["content"].strip().upper()
+            
+            if "SQL" in txt:
+                return "SQL"
+            elif "VECTOR" in txt:
+                return "VECTOR"
+            elif "HYBRID" in txt:
+                return "HYBRID"
+            else:
+                return "HYBRID"
+        except Exception as e:
+            print(f"⚠️ Routing classification via OpenRouter failed: {e}")
+    
+    # Fall back to Gemini if available
+    if settings.GEMINI_API_KEY:
+        try:
+            from .llm_client import get_gemini_client
+            client = get_gemini_client()
+            messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+            txt = client.chat(messages, max_tokens=10, temperature=0.0).strip().upper()
+            if "SQL" in txt:
+                return "SQL"
+            elif "VECTOR" in txt:
+                return "VECTOR"
+            elif "HYBRID" in txt:
+                return "HYBRID"
+            else:
+                return "HYBRID"
+        except Exception as e:
+            print(f"⚠️ Routing classification via Gemini failed: {e}")
+    
+    # Default safe fallback
+    return "HYBRID"
+
+def _classify_intent_with_llm(query: str) -> Optional[Dict[str, Any]]:
+    """LLM-based autonomous classifier: returns {action, specialization, confidence}.
+    action ∈ {count, list, compare, hybrid, general}; confidence ∈ [0,1].
+    """
+    settings = get_settings()
+    
+    system = (
+        "You extract user intent for a placement database. Respond with STRICT JSON only. "
+        "Keys: action (count|list|compare|hybrid|general), specialization (or null), confidence (0..1)."
+    )
+    user = (
+        "Query: " + query + "\n\n"
+        "Rules:\n"
+        "- If the user asks for presence/which/list, action=list.\n"
+        "- If explicitly asking counts, action=count.\n"
+        "- If comparing/trends/why, action=hybrid.\n"
+        "- specialization should be a canonical MBA domain if clear (MARKETING, FINANCE, HR, LEAN OPERATION AND SYSTEMS, STRATEGY, IT, BUSINESS ANALYTICS), else null.\n"
+        "- confidence is your certainty 0..1."
+    )
+    
+    # Try OpenRouter if configured
+    if settings.OPENROUTER_API_KEY:
+        try:
+            headers = {
+                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": settings.OPENROUTER_UNSTRUCTURED_MODEL,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user}
+                ],
+                "temperature": 0.0,
+                "max_tokens": 60,
+            }
+            resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=20)
+            resp.raise_for_status()
+            txt = resp.json()["choices"][0]["message"]["content"].strip()
+            # Attempt to extract JSON
+            m = re.search(r"\{[\s\S]*\}$", txt)
+            raw = m.group(0) if m else txt
+            parsed = json.loads(raw)
+            # Normalize keys
+            out = {
+                "action": (parsed.get("action") or "").strip().lower(),
+                "specialization": parsed.get("specialization"),
+                "confidence": float(parsed.get("confidence") or 0.0)
+            }
+            return out
+        except Exception as e:
+            print(f"⚠️ Intent classification via OpenRouter failed: {e}")
+    
+    # Fall back to Gemini if available
+    if settings.GEMINI_API_KEY:
+        try:
+            from .llm_client import get_gemini_client
+            client = get_gemini_client()
+            messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+            txt = client.chat(messages, max_tokens=60, temperature=0.0).strip()
+            # Attempt to extract JSON
+            m = re.search(r"\{[\s\S]*\}$", txt)
+            raw = m.group(0) if m else txt
+            parsed = json.loads(raw)
+            # Normalize keys
+            out = {
+                "action": (parsed.get("action") or "").strip().lower(),
+                "specialization": parsed.get("specialization"),
+                "confidence": float(parsed.get("confidence") or 0.0)
+            }
+            return out
+        except Exception as e:
+            print(f"⚠️ Intent classification via Gemini failed: {e}")
+    
+    return None
 
 def _summarize_sql_with_llm(question: str, sql_result: str) -> str:
     """Use LLM to summarize SQL results in natural language."""
@@ -1757,6 +2059,14 @@ def _extract_specialization_from_question(question: str) -> Optional[str]:
     mapping = {
         "marketing": "MARKETING",
         "finance": "FINANCE", 
+        "portfolio management": "FINANCE",
+        "portfolio manager": "FINANCE",
+        "asset management": "FINANCE",
+        "wealth management": "FINANCE",
+        "equity research": "FINANCE",
+        "corporate finance": "FINANCE",
+        "treasury": "FINANCE",
+        "investment": "FINANCE",
         "human resources": "HR",
         "hr": "HR",
         "operations": "LEAN OPERATION AND SYSTEMS",

@@ -367,7 +367,7 @@ def _create_sql_query_engine():
     try:
         from llama_index.core import SQLDatabase
         from llama_index.core.indices.struct_store import NLSQLTableQueryEngine
-        from llama_index.llms.openai import OpenAI
+        from .agent import GeminiLLM
     except Exception:
         return None
 
@@ -375,17 +375,13 @@ def _create_sql_query_engine():
     _engine = create_engine(f"sqlite:///{db_path}")
     sql_db = SQLDatabase(_engine)
 
-    openrouter_key = os.getenv("OPENROUTER_API_KEY")
-    if not openrouter_key:
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if not gemini_key:
         return None
 
-    # Set OpenAI-compatible env vars to route through OpenRouter
-    os.environ.setdefault("OPENAI_API_KEY", openrouter_key)
-    os.environ.setdefault("OPENAI_API_BASE", "https://openrouter.ai/api/v1")
-
-    # Use explicit OpenRouter model; default to Grok-4 Fast per user directive
-    model_name = os.getenv("OPENROUTER_MODEL", "x-ai/grok-4-fast")
-    llm = OpenAI(api_key=openrouter_key, model=model_name)
+    # Use Gemini LLM wrapper
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    llm = GeminiLLM(api_key=gemini_key, model=model_name, temperature=0.0)
     _query_engine = NLSQLTableQueryEngine(sql_database=sql_db, tables=None, llm=llm)
     return _query_engine
 

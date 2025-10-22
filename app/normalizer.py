@@ -146,58 +146,85 @@ class HybridNormalizer:
     # ---------------- Internal Helpers -----------------
     def _semantic_expand_openrouter(self, question: str) -> Optional[Dict[str, List[str]]]:
         api_key = os.getenv("OPENROUTER_API_KEY")
-        if not api_key:
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        if not api_key and not gemini_key:
             return None
+
         allowed = {
             "industry": ["FMCG", "BFSI"],
             "company_type": ["B2B", "B2C"],
             "specialization": ["Marketing", "Finance", "HR", "LEAN OPERATION AND SYSTEMS", "Analytics", "IT", "Strategy"],
             "role": ["Sales", "Inside Sales", "Field Sales", "Business Development"],
         }
+
         model = os.getenv("OPENROUTER_NORMALIZER_MODEL") or os.getenv("OPENROUTER_MODEL") or "mistralai/mistral-medium-3.1"
         prompt = (
             "Extract canonical placement intent categories. Return STRICT minified JSON only.\n"
             f"Allowed values: {allowed}.\n"
             "Include a key only if explicitly present or an unambiguous synonym.\n"
-            f"User Query: {question}\nJSON:"  # question already lowercase
+            f"User Query: {question}\nJSON:"
         )
+
         try:
-            resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": "You output ONLY strict JSON without commentary."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    "temperature": 0.0,
-                    "max_tokens": 128,
-                },
-                timeout=180,
-            )
-            if resp.status_code != 200:
-                return None
-            data = resp.json()
-            choices = data.get("choices") or []
-            if not choices:
-                return None
-            content = (choices[0].get("message", {}) or {}).get("content") or choices[0].get("text")
+            # Prefer OpenRouter when explicitly configured, otherwise use Gemini
+            if api_key:
+                resp = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": "You output ONLY strict JSON without commentary."},
+                            {"role": "user", "content": prompt},
+                        ],
+                        "temperature": 0.0,
+                        "max_tokens": 128,
+                    },
+                    timeout=180,
+                )
+                if resp.status_code != 200:
+                    return None
+                data = resp.json()
+                choices = data.get("choices") or []
+                if not choices:
+                    return None
+                content = (choices[0].get("message", {}) or {}).get("content") or choices[0].get("text")
+            else:
+                # Use Gemini client as fallback default
+                from app.llm_client import get_gemini_client
+                gemini = get_gemini_client()
+                messages = [
+                    {"role": "system", "content": "You output ONLY strict JSON without commentary."},
+                    {"role": "user", "content": prompt},
+                ]
+                content = gemini.chat(messages, temperature=0.0, max_tokens=128)
+
             if not content:
                 return None
+
             raw = content.strip()
-            start, end = raw.find("{"), raw.rfind("}")
+            start = raw.find("{")
+            end = raw.rfind("}")
             if start == -1 or end == -1:
                 return None
             blob = raw[start : end + 1]
             parsed = json.loads(blob)
+
             cleaned: Dict[str, List[str]] = {}
             for k, v in parsed.items():
-                if k in allowed and isinstance(v, str) and v in allowed[k]:
+                if k not in allowed:
+                    continue
+                # Accept single string or list of strings
+                if isinstance(v, str) and v in allowed[k]:
                     cleaned[k] = [v]
+                elif isinstance(v, list):
+                    vals = [s for s in v if isinstance(s, str) and s in allowed[k]]
+                    if vals:
+                        cleaned[k] = vals
+
             return cleaned or None
         except Exception:
             return None

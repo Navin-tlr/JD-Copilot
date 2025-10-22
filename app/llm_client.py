@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import google.generativeai as genai
+import ssl
 from typing import List, Dict, Optional
 from .config import get_settings
 
@@ -29,7 +30,23 @@ class GeminiClient:
         if not api_key:
             raise RuntimeError("GEMINI_API_KEY is not set. Please configure it in .env")
 
-        genai.configure(api_key=api_key)
+        # --- DIAGNOSTIC STEP ---
+        # Print the SSL certificate path Python is using.
+        try:
+            cert_path = ssl.get_default_verify_paths()
+            print(f"✅ [DIAGNOSTIC] Python SSL cert path: {cert_path.cafile}")
+        except Exception as e:
+            print(f"❌ [DIAGNOSTIC] Could not get Python SSL cert path: {e}")
+        # --- END DIAGNOSTIC ---
+        
+        # CRITICAL FIX: Force REST API instead of gRPC
+        # The default gRPC transport is being blocked/timing out in this environment
+        # Using REST transport resolves 504 Deadline Exceeded errors
+        import google.generativeai.types as genai_types
+        genai.configure(
+            api_key=api_key,
+            transport="rest"  # Force REST instead of gRPC
+        )
         self.model_name = model or settings.GEMINI_MODEL or "gemini-2.5-flash"
         
         # Configure safety settings for internal corporate data processing
@@ -208,44 +225,66 @@ USER QUERY
         }
         return reason_map.get(finish_reason, f"UNKNOWN({finish_reason})")
 
-    def chat(self, messages: List[Dict[str, str]], max_tokens: int = 3000, temperature: float = 0.7) -> str:
+    def chat(self, messages: List[Dict[str, str]], max_tokens: int = 3000, temperature: float = 0.7, timeout: Optional[float] = None) -> str:
         """Send messages to Gemini and return the response.
         
         Args:
             messages: List of OpenAI-style messages (automatically converted)
             max_tokens: Maximum tokens in response
             temperature: Sampling temperature (0.0 = deterministic, 1.0 = creative)
+            timeout: Request timeout in seconds (default: 60.0)
             
         Returns:
             Generated text response
         """
+        import os
+        
+        # Use configurable timeout, defaulting to 60 seconds
+        request_timeout = timeout or float(os.getenv("GEMINI_TIMEOUT_SECONDS", "60.0"))
+        
         gemini_messages = self._to_gemini_messages(messages)
         
-        # If we have only one message, use generate_content directly
-        if len(gemini_messages) == 1:
-            resp = self._model.generate_content(
-                gemini_messages[0]["parts"][0],
+        try:
+            # If we have only one message, use generate_content directly
+            if len(gemini_messages) == 1:
+                resp = self._model.generate_content(
+                    gemini_messages[0]["parts"][0],
+                    generation_config=genai.types.GenerationConfig(
+                        max_output_tokens=max_tokens,
+                        temperature=temperature,
+                    ),
+                    request_options={"timeout": request_timeout},
+                )
+                return self._safe_get_text(resp)
+            
+            # For multi-turn conversations, use chat with history
+            # Split into history (all but last) and current message (last)
+            history = gemini_messages[:-1]
+            current_msg = gemini_messages[-1]
+            
+            convo = self._model.start_chat(history=history)
+            resp = convo.send_message(
+                current_msg["parts"][0],
                 generation_config=genai.types.GenerationConfig(
                     max_output_tokens=max_tokens,
                     temperature=temperature,
                 ),
+                request_options={"timeout": request_timeout},
             )
             return self._safe_get_text(resp)
         
-        # For multi-turn conversations, use chat with history
-        # Split into history (all but last) and current message (last)
-        history = gemini_messages[:-1]
-        current_msg = gemini_messages[-1]
-        
-        convo = self._model.start_chat(history=history)
-        resp = convo.send_message(
-            current_msg["parts"][0],
-            generation_config=genai.types.GenerationConfig(
-                max_output_tokens=max_tokens,
-                temperature=temperature,
-            ),
-        )
-        return self._safe_get_text(resp)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"❌ Gemini API error: {e}")
+            logger.error(f"   Request timeout: {request_timeout}s")
+            logger.error(f"   Model: {self.model_name}")
+            
+            # Re-raise with more context
+            if "timeout" in str(e).lower():
+                raise TimeoutError(f"Gemini API timeout after {request_timeout}s: {e}") from e
+            else:
+                raise RuntimeError(f"Gemini API error: {e}") from e
 
 
 def get_gemini_client(model: Optional[str] = None) -> GeminiClient:

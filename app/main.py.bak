@@ -5,18 +5,17 @@ from pathlib import Path
 from typing import Any, Dict, Optional, List
 import re
 import sqlite3
-import os
-import json
-from datetime import datetime
 
-import certifi
-import ssl
-import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, Body, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from typing import List, Dict, Any, Optional
+import uvicorn
+import os
+import json
+from datetime import datetime
 
 from .config import get_settings
 from .database import PlacementDatabase
@@ -31,25 +30,6 @@ from .chat_service import chat_service
 from .workflow_api import include_workflow_router
 from .api.industry_hierarchy import router as industry_hierarchy_router
 from .orchestrator import get_orchestrator, OrchestratorResponse
-
-# Ensure local .env is loaded early so os.getenv and Settings both see values
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except Exception:
-    # Non-fatal: Settings will still read env_file; this just helps os.getenv users
-    pass
-
-# Force Python to use certifi's CA bundle
-# This is a critical fix for environments where the default SSL certificates are outdated
-# or where system-level configs interfere with Python's SSL verification.
-try:
-    cert_path = certifi.where()
-    os.environ["SSL_CERT_FILE"] = cert_path
-    os.environ["REQUESTS_CA_BUNDLE"] = cert_path
-    print(f"✅ SSL Context Forced: Using certifi bundle at {cert_path}")
-except Exception as e:
-    print(f"⚠️  Could not force SSL context: {e}")
 
 app = FastAPI(title="JD-Copilot API", version="1.0.0")
 
@@ -180,7 +160,6 @@ class QueryRequest(BaseModel):
     question: str
     session_id: str = "default"
     user_id: Optional[str] = "anonymous"
-    user_context: Optional[Dict[str, Any]] = None
 
 class ChatRequest(BaseModel):
     query: str
@@ -362,9 +341,10 @@ async def chat_endpoint(request: QueryRequest):
         
         # Use the new orchestrator instead of old adaptive workflow
         orchestrator = get_orchestrator()
-        result: OrchestratorResponse = await orchestrator.process_query(
-            user_query=question,
+        result: OrchestratorResponse = orchestrator.process_query(
+            query=question,
             session_id=session_id,
+            user_id=user_id,
             user_context=request.user_context or {}
         )
         
@@ -443,6 +423,197 @@ def _restore_deep_dive_if_needed():
     """Placeholder for potential deep-dive feature restoration"""
     if False:  # Disabled - using orchestrator
         is_deep_dive_consent = _is_deep_dive_consent(question)
+            print("🎯 Deep-dive mode activated by user consent")
+            # Get the previous question from chat memory for context
+            previous_messages = chat_memory.get_messages(session_id)
+            print(f"📝 Chat history has {len(previous_messages)} messages")
+            original_question = None
+            if len(previous_messages) >= 2:  # At least one previous Q&A
+                # Get the last user question before consent (skip the current "yes" message)
+                for i in range(len(previous_messages) - 2, -1, -1):
+                    message = previous_messages[i]
+                    role = message.get("role") if isinstance(message, dict) else getattr(message, "role", None)
+                    content = message.get("content") if isinstance(message, dict) else getattr(message, "content", "")
+                    print(f"  Message {i}: role={role}, content='{content[:50]}...'")
+                    if role == "user" and content and not _is_deep_dive_consent(content):
+                        original_question = content
+                        print(f"🔍 Found original query: {original_question}")
+                        break
+                if original_question:
+                    # Force unstructured search
+                    answer = _execute_deep_dive_search(original_question)
+                else:
+                    print("❌ Could not find original question in chat history")
+                    answer = "I need the original question to perform deep-dive analysis. Please ask your question again."
+            else:
+                print("❌ Not enough messages in chat history")
+                answer = "I need the original question to perform deep-dive analysis. Please ask your question again."
+        else:
+            # Early exit for simple queries - bypass complex workflow
+            if _is_simple_query(question):
+                print("🚀 Simple query detected - using direct routing")
+                try:
+                    answer = route_query(question, {})
+                    if not isinstance(answer, str) or not answer.strip():
+                        answer = "I'm sorry, I couldn't process your query."
+                except Exception as simple_error:
+                    print(f"⚠️ Simple query routing failed: {simple_error}")
+                    answer = "I'm sorry, I encountered an error processing your query."
+            else:
+                # === NEW ADAPTIVE LANGGRAPH WORKFLOW ===
+                print("🎯 Invoking adaptive LangGraph workflow...")
+                try:
+                    # 1. Get conversation history from chat memory
+                    previous_messages = chat_memory.get_messages(session_id)
+                    
+                    # Extract user messages for context (convert to simple string list)
+                    history_strings = []
+                    if not disable_ctx:
+                        for msg in previous_messages:
+                            if isinstance(msg, dict):
+                                role = msg.get("role", "")
+                                content = msg.get("content", "")
+                                if role == "user" and content:
+                                    history_strings.append(content)
+                            else:
+                                # Handle object format
+                                role = getattr(msg, "role", "")
+                                content = getattr(msg, "content", "")
+                                if role == "user" and content:
+                                    history_strings.append(content)
+                    
+                    # 2. Invoke the adaptive workflow
+                    #    This runs triage → planning → tool_input → retrieve → reflect/synthesize
+                    #    The workflow includes:
+                    #    - triage_agent: Classifies intent and extracts entities (NO context resolution here)
+                    #    - planning_agent: Creates execution plan
+                    #    - tool_input_agent: Prepares tool invocation
+                    #    - retrieval_agent: Executes data retrieval
+                    #    - reflection_agent: Validates results and suggests fallbacks
+                    #    - synthesis_agent: Generates final response
+                    import asyncio as _aio
+                    from .agent import run_adaptive_workflow as _run_graph
+
+                    async def _run_graph_in_thread():
+                        loop = _aio.get_event_loop()
+                        return await loop.run_in_executor(None, _run_graph, question, (history_strings if not disable_ctx else []), session_id)
+
+                    timeout_s = float(os.getenv('ADAPTIVE_WORKFLOW_TIMEOUT', '15.0'))
+                    try:
+                        workflow_result = await _aio.wait_for(_run_graph_in_thread(), timeout=timeout_s)
+                    except _aio.TimeoutError:
+                        print("⏱️ Adaptive workflow timed out in /chat; falling back to simple route_query")
+                        # Minimal deterministic fallback: use structured route_query path
+                        try:
+                            answer = route_query(question, {})
+                            # Ensure non-empty basic fallback
+                            if not isinstance(answer, str) or not answer.strip():
+                                answer = "I'm sorry, I couldn't process your query in time. Please try again."
+                            workflow_result = {"final_response": answer}
+                        except Exception as _e:
+                            workflow_result = {"final_response": "I'm sorry, I couldn't process your query in time. Please try again."}
+                    
+                    # 3. Extract response from workflow
+                    answer = workflow_result.get("final_response", "I'm sorry, I encountered an error processing your query.")
+
+                    print(f"✅ Adaptive workflow completed successfully")
+                    print(f"🔍 Final answer: {answer[:100]}...")
+
+                except Exception as workflow_error:
+                    print(f"❌ Adaptive workflow error: {workflow_error}")
+                    import traceback
+                    traceback.print_exc()
+                    _sync_history_snapshot(user_id, session_id)
+                    return ChatResponse(
+                        answer=f"Adaptive workflow failed: {str(workflow_error)}. Please try rephrasing your question.",
+                        snippets=[],
+                        citations=[],
+                        error=True
+                    )
+            # === END ADAPTIVE WORKFLOW ===
+
+        # Persist messages only when context is enabled
+        if not disable_ctx:
+            # Add user message and AI response to memory after processing to avoid first-turn history issues
+            chat_memory.add_message(session_id, "user", question)
+            chat_memory.add_message(session_id, "assistant", answer)
+            _sync_history_snapshot(user_id, session_id)
+        
+        # Extract snippets from the answer if available
+        snippets = []
+        try:
+            temp_snippets = retrieve_snippets(question, top_k=50, filters={})
+            if temp_snippets:
+                snippets = temp_snippets
+        except Exception as e:
+            print(f"Warning: Could not retrieve snippets: {e}")
+        
+        # Prepare citations for the response object (but don't add to answer text)
+        
+        print(f"✅ Query processed successfully. Answer length: {len(answer)} chars")
+        
+        lower_ans = answer.lower().strip() if answer else ""
+        no_data = _is_no_data_result(answer)
+        deep_dive_phrase = "deep-dive mode available" in lower_ans
+        deep_dive_analysis = "deep-dive analysis complete" in lower_ans
+        is_error_response = "i couldn't process your query" in lower_ans or "i apologize" in lower_ans
+        limited = (
+            len(answer) < 60 and (
+                "no companies" in lower_ans or
+                "couldn't" in lower_ans or
+                "0 roles" in lower_ans or
+                "no roles" in lower_ans or
+                "0 placements" in lower_ans or
+                "no placements" in lower_ans or
+                "0 consulting roles" in lower_ans or
+                "no consulting roles" in lower_ans
+            )
+        )
+
+        deep_dive_offered = False
+        deep_dive_consent_needed = False
+        needs_vector = False
+        reason = None
+        deep_dive_mandatory = False
+
+        # Offer deep-dive only for structured queries with no/limited results, or when no data/error occurs from other routes
+        if (LAST_ROUTE_TYPE == "STRUCTURED" and (no_data or limited or is_error_response)) or (not LAST_ROUTE_TYPE == "STRUCTURED" and (no_data or deep_dive_phrase or is_error_response)):
+            deep_dive_offered = True
+            deep_dive_consent_needed = True and not deep_dive_analysis
+            needs_vector = True  # front-end can show consent CTA
+            if LAST_ROUTE_TYPE == "STRUCTURED":
+                reason = "Structured query returned limited results. Deep-dive available for enhanced semantic understanding."
+            elif is_error_response:
+                reason = "Query processing failed. Deep-dive may provide alternative insights."
+            else:
+                reason = "Query returned no results. Offer deep-dive search of unstructured job descriptions."
+        # If user already consented, we mark vector_used implicitly in answer content; keep flags off
+
+        return ChatResponse(
+            answer=answer,
+            snippets=snippets,
+            citations=[],
+            needs_vector_approval=needs_vector,
+            vector_reason=reason,
+            vector_used=deep_dive_analysis,  # treat analysis completion as vector usage
+            performance=get_last_timings(),
+            deep_dive_mandatory=deep_dive_mandatory,
+            deep_dive_offered=deep_dive_offered,
+            deep_dive_consent_needed=deep_dive_consent_needed
+        )
+        
+    except Exception as e:
+        # Log the error for debugging
+        try:
+            _sync_history_snapshot(user_id, session_id)
+        except Exception:
+            pass
+        print(f"Processing error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Processing failed. Debug input and retry.")
+
+
 @app.post("/chat/enhanced", response_model=ChatResponse)
 async def enhanced_chat_endpoint(request: QueryRequest):
     """

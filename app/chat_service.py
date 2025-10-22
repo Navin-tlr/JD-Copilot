@@ -45,6 +45,9 @@ class ChatService:
         self.session_memory_limit: int = int(os.getenv("CHAT_SESSION_MEMORY_LIMIT", "10"))
         # Maximum messages to keep per session memory (default: 200)
         self.session_message_limit: int = int(os.getenv("CHAT_SESSION_MESSAGE_LIMIT", "200"))
+        # Global kill-switch: when true, treat every question as standalone (no history reads/writes)
+        # Default is enabled ("1") to disable context memory per current requirement
+        self.disable_context: bool = os.getenv("DISABLE_CONTEXT_MEMORY", "1") != "0"
     
     def _generate_session_name(self, first_message: str) -> str:
         """Generate a descriptive name from the first user message (ChatGPT-style)"""
@@ -86,7 +89,6 @@ class ChatService:
         """Guarantee that a session exists and return the active session ID."""
         if not session_id:
             return await self.create_session(user_id)
-
         if session_id not in self.sessions:
             await self.create_session(user_id, session_id=session_id)
 
@@ -95,71 +97,105 @@ class ChatService:
     async def send_message(self, session_id: str, content: str, user_id: str) -> AsyncGenerator[ChatMessage, None]:
         print(f"🔍 Backend received query: '{content}' from user {user_id}")
 
-        # Create session if it doesn't exist
+        # Ensure session exists
         session_id = await self.ensure_session(session_id, user_id)
-
         memory = self.memories[session_id]
 
         # Auto-generate session name from first message (ChatGPT behavior)
-        if self.sessions[session_id].name is None and len(memory.messages) == 0:
+        if self.sessions[session_id].name is None:
             self.sessions[session_id].name = self._generate_session_name(content)
-            print(f"📝 Auto-generated session name: '{self.sessions[session_id].name}'")
 
         # Enforce per-session message threshold (defensive trim)
         max_msgs = getattr(memory, "max_messages", None)
-        if isinstance(max_msgs, int) and max_msgs > 0:
+        if not self.disable_context and isinstance(max_msgs, int) and max_msgs > 0:
             try:
                 while len(memory.messages) > max_msgs:
-                    # remove oldest message
                     memory.messages.pop(0)
             except Exception:
-                # If memory shape is unexpected, ignore and continue
                 pass
 
         original_query = content
-        context_info: Dict[str, Any] = {}
 
-        # Check if query needs context resolution
-        if memory.is_contextual_query(content):
-            resolved_query, context_info = memory.resolve_context(content)
-            if resolved_query != content:
-                print(f"🔄 Resolved contextual query: '{content}' → '{resolved_query}'")
-                content = resolved_query
+        # Optional deterministic context resolution when memory is enabled and history exists
+        if not self.disable_context:
+            has_history = len(memory.messages) > 0
+            if has_history and memory.is_contextual_query(content):
+                try:
+                    resolved_query, context_info = memory.resolve_context(content)
+                    if resolved_query and isinstance(resolved_query, str):
+                        content = resolved_query
+                except Exception as _:
+                    # Fail open: keep original content if resolver fails
+                    pass
 
-        # Store user message in memory with enhanced tracking
-        await memory.add_message(
-            role='user',
-            content=content,
-            metadata={
-                'user_id': user_id,
-                'original_query': original_query if content != original_query else None,
-                'context_resolution': context_info if context_info else None
-            },
-            query_type=self._detect_query_type(content),
-            specialization=self._detect_specialization(content),
-            entities_mentioned=self._extract_entities(content)
-        )
+        # Build context and history texts (empty when context disabled)
+        context = {} if self.disable_context else await self._build_enhanced_context(session_id)
+        history_texts = [] if self.disable_context else [m['content'] for m in context.get('full_conversation_history', [])]
 
-        # Generate AI response using adaptive agentic workflow, with orchestrator fallback
-        context = await self._build_enhanced_context(session_id)
+        # Generate AI response using adaptive workflow with timeout, then orchestrator, then legacy RAG
+        ai_response: str = ""
         try:
             from .agent import run_adaptive_workflow
-            history_texts = [m['content'] for m in context.get('full_conversation_history', [])]
-            state = run_adaptive_workflow(content, history_texts, session_id)
-            ai_response = state.get('final_response') or ''
-            if not ai_response:
-                # fallback to orchestrator/legacy pipeline
-                ai_response = await self._generate_rag_response(content, session_id, user_id, context)
-        except Exception as wf_err:
-            print(f"❌ Adaptive workflow failed: {wf_err}. Falling back to legacy.")
-            ai_response = await self._generate_rag_response(content, session_id, user_id, context)
 
-        # Store AI response in memory with enhanced tracking
-        await memory.add_message(
-            role='assistant',
-            content=ai_response,
-            metadata={'context_used': bool(context), 'enhanced_memory': True}
-        )
+            async def _run_graph():
+                loop = asyncio.get_event_loop()
+                return await loop.run_in_executor(None, run_adaptive_workflow, content, history_texts, session_id)
+
+            timeout_s = float(os.getenv('ADAPTIVE_WORKFLOW_TIMEOUT', '3.0'))
+            try:
+                state = await asyncio.wait_for(_run_graph(), timeout=timeout_s)
+            except asyncio.TimeoutError:
+                print("⏱️ Adaptive workflow timed out; switching to orchestrator")
+                state = None
+
+            ai_response = (state or {}).get('final_response') if state else None
+            if not ai_response:
+                # Try orchestrator
+                resp = await agent_orchestrator.process_query(
+                    query=content,
+                    session_id=session_id,
+                    user_id=user_id,
+                    context={'full_conversation_history': history_texts}
+                )
+                ai_response = (resp or {}).get('response') or ''
+                if not ai_response:
+                    # Final fallback to legacy RAG
+                    ai_response = await self._generate_rag_response(content, session_id, user_id, context)
+        except Exception as wf_err:
+            print(f"❌ Adaptive workflow failed: {wf_err}. Trying orchestrator...")
+            try:
+                resp = await agent_orchestrator.process_query(
+                    query=content,
+                    session_id=session_id,
+                    user_id=user_id,
+                    context={'full_conversation_history': history_texts}
+                )
+                ai_response = (resp or {}).get('response') or ''
+                if not ai_response:
+                    ai_response = await self._generate_rag_response(content, session_id, user_id, context)
+            except Exception as orch_err:
+                print(f"❌ Orchestrator failed: {orch_err}. Falling back to RAG.")
+                ai_response = await self._generate_rag_response(content, session_id, user_id, context)
+
+        # Update memory only when enabled
+        if not self.disable_context:
+            try:
+                await memory.add_message(
+                    role='user',
+                    content=original_query,
+                    metadata={'user_id': user_id},
+                    query_type=self._detect_query_type(original_query),
+                    specialization=self._detect_specialization(original_query),
+                    entities_mentioned=self._extract_entities(original_query)
+                )
+                await memory.add_message(
+                    role='assistant',
+                    content=ai_response,
+                    metadata={'context_used': bool(context), 'enhanced_memory': True}
+                )
+            except Exception:
+                # Memory is best-effort; don't fail the response on memory errors
+                pass
 
         # Create response message
         ai_message = ChatMessage(

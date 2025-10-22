@@ -113,17 +113,33 @@ def classify_role_types_llm(roles: List[dict], doc_text: str, max_doc_chars: int
     }
 
     try:
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=180,
-        )
-        if resp.status_code != 200:
-            print(f"⚠️ Role type LLM classification failed status={resp.status_code}")
-            return {}
-        data = resp.json()
-        content = data["choices"][0]["message"]["content"].strip()
+        # Prefer OpenRouter if explicitly configured, otherwise use Gemini
+        settings = get_settings()
+        if getattr(settings, "OPENROUTER_API_KEY", None) and getattr(settings, "OPENROUTER_MODEL", None):
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=180,
+            )
+            if resp.status_code != 200:
+                print(f"⚠️ Role type LLM classification failed status={resp.status_code}")
+                return {}
+            data = resp.json()
+            content = data["choices"][0]["message"]["content"].strip()
+        else:
+            # Use Gemini as the default LLM
+            try:
+                from app.llm_client import get_gemini_client
+                gemini = get_gemini_client()
+                messages = [
+                    {"role": "system", "content": SYSTEM_INSTRUCTIONS},
+                    {"role": "user", "content": user_prompt},
+                ]
+                content = gemini.chat(messages, temperature=0.0, max_tokens=800).strip()
+            except Exception as inner_e:
+                print(f"⚠️ Gemini classification failed: {inner_e}")
+                return {}
         if os.getenv("ROLE_TYPES_DEBUG"):
             try:
                 import time
