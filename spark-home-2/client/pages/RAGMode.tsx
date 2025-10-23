@@ -209,7 +209,7 @@ export default function RAGMode() {
                       <span className="text-[12px] text-[#C8C6C4] font-semibold">Analyst</span>
                     </div>
                     {/* Assistant content */}
-                    <div className="max-w-[95%] bg-[#2f2f2f] text-[#E0E0E0] px-5 py-4 rounded-2xl text-[14px] leading-[1.8] shadow rag-response prose prose-invert max-w-none">
+                    <div className="max-w-[95%] text-[#E0E0E0] text-[14px] leading-[1.8] rag-response prose prose-invert max-w-none">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {msg.content}
                       </ReactMarkdown>
@@ -233,7 +233,7 @@ export default function RAGMode() {
                   </div>
                   <span className="text-[12px] text-[#C8C6C4] font-semibold">Analyst</span>
                 </div>
-                <div className="text-[#D0D0D0] text-[13px] leading-[1.7] italic">
+                <div className="text-[#D0D0D0] text-[13px] leading-[1.7]">
                   Gathering context for the best possible answer…
                 </div>
               </div>

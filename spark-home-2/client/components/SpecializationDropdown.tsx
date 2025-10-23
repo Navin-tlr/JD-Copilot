@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 interface SpecializationDropdownProps {
-  onSelect: (specialization: string) => void;
+  onSelectSpecialization: (specialization: string) => void;
   onClose: () => void;
   position: { top: number; left: number };
   variant?: 'default' | 'rag' | 'benchmark';
@@ -18,7 +18,7 @@ const SPECIALIZATIONS = [
 ];
 
 export default function SpecializationDropdown({
-  onSelect,
+  onSelectSpecialization,
   onClose,
   position,
   variant = 'default',
@@ -102,7 +102,7 @@ export default function SpecializationDropdown({
         {SPECIALIZATIONS.map((spec) => (
           <button
             key={spec.value}
-            onClick={() => onSelect(spec.value)}
+            onClick={() => onSelectSpecialization(spec.value)}
             className="w-full text-left px-3 py-2 rounded-md transition-all duration-150 flex items-center gap-2"
             style={{
               color: colors.text,

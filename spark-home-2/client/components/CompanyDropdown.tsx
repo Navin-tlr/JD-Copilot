@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { buildApiUrl } from '@/lib/api';
 
 interface CompanyDropdownProps {
-  onSelect: (company: string) => void;
+  onSelectCompany: (company: string) => void;
   onClose: () => void;
   position: { top: number; left: number };
   variant?: 'default' | 'rag' | 'benchmark';
@@ -14,7 +14,7 @@ interface Company {
 }
 
 export default function CompanyDropdown({
-  onSelect,
+  onSelectCompany,
   onClose,
   position,
   variant = 'default',
