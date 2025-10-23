@@ -3,24 +3,6 @@
   "messages": [
     {
       "role": "assistant",
-      "content": "I couldn\u2019t retrieve the list of B2B companies due to an access error. Please try again or check your connection.",
-      "timestamp": "2025-09-26T18:53:16.212265",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "user",
-      "content": "GIVE ME LIST OF B2B COMPANIES CAME FOR PLACEMENTS",
-      "timestamp": "2025-09-26T19:00:01.279189",
-      "metadata": {},
-      "query_type": null,
-      "specialization": null,
-      "entities_mentioned": []
-    },
-    {
-      "role": "assistant",
       "content": "I couldn\u2019t retrieve the list due to a system error. Please try again later or check your access.",
       "timestamp": "2025-09-26T19:00:16.529979",
       "metadata": {},
@@ -900,18 +882,37 @@
       "query_type": null,
       "specialization": null,
       "entities_mentioned": []
+    },
+    {
+      "role": "user",
+      "content": "how many companies came for portfolio management",
+      "timestamp": "2025-10-23T18:55:14.924250",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
+    },
+    {
+      "role": "assistant",
+      "content": "I couldn't find relevant information for your query. Please try rephrasing or provide more details.",
+      "timestamp": "2025-10-23T18:55:14.930593",
+      "metadata": {},
+      "query_type": null,
+      "specialization": null,
+      "entities_mentioned": []
     }
   ],
   "current_context": {
     "last_query_type": "unstructured",
-    "last_company_query": "how many b2b companies came for placements",
+    "last_company_query": "how many companies came for portfolio management",
     "last_companies_mentioned": [
       "Unlike Withum's Talent Acquisition Assistant (HR-focused",
       "Bengaluru-based",
       "requiring MBA/PGDM in HR with LinkedIn exposure)",
       "Target offers broader Operations exposure without prior recruiting experience",
       "suiting entry-level MBAs. (EVID:VEC:Withum_Reqs; STRAT:EXT:McKinsey:2023:Retail-Talent-Trends \u2013 Retail apprenticeships yield 20% faster promotions vs. professional services.)"
-    ]
+    ],
+    "company_query_timestamp": "2025-10-23 18:55:14.924250"
   },
-  "last_updated": "2025-09-28T09:41:45.502288"
+  "last_updated": "2025-10-23T18:55:14.933337"
 }

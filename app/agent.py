@@ -33,16 +33,7 @@ from sqlalchemy import create_engine
 Settings.tokenizer = None
 
 # Configure embedding model to use Gemini instead of OpenAI
-from .agent import GeminiEmbedding
 import os
-
-# Configure embedding model to use Gemini instead of OpenAI
-gemini_key = os.getenv("GEMINI_API_KEY")
-if gemini_key:
-    Settings.embed_model = GeminiEmbedding(api_key=gemini_key, model="text-embedding-004")
-else:
-    # Fallback to mock embeddings if no API key
-    Settings.embed_model = GeminiEmbedding(api_key="mock-key", model="text-embedding-004")
 
 
 class GeminiEmbedding(BaseEmbedding):
@@ -50,9 +41,11 @@ class GeminiEmbedding(BaseEmbedding):
     Gemini embedding wrapper for LlamaIndex that uses Gemini's text-embedding-004 model.
     Provides proper fallback to mock embeddings if Gemini API is unavailable.
     """
+    api_key: str
+    model: str = "text-embedding-004"
+
     def __init__(self, api_key: str, model: str = "text-embedding-004"):
-        self.api_key = api_key
-        self.model = model
+        super().__init__(api_key=api_key, model=model)
         self._client = None
         self._initialize_client()
 
@@ -108,6 +101,14 @@ class GeminiEmbedding(BaseEmbedding):
     @property
     def embed_batch_size(self) -> int:
         return 10  # Conservative batch size for Gemini API
+
+# Configure embedding model to use Gemini instead of OpenAI
+gemini_key = os.getenv("GEMINI_API_KEY")
+if gemini_key:
+    Settings.embed_model = GeminiEmbedding(api_key=gemini_key, model="text-embedding-004")
+else:
+    # Fallback to mock embeddings if no API key
+    Settings.embed_model = GeminiEmbedding(api_key="mock-key", model="text-embedding-004")
 
 class GeminiLLM(CustomLLM):
     """
@@ -1010,9 +1011,19 @@ CRITICAL RULES:
 3.  **Counting Companies**: When counting companies for a job domain, you MUST `JOIN roles` to `companies` and `COUNT(DISTINCT companies.id)`.
 4.  **Error Condition**: If the user's question CANNOT be answered using the provided schema (e.g., asking for "B2B companies" when there is no 'B2B' category), you MUST return the single phrase **QUERY_ERROR** and nothing else.
 
+PRIORITY FILTERING:
+- If the input contains "Identified Role:" or "Identified Specialization:", prioritize filtering by `roles.title` (for specific roles) or `roles.specialization` (for domains) BEFORE falling back to other columns.
+- Use the identified entities as the primary filter criteria, even if they differ from the natural language question.
+- For role-specific queries, filter by `roles.title` using exact or LIKE matching.
+- For specialization queries, filter by `roles.specialization` using UPPER() matching.
+
 EXAMPLES:
 *   **User Question**: "How many companies for Finance?"
     *   **SQL**: `SELECT COUNT(DISTINCT c.id) FROM companies c JOIN roles r ON r.company_id = c.id WHERE r.specialization = 'FINANCE'`
+*   **User Question**: "-- Context from Intent Router -- Identified Specialization: FINANCE -- Original User Question -- how many companies for portfolio management"
+    *   **SQL**: `SELECT COUNT(DISTINCT c.id) FROM companies c JOIN roles r ON r.company_id = c.id WHERE r.specialization = 'FINANCE'`
+*   **User Question**: "-- Context from Intent Router -- Identified Role: Portfolio Manager -- Original User Question -- how many companies came for portfolio management"
+    *   **SQL**: `SELECT COUNT(DISTINCT c.id) FROM companies c JOIN roles r ON r.company_id = c.id WHERE UPPER(r.title) LIKE UPPER('%Portfolio Manager%')`
 *   **User Question**: "list b2b companies"
     *   **SQL**: `QUERY_ERROR`
 *   **User Question**: "top 5 paying companies"

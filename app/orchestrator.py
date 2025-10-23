@@ -212,14 +212,30 @@ class QueryOrchestrator:
             if decision.entities.year:
                 query_parts.append(f"year: {decision.entities.year}")
             
-            # Construct natural query
-            if query_parts:
-                natural_query = f"{decision.intent} for {', '.join(query_parts)}"
+            # Construct natural query with entity context
+            entity_context = []
+
+            if decision.entities.specialization:
+                entity_context.append(f"Identified Specialization: {', '.join(decision.entities.specialization)}")
+
+            if decision.entities.role:
+                entity_context.append(f"Identified Role: {', '.join(decision.entities.role)}")
+
+            if decision.entities.company:
+                entity_context.append(f"Identified Company: {', '.join(decision.entities.company)}")
+
+            if decision.entities.year:
+                entity_context.append(f"Identified Year: {decision.entities.year}")
+
+            # Build enhanced query with context
+            if entity_context:
+                context_prefix = "-- Context from Intent Router --\n" + "\n".join(entity_context) + "\n-- Original User Question --\n"
+                natural_query = context_prefix + user_query
             else:
-                natural_query = decision.intent
-            
+                natural_query = user_query
+
             print(f"   📝 SQL Query: {natural_query}")
-            
+
             # Call existing SQL tool
             result = run_sql_query(natural_query)
             
