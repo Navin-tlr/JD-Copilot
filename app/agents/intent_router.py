@@ -486,7 +486,13 @@ Your purpose is not to answer but to understand and route with absolute clarity.
         print(f"✅ Gemini response received ({len(response)} chars)")
         
         # Parse JSON response
-        decision_dict = self._parse_llm_response(response)
+        try:
+            decision_dict = self._parse_llm_response(response)
+        except Exception as e:
+            # If parsing fails, fall back to heuristic classification
+            print(f"❌ Failed to parse LLM response: {e}")
+            print("🔄 Falling back to heuristic classification...")
+            return self._heuristic_classification(query)
         
         # Convert to RouterDecision object
         decision = self._dict_to_decision(decision_dict)
@@ -514,7 +520,8 @@ Your purpose is not to answer but to understand and route with absolute clarity.
         except json.JSONDecodeError as e:
             print(f"⚠️ JSON parse error: {e}")
             print(f"Response: {response[:200]}...")
-            raise
+            # If JSON parsing fails, fall back to heuristic classification
+            raise RuntimeError("JSON parsing failed") from e
     
     def _dict_to_decision(self, data: Dict[str, Any]) -> RouterDecision:
         """Convert dictionary to RouterDecision object."""

@@ -32,6 +32,83 @@ from sqlalchemy import create_engine
 # Disable default tokenization to avoid tiktoken dependency
 Settings.tokenizer = None
 
+# Configure embedding model to use Gemini instead of OpenAI
+from .agent import GeminiEmbedding
+import os
+
+# Configure embedding model to use Gemini instead of OpenAI
+gemini_key = os.getenv("GEMINI_API_KEY")
+if gemini_key:
+    Settings.embed_model = GeminiEmbedding(api_key=gemini_key, model="text-embedding-004")
+else:
+    # Fallback to mock embeddings if no API key
+    Settings.embed_model = GeminiEmbedding(api_key="mock-key", model="text-embedding-004")
+
+
+class GeminiEmbedding(BaseEmbedding):
+    """
+    Gemini embedding wrapper for LlamaIndex that uses Gemini's text-embedding-004 model.
+    Provides proper fallback to mock embeddings if Gemini API is unavailable.
+    """
+    def __init__(self, api_key: str, model: str = "text-embedding-004"):
+        self.api_key = api_key
+        self.model = model
+        self._client = None
+        self._initialize_client()
+
+    def _initialize_client(self):
+        """Initialize Gemini client for embeddings."""
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=self.api_key)
+            self._client = genai
+            print(f"✅ Gemini embedding initialized: {self.model} (dimension=768)")
+        except ImportError:
+            raise RuntimeError("❌ google-generativeai package not installed")
+        except Exception as exc:
+            raise RuntimeError(f"❌ Failed to initialize Gemini embedding: {exc}")
+
+    def _get_embedding(self, text: str, task_type: str = "retrieval_document") -> List[float]:
+        """Get embedding for text using Gemini."""
+        if not self._client:
+            print("⚠️ Gemini client not initialized, using mock embeddings")
+            return [0.0] * 768  # Fallback to mock embeddings
+
+        try:
+            result = self._client.embed_content(
+                model=f"models/{self.model}",
+                content=text,
+                task_type=task_type
+            )
+            return result['embedding']
+        except Exception as exc:
+            print(f"⚠️ Gemini embedding failed: {exc}, falling back to mock")
+            return [0.0] * 768  # Fallback to mock embeddings
+
+    def _get_query_embedding(self, query: str) -> List[float]:
+        """Get embedding for query text."""
+        return self._get_embedding(query, task_type="retrieval_query")
+
+    def _get_text_embedding(self, text: str) -> List[float]:
+        """Get embedding for document text."""
+        return self._get_embedding(text, task_type="retrieval_document")
+
+    async def _aget_query_embedding(self, query: str) -> List[float]:
+        """Async version of query embedding."""
+        import asyncio
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self._get_query_embedding, query)
+
+    async def _aget_text_embedding(self, text: str) -> List[float]:
+        """Async version of text embedding."""
+        import asyncio
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self._get_text_embedding, text)
+
+    @property
+    def embed_batch_size(self) -> int:
+        return 10  # Conservative batch size for Gemini API
+
 class GeminiLLM(CustomLLM):
     """
     Gemini wrapper for LlamaIndex that replaces OpenAI wrapper in SQL tools.
@@ -864,25 +941,56 @@ SEMANTIC MAPPING:
                 print("❌ No Gemini API key available")
                 return None
 
-            # Create mock embedding to avoid external dependencies
-            class MockEmbedding(BaseEmbedding):
-                def _get_query_embedding(self, query: str):
-                    return [0.0] * 384
-                    
-                def _get_text_embedding(self, text: str):
-                    return [0.0] * 384
-                    
-                async def _aget_query_embedding(self, query: str):
-                    return [0.0] * 384
-                    
-                async def _aget_text_embedding(self, text: str):
-                    return [0.0] * 384
-                    
-                @property
-                def embed_batch_size(self) -> int:
-                    return 10
-                    
-            embed_model = MockEmbedding()
+            # Initialize Gemini embedding if API key is available
+            if settings.GEMINI_API_KEY:
+                try:
+                    embed_model = GeminiEmbedding(
+                        api_key=settings.GEMINI_API_KEY,
+                        model="text-embedding-004"
+                    )
+                    print("✅ Using Gemini embeddings for SQL query engine")
+                except Exception as e:
+                    print(f"⚠️ Failed to initialize Gemini embeddings: {e}. Falling back to mock embeddings.")
+                    # Fallback to mock embedding
+                    class MockEmbedding(BaseEmbedding):
+                        def _get_query_embedding(self, query: str):
+                            return [0.0] * 768  # Match Gemini dimension
+
+                        def _get_text_embedding(self, text: str):
+                            return [0.0] * 768
+
+                        async def _aget_query_embedding(self, query: str):
+                            return [0.0] * 768
+
+                        async def _aget_text_embedding(self, text: str):
+                            return [0.0] * 768
+
+                        @property
+                        def embed_batch_size(self) -> int:
+                            return 10
+
+                    embed_model = MockEmbedding()
+            else:
+                print("⚠️ No GEMINI_API_KEY available. Using mock embeddings.")
+                # Fallback to mock embedding
+                class MockEmbedding(BaseEmbedding):
+                    def _get_query_embedding(self, query: str):
+                        return [0.0] * 768
+
+                    def _get_text_embedding(self, text: str):
+                        return [0.0] * 768
+
+                    async def _aget_query_embedding(self, query: str):
+                        return [0.0] * 768
+
+                    async def _aget_text_embedding(self, text: str):
+                        return [0.0] * 768
+
+                    @property
+                    def embed_batch_size(self) -> int:
+                        return 10
+
+                embed_model = MockEmbedding()
 
             # Create NLSQLTableQueryEngine with explicit embedding and custom prompt
             from llama_index.core.prompts import PromptTemplate
