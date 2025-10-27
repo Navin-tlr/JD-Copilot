@@ -227,9 +227,12 @@ IMPORTANT:
             roles = []
             if data.get("roles"):
                 for role_data in data["roles"]:
+                    spec = role_data.get("specialization", "MARKETING")
+                    # Normalize specialization: lowercase, replace '&' with 'and', remove symbols
+                    spec_normalized = spec.lower().replace('&', 'and').replace('#', '').strip()
                     role = Role(
                         title=role_data.get("title", ""),
-                        specialization=role_data.get("specialization", "MARKETING"),  # Default to MARKETING if missing
+                        specialization=spec_normalized,  # Normalized lowercase
                         location=role_data.get("location"),
                         salary_min_lpa=role_data.get("salary_min_lpa"),
                         salary_max_lpa=role_data.get("salary_max_lpa"),

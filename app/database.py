@@ -186,6 +186,9 @@ class PlacementDatabase:
                 roles = extraction_data.get("roles", [])
                 for role_data in roles:
                     # Insert role with specialization
+                    spec = role_data.get("specialization", "General")
+                    # Normalize specialization: lowercase, replace '&' with 'and', remove symbols
+                    spec_normalized = spec.lower().replace('&', 'and').replace('#', '').strip()
                     role_types = role_data.get("role_types")  # expected list already
                     role_types_json = json.dumps(role_types) if isinstance(role_types, list) else None
                     cursor.execute("""
@@ -194,7 +197,7 @@ class PlacementDatabase:
                     """, (
                         company_id,
                         role_data.get("title", ""),
-                        role_data.get("specialization", "General"),
+                        spec_normalized,
                         role_data.get("location"),
                         role_data.get("role_description", ""),
                         role_types_json,
@@ -355,7 +358,8 @@ class PlacementDatabase:
                 params = []
                 
                 if specialization:
-                    filters.append("r.specialization = ?")
+                    # Case-insensitive exact match
+                    filters.append("LOWER(r.specialization) = LOWER(?)")
                     params.append(specialization)
                 
                 filters.append("o.batch_year = ?")
@@ -607,7 +611,7 @@ class PlacementDatabase:
                     FROM companies c
                     JOIN roles r ON c.id = r.company_id
                     JOIN offers o ON r.id = o.role_id
-                    WHERE r.specialization = ? AND o.batch_year = ?
+                    WHERE LOWER(r.specialization) = LOWER(?) AND o.batch_year = ?
                 """, (specialization, batch_year))
                 
                 stats = cursor.fetchone()
@@ -619,7 +623,7 @@ class PlacementDatabase:
                     FROM companies c
                     JOIN roles r ON c.id = r.company_id
                     JOIN offers o ON r.id = o.role_id
-                    WHERE r.specialization = ? AND o.batch_year = ?
+                    WHERE LOWER(r.specialization) = LOWER(?) AND o.batch_year = ?
                     GROUP BY c.id, c.company_name
                     ORDER BY avg_salary DESC
                     LIMIT 5
@@ -634,7 +638,7 @@ class PlacementDatabase:
                     FROM skills s
                     JOIN roles r ON s.role_id = r.id
                     JOIN offers o ON r.id = o.role_id
-                    WHERE r.specialization = ? AND o.batch_year = ?
+                    WHERE LOWER(r.specialization) = LOWER(?) AND o.batch_year = ?
                     GROUP BY s.skill_name
                     ORDER BY count DESC
                     LIMIT 10
@@ -670,7 +674,7 @@ class PlacementDatabase:
                     SELECT o.salary_max_lpa
                     FROM roles r
                     JOIN offers o ON r.id = o.role_id
-                    WHERE r.specialization = ? AND o.batch_year = ?
+                    WHERE LOWER(r.specialization) = LOWER(?) AND o.batch_year = ?
                     AND o.salary_max_lpa IS NOT NULL
                     ORDER BY o.salary_max_lpa
                 """, (specialization, batch_year))

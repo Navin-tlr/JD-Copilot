@@ -66,7 +66,7 @@ CANONICAL_QUERIES = {
     },
     # Operations
     "count_operations_companies": {
-        "keywords": ["companies came for operations", "operations role", "count companies for operations", "for operations"],
+        "keywords": ["companies came for operations", "operations role", "count companies for operations", "for operations", "#operations", "lean operations", "lean operation", "operations & systems", "lean operations & systems"],
         "query": (
             "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
             "JOIN companies c ON r.company_id = c.id "
@@ -74,7 +74,7 @@ CANONICAL_QUERIES = {
         ),
     },
     "list_operations_companies": {
-        "keywords": ["list companies for operations", "operations companies list"],
+        "keywords": ["list companies for operations", "operations companies list", "who are the companies for operations", "#operations companies"],
         "query": (
             "SELECT DISTINCT c.company_name FROM roles r "
             "JOIN companies c ON r.company_id = c.id "
@@ -83,24 +83,24 @@ CANONICAL_QUERIES = {
     },
     # Analytics
     "count_analytics_companies": {
-        "keywords": ["companies came for analytics", "analytics role", "count companies for analytics", "for analytics"],
+        "keywords": ["companies came for analytics", "analytics role", "count companies for analytics", "for analytics", "#analytics", "business analytics"],
         "query": (
             "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
             "JOIN companies c ON r.company_id = c.id "
-            "WHERE LOWER(r.specialization) = 'analytics';"
+            "WHERE LOWER(r.specialization) = 'business analytics';"
         ),
     },
     "list_analytics_companies": {
-        "keywords": ["list companies for analytics", "analytics companies list"],
+        "keywords": ["list companies for analytics", "analytics companies list", "#analytics companies", "business analytics companies"],
         "query": (
             "SELECT DISTINCT c.company_name FROM roles r "
             "JOIN companies c ON r.company_id = c.id "
-            "WHERE LOWER(r.specialization) = 'analytics' ORDER BY c.company_name;"
+            "WHERE LOWER(r.specialization) = 'business analytics' ORDER BY c.company_name;"
         ),
     },
     # IT
     "count_it_companies": {
-        "keywords": ["companies came for it", "it role", "count companies for it", "for it", "information technology"],
+        "keywords": ["companies came for it", "it role", "count companies for it", "for it", "information technology", "#it"],
         "query": (
             "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
             "JOIN companies c ON r.company_id = c.id "
@@ -108,7 +108,7 @@ CANONICAL_QUERIES = {
         ),
     },
     "list_it_companies": {
-        "keywords": ["list companies for it", "it companies list"],
+        "keywords": ["list companies for it", "it companies list", "#it companies"],
         "query": (
             "SELECT DISTINCT c.company_name FROM roles r "
             "JOIN companies c ON r.company_id = c.id "
@@ -117,7 +117,7 @@ CANONICAL_QUERIES = {
     },
     # Strategy
     "count_strategy_companies": {
-        "keywords": ["companies came for strategy", "strategy role", "count companies for strategy", "for strategy"],
+        "keywords": ["companies came for strategy", "strategy role", "count companies for strategy", "for strategy", "#strategy"],
         "query": (
             "SELECT COUNT(DISTINCT c.company_name) FROM roles r "
             "JOIN companies c ON r.company_id = c.id "
@@ -125,7 +125,7 @@ CANONICAL_QUERIES = {
         ),
     },
     "list_strategy_companies": {
-        "keywords": ["list companies for strategy", "strategy companies list"],
+        "keywords": ["list companies for strategy", "strategy companies list", "#strategy companies"],
         "query": (
             "SELECT DISTINCT c.company_name FROM roles r "
             "JOIN companies c ON r.company_id = c.id "
@@ -381,7 +381,28 @@ def _create_sql_query_engine():
 
     # Use Gemini LLM wrapper
     model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-    llm = GeminiLLM(api_key=gemini_key, model=model_name, temperature=0.0)
+    llm = GeminiLLM(
+        api_key=gemini_key,
+        model=model_name,
+        temperature=0.0,
+        system_prompt="""You are a SQL expert for MBA placement data. Output ONLY the SQL query. No explanations.
+
+Key tables:
+- companies: id, company_name
+- roles: id, company_id, specialization, title
+- offers: id, role_id, salary_min_lpa, salary_max_lpa
+
+Input includes pre-normalized specialization (lowercase).
+
+RULES:
+1. For counts: SELECT COUNT(DISTINCT c.company_name) FROM companies c JOIN roles r ON c.id = r.company_id WHERE LOWER(r.specialization) = LOWER('specialization')
+2. For lists: SELECT DISTINCT c.company_name FROM companies c JOIN roles r ON c.id = r.company_id WHERE LOWER(r.specialization) = LOWER('specialization') ORDER BY c.company_name
+3. For count + list: SELECT COUNT(DISTINCT c.id), GROUP_CONCAT(DISTINCT c.company_name) FROM companies c JOIN roles r ON r.company_id = c.id WHERE LOWER(r.specialization) = LOWER('specialization')
+4. Use LOWER() for case-insensitive matching.
+5. If no specialization, query all roles/companies.
+
+Adapt to question: count/list/combined. Use provided specialization directly."""
+    )
     _query_engine = NLSQLTableQueryEngine(sql_database=sql_db, tables=None, llm=llm)
     return _query_engine
 
