@@ -933,10 +933,17 @@ SEMANTIC MAPPING:
             # Initialize Gemini LLM using CustomLLM wrapper
             settings = get_settings()
             if settings.GEMINI_API_KEY:
-                llm = GeminiLLM(
+                from llama_index.llms.google import Gemini
+                llm = Gemini(
                     model=settings.GEMINI_MODEL or "gemini-2.5-flash",
                     api_key=settings.GEMINI_API_KEY,
-                    temperature=0.0
+                    safety_settings={
+                        'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE',
+                        'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE',
+                        'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_NONE',
+                        'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE',
+                    },
+                    transport="rest"
                 )
                 print(f"✅ Gemini LLM for SQL initialized with model: {llm.model}")
             else:
