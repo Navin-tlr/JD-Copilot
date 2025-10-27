@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import SpecializationPopup, { SpecializationSelection } from './SpecializationPopup';
+import CompanyPopup, { CompanySelection } from './CompanyPopup';
 
 interface ChatInputProps {
   variant?: 'default' | 'rag' | 'benchmark';
@@ -13,9 +14,18 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
   const [specializationTriggerIndex, setSpecializationTriggerIndex] = useState<number | null>(null);
   const [lastHashHandled, setLastHashHandled] = useState<number | null>(null);
   const [selectedSpecialization, setSelectedSpecialization] = useState<SpecializationSelection | null>(null);
+  const [isCompanyPopupOpen, setIsCompanyPopupOpen] = useState(false);
+  const [companyTriggerIndex, setCompanyTriggerIndex] = useState<number | null>(null);
+  const [lastSlashHandled, setLastSlashHandled] = useState<number | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<CompanySelection | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    console.log('State update: isCompanyPopupOpen =', isCompanyPopupOpen);
+  }, [isCompanyPopupOpen]);
   const navigate = useNavigate();
   const location = useLocation();
+  const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
 
   const getRagMode = () => location.pathname === '/rag';
   const ragMode = getRagMode();
@@ -75,6 +85,17 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
     }
   }, [input, selectedSpecialization]);
 
+  useEffect(() => {
+    if (!selectedCompany) {
+      return;
+    }
+
+    const token = selectedCompany.token.toLowerCase();
+    if (!input.toLowerCase().includes(token)) {
+      setSelectedCompany(null);
+    }
+  }, [input, selectedCompany]);
+
   const handleRagClick = () => {
     navigate('/rag');
   };
@@ -89,9 +110,26 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    console.log('DEBUG: onChange event - value:', value, 'lastSlashIndex:', value.lastIndexOf('/'));
+    console.log('DEBUG: Input onChange - new value:', value);
     setInput(value);
 
+    // Update cursor position
+    const cursorX = e.target.selectionStart || 0;
+    const rect = e.target.getBoundingClientRect();
+    const scrollLeft = e.target.scrollLeft;
+    const x = rect.left + (cursorX * 10) - scrollLeft; // Adjusted approximate char width to 10px for better accuracy
+    const y = rect.bottom + 8; // Position below the input
+    setCursorPosition({ x, y });
+    console.log('DEBUG: Cursor position updated to:', { x, y });
+
     const lastHashIndex = value.lastIndexOf('#');
+    const lastSlashIndex = value.lastIndexOf('/');
+    console.log('DEBUG: Last slash index:', lastSlashIndex, 'lastSlashHandled:', lastSlashHandled, 'current isCompanyPopupOpen:', isCompanyPopupOpen);
+
+    if (lastSlashIndex !== -1) {
+      console.log('DEBUG: Slash detected at index:', lastSlashIndex);
+    }
 
     if (lastHashIndex !== -1) {
       setSpecializationTriggerIndex(lastHashIndex);
@@ -108,6 +146,38 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
       }
       if (lastHashHandled !== null) {
         setLastHashHandled(null);
+      }
+    }
+
+    // Validate slash position: at start or after space
+    const isValidSlashTrigger = lastSlashIndex === 0 || (lastSlashIndex > 0 && value[lastSlashIndex - 1] === ' ');
+
+    if (lastSlashIndex !== -1 && isValidSlashTrigger) {
+      console.log('DEBUG: Valid slash trigger detected at index:', lastSlashIndex);
+      setCompanyTriggerIndex(lastSlashIndex);
+      if (lastSlashHandled !== lastSlashIndex) {
+        console.log('DEBUG: New valid slash position, opening company popup - setting isCompanyPopupOpen to true');
+        setIsCompanyPopupOpen(true);
+        setLastSlashHandled(lastSlashIndex);
+      } else {
+        console.log('DEBUG: Slash position unchanged and valid, popup state remains', isCompanyPopupOpen);
+      }
+    } else if (lastSlashIndex !== -1 && !isValidSlashTrigger) {
+      console.log('DEBUG: Slash detected but invalid position (not at start or after space), not opening popup');
+      // Close if open from previous valid trigger
+      if (isCompanyPopupOpen) {
+        setIsCompanyPopupOpen(false);
+      }
+    } else {
+      console.log('DEBUG: No slash found or invalid, closing company popup if open');
+      if (isCompanyPopupOpen) {
+        setIsCompanyPopupOpen(false);
+      }
+      if (companyTriggerIndex !== null) {
+        setCompanyTriggerIndex(null);
+      }
+      if (lastSlashHandled !== null) {
+        setLastSlashHandled(null);
       }
     }
   };
@@ -146,6 +216,43 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
     });
   };
 
+  const handleCompanySelect = (selection: CompanySelection) => {
+    console.log('Company selected:', selection.name, 'ID:', selection.id);
+    const triggerIndex =
+      companyTriggerIndex !== null ? companyTriggerIndex : input.lastIndexOf('/');
+
+    if (triggerIndex === -1) {
+      setIsCompanyPopupOpen(false);
+      setCompanyTriggerIndex(null);
+      setLastSlashHandled(null);
+      return;
+    }
+
+    const before = input.slice(0, triggerIndex);
+    const after = input.slice(triggerIndex + 1);
+    const baseToken = `@${selection.name}`;
+    const needsLeadingSpace = before.length > 0 && !/\s$/.test(before);
+    const needsTrailingSpace = after.length > 0 && !/^\s/.test(after);
+    const tokenWithSpacing = `${needsLeadingSpace ? ' ' : ''}${baseToken}${needsTrailingSpace ? ' ' : ''}`;
+    const nextValue = `${before}${tokenWithSpacing}${after}`;
+    console.log('Company insertion - new input value:', nextValue, 'triggerIndex:', triggerIndex, 'tokenWithSpacing:', tokenWithSpacing);
+
+    setInput(nextValue);
+    setSelectedCompany(selection);
+    setIsCompanyPopupOpen(false);
+    console.log('Closing company popup after selection');
+    setCompanyTriggerIndex(null);
+    setLastSlashHandled(null);
+
+    requestAnimationFrame(() => {
+      if (inputRef.current) {
+        const caretPosition = before.length + tokenWithSpacing.length;
+        inputRef.current.focus();
+        inputRef.current.setSelectionRange(caretPosition, caretPosition);
+      }
+    });
+  };
+
   const handleSend = () => {
     if (!active) return;
     onSend?.(input.trim());
@@ -154,6 +261,10 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
     setSpecializationTriggerIndex(null);
     setLastHashHandled(null);
     setIsSpecializationPopupOpen(false);
+    setSelectedCompany(null);
+    setCompanyTriggerIndex(null);
+    setLastSlashHandled(null);
+    setIsCompanyPopupOpen(false);
   };
 
   return (
@@ -188,9 +299,14 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
         value={input}
         onChange={handleInputChange}
         onKeyDown={(e) => {
+          console.log('Key pressed:', e.key);
+          if (e.key === '/') {
+            console.log('Slash key down detected');
+            // No preventDefault needed as we handle in onChange
+          }
           if (e.key === 'Enter') handleSend();
         }}
-  placeholder={variant === 'benchmark' ? 'Alright genius, spit out...' : 'Type # to select specialization...'}
+    placeholder={variant === 'benchmark' ? 'Alright genius, spit out...' : 'Type # for specialization or / for company...'}
         className="absolute left-[60px] top-[17px] bg-transparent outline-none text-[14px] font-normal w-[calc(100%-120px)]"
         style={{ color: colors.text, opacity: input ? 1 : 0.6 }}
       />
@@ -528,6 +644,21 @@ export default function ChatInput({ variant = 'default', onSend }: ChatInputProp
           setIsSpecializationPopupOpen(false);
           if (specializationTriggerIndex !== null) {
             setLastHashHandled(specializationTriggerIndex);
+          }
+        }}
+      />
+    
+      <CompanyPopup
+        isOpen={isCompanyPopupOpen}
+        variant={variant}
+        currentSelection={selectedCompany?.id ?? null}
+        filterText={companyTriggerIndex !== null ? input.slice(companyTriggerIndex + 1) : ''}
+        onSelect={handleCompanySelect}
+        onClose={() => {
+          setIsCompanyPopupOpen(false);
+          console.log('DEBUG: Closing company popup via onClose');
+          if (companyTriggerIndex !== null) {
+            setLastSlashHandled(companyTriggerIndex);
           }
         }}
       />
