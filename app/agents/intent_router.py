@@ -485,8 +485,17 @@ Your purpose is not to answer but to understand and route with absolute clarity.
         
         print(f"✅ Gemini response received ({len(response)} chars)")
         
-        # Parse JSON response
-        decision_dict = self._parse_llm_response(response)
+        # Parse JSON response with safety fallback
+        try:
+            decision_dict = self._parse_llm_response(response)
+        except json.JSONDecodeError:
+            import re
+            if re.search(r'content filter|safety', response, re.IGNORECASE):
+                print("Safety block detected; using heuristic fallback.")
+                fallback_decision = self._heuristic_classification(query)
+                return fallback_decision
+            else:
+                raise
         
         # Convert to RouterDecision object
         decision = self._dict_to_decision(decision_dict)
@@ -498,14 +507,24 @@ Your purpose is not to answer but to understand and route with absolute clarity.
     
     def _parse_llm_response(self, response: str) -> Dict[str, Any]:
         """Parse LLM response and extract JSON."""
-        # Robustly extract JSON from markdown code blocks
         import re
-        match = re.search(r"\{.*\}", response, re.DOTALL)
-        if not match:
-            print(f"⚠️ No JSON object found in LLM response: {response}")
-            raise json.JSONDecodeError("No JSON object found in response", response, 0)
+        import json
         
-        json_str = match.group(0)
+        # First try markdown JSON block
+        match = re.search(r'```json\s*(\{.*?\})\s*```', response, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+        else:
+            # Fallback to raw JSON
+            match = re.search(r"\{.*\}", response, re.DOTALL)
+            if not match:
+                print(f"⚠️ No JSON object found in LLM response: {response[:200]}...")
+                raise json.JSONDecodeError("No JSON object found in response", response, 0)
+            json_str = match.group(0)
+        
+        # Clean the extracted string: remove escaped newlines
+        json_str = re.sub(r'\\n', '\n', json_str)
+        json_str = json_str.strip()
         
         try:
             return json.loads(json_str)
@@ -597,11 +616,11 @@ Your purpose is not to answer but to understand and route with absolute clarity.
         
         # Determine route
         if is_count_query or is_list_query:
-            route = RouteDestination.STRUCTURED
+            route = RouteDestination.STRUCTURED_DB
             intent = "count_query" if is_count_query else "list_query"
             confidence = 0.7
         elif is_desc_query:
-            route = RouteDestination.UNSTRUCTURED
+            route = RouteDestination.VECTOR_DB
             intent = "description_query"
             confidence = 0.6
         else:

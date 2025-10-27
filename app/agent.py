@@ -933,7 +933,7 @@ SEMANTIC MAPPING:
             # Initialize Gemini LLM using CustomLLM wrapper
             settings = get_settings()
             if settings.GEMINI_API_KEY:
-                from llama_index.llms.google import Gemini
+                from llama_index.llms.gemini import Gemini
                 llm = Gemini(
                     model=settings.GEMINI_MODEL or "gemini-2.5-flash",
                     api_key=settings.GEMINI_API_KEY,

@@ -45,4 +45,4 @@ tiktoken
 sqlalchemy
 llama-index
 llama-index-llms-openai
-
+llama-index-llms-gemini>=0.2.0

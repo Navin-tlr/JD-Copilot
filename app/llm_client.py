@@ -58,12 +58,12 @@ class GeminiClient:
         # See GEMINI_SAFETY_FIX.md for full rationale
         from google.generativeai.types import HarmCategory, HarmBlockThreshold
         
-        self.safety_settings = {
-            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-        }
+        self.safety_settings = [
+            {"category": HarmCategory.HARM_CATEGORY_HARASSMENT, "threshold": HarmBlockThreshold.BLOCK_NONE},
+            {"category": HarmCategory.HARM_CATEGORY_HATE_SPEECH, "threshold": HarmBlockThreshold.BLOCK_NONE},
+            {"category": HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, "threshold": HarmBlockThreshold.BLOCK_NONE},
+            {"category": HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, "threshold": HarmBlockThreshold.BLOCK_NONE},
+        ]
         
         self._model = genai.GenerativeModel(self.model_name, safety_settings=self.safety_settings)
 
@@ -254,7 +254,6 @@ USER QUERY
                         temperature=temperature,
                     ),
                     request_options={"timeout": request_timeout},
-                    safety_settings=self.safety_settings,
                 )
                 return self._safe_get_text(resp)
             
@@ -271,7 +270,6 @@ USER QUERY
                     temperature=temperature,
                 ),
                 request_options={"timeout": request_timeout},
-                safety_settings=self.safety_settings,
             )
             return self._safe_get_text(resp)
         
