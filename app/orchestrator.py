@@ -289,8 +289,9 @@ class QueryOrchestrator:
             # Build filters
             filters = {}
             if decision.entities.company:
-                # Use first company for filtering
-                filters["company"] = decision.entities.company[0]
+                # Use first company for filtering, lowercase for company_norm in Pinecone
+                company_name = decision.entities.company[0].lower()
+                filters["company_norm"] = company_name
             
             # Retrieve snippets (top_k based on route)
             top_k = 100 if decision.route.value == "vector_db" else 50
@@ -350,7 +351,8 @@ class QueryOrchestrator:
                 # Build filters for synthesis
                 filters = {}
                 if decision.entities.company:
-                    filters["company"] = decision.entities.company[0]
+                    company_name = decision.entities.company[0].lower()
+                    filters["company_norm"] = company_name
                 
                 # Build context for synthesis
                 context = {}

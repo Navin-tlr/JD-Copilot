@@ -259,7 +259,7 @@ class PlacementDatabase:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT c.company_name, c.company_type, c.industry, c.location, 
+                    SELECT c.id, c.company_name, c.company_type, c.industry, c.location,
                            COUNT(DISTINCT r.id) as role_count
                     FROM companies c
                     LEFT JOIN roles r ON c.id = r.company_id

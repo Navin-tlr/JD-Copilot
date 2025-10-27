@@ -663,6 +663,22 @@ async def get_companies():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving companies: {str(e)}")
 
+
+@app.get("/api/companies")
+async def get_api_companies(limit: int = Query(100)):
+    """Get limited list of companies for autocomplete/popup (id, name only)."""
+    print(f"🔍 API /companies called with limit: {limit}")
+    try:
+        db = PlacementDatabase()
+        all_companies = db.get_companies()
+        limited_companies = all_companies[:limit]
+        response_data = [{"id": c["id"], "name": c["company_name"]} for c in limited_companies]
+        print(f"✅ /api/companies returning {len(response_data)} companies")
+        return response_data
+    except Exception as e:
+        print(f"❌ Error in /api/companies: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving companies: {str(e)}")
+
 @app.get("/role-types")
 async def get_role_types():
     """Get all distinct role types from the database for role selector."""

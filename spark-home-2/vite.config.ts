@@ -17,6 +17,10 @@ export default defineConfig(({ mode }) => {
         deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "server/**"],
       },
       proxy: {
+        "/api": {
+          target: backendProxyTarget || "http://localhost:8000",
+          changeOrigin: true,
+        },
         "/chat": {
           target: backendProxyTarget || "http://localhost:8000",
           changeOrigin: true,

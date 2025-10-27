@@ -136,6 +136,8 @@ Your outputs must be precise, machine-readable JSON and must never contain natur
      - Can extract multiple roles from a single query
    * `company` → array of company names (e.g., ["Deloitte", "PwC"], ["UNIQLO"], etc.)
      - Can extract multiple companies from a single query
+     - Recognize '@company' tokens: e.g., '@Aurm' → extract "Aurm" as company name, preserve original casing for matching
+     - Normalization: lowercase the company name extracted from '@company_name'
    * `year` → explicit or inferred (e.g., "this year", "last year", "2024")
 
 3. **Select Routing Path**
@@ -158,6 +160,8 @@ Your outputs must be precise, machine-readable JSON and must never contain natur
 
 **Critical:** Always normalize specializations to the exact database format (lowercase, 'and' instead of '&', singular where needed). For example, '#operations' or 'Lean Operations & Systems' → 'lean operation and systems'. "Analytics" (without "Business") should map to "general" specialization because it's ambiguous (could be Financial Analytics, HR Analytics, Marketing Analytics, etc.)
 
+For companies: Extract from '@company_name' format, normalize to lowercase (e.g., '@Aurm' → "aurm")
+
 | Step | Thought | Example Result |
 |------|---------|----------------|
 | 1 | Parse user query semantically | Understand the core intent and information being requested |
@@ -166,8 +170,9 @@ Your outputs must be precise, machine-readable JSON and must never contain natur
 | 4 | Handle "Analytics" disambiguation | If only "Analytics" (not "Business Analytics") → use "general" specialization |
 | 5 | Extract multiple entities if present | Query can have multiple roles, companies, or specializations |
 | 6 | Detect missing entities | Use empty arrays `[]` for missing roles/companies/specializations |
-| 7 | Determine routing based on query type | Quantitative → `structured_db`, Qualitative → `vector_db`, Both → `hybrid` |
-| 8 | Assess confidence | High confidence (≥0.85) → no memory needed; Low confidence (<0.50) → use memory |
+| 7 | For companies: recognize @company tokens and normalize to lowercase | e.g., '@aurm' → ["aurm"] |
+| 8 | Determine routing based on query type | Quantitative → `structured_db`, Qualitative → `vector_db`, Both → `hybrid` |
+| 9 | Assess confidence | High confidence (≥0.85) → no memory needed; Low confidence (<0.50) → use memory |
 
 ---
 
@@ -194,6 +199,7 @@ Your outputs must be precise, machine-readable JSON and must never contain natur
 - Output specializations in normalized lowercase form to match database (e.g., 'lean operation and systems' not 'Lean Operations & Systems')
 - "Analytics" alone → `["general"]` (ambiguous, could be any specialization's analytics)
 - "Business Analytics" → `["business analytics"]` (exact normalized match)
+- Companies from '@company': normalize to lowercase (e.g., '@Aurm' → "aurm")
 
 ---
 
@@ -328,6 +334,26 @@ User: "how many companies came for #operations, and who are they?"
   "use_memory": false,
   "confidence": 0.95,
   "reasoning": "Quantitative query requesting count and list of companies for operations specialization. Normalized '#operations' to 'lean operation and systems' to match database."
+}
+```
+
+**Example 6 — Company Token Extraction**
+
+User: "What roles does @Aurm offer in finance?"
+
+```json
+{
+  "intent": "company_roles_by_specialization",
+  "entities": {
+    "specialization": ["finance"],
+    "role": [],
+    "company": ["Aurm"],
+    "year": "not_specified"
+  },
+  "route": "structured_db",
+  "use_memory": false,
+  "confidence": 0.95,
+  "reasoning": "Query about roles for specific company in specialization. Extracted '@Aurm' as company 'Aurm' (original casing preserved). Quantitative/factual, route to structured_db."
 }
 ```
 
