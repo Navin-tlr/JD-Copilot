@@ -58,14 +58,14 @@ class GeminiClient:
         # See GEMINI_SAFETY_FIX.md for full rationale
         from google.generativeai.types import HarmCategory, HarmBlockThreshold
         
-        safety_settings = {
+        self.safety_settings = {
             HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
             HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
             HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
             HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
         }
         
-        self._model = genai.GenerativeModel(self.model_name, safety_settings=safety_settings)
+        self._model = genai.GenerativeModel(self.model_name, safety_settings=self.safety_settings)
 
     def _to_gemini_messages(self, messages: List[Dict[str, str]]) -> List[Dict[str, List[str]]]:
         """Convert OpenAI-style messages to Gemini format.
@@ -254,6 +254,7 @@ USER QUERY
                         temperature=temperature,
                     ),
                     request_options={"timeout": request_timeout},
+                    safety_settings=self.safety_settings,
                 )
                 return self._safe_get_text(resp)
             
@@ -270,6 +271,7 @@ USER QUERY
                     temperature=temperature,
                 ),
                 request_options={"timeout": request_timeout},
+                safety_settings=self.safety_settings,
             )
             return self._safe_get_text(resp)
         

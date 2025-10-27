@@ -450,7 +450,7 @@ Your purpose is not to answer but to understand and route with absolute clarity.
                 return self.llm_client.chat(
                     messages,
                     temperature=0.1,
-                    max_tokens=800,
+                    max_tokens=1200,
                     timeout=max(10.0, timeout_sec - 2.0)  # Ensure Gemini times out before asyncio
                 )
             finally:
@@ -498,22 +498,20 @@ Your purpose is not to answer but to understand and route with absolute clarity.
     
     def _parse_llm_response(self, response: str) -> Dict[str, Any]:
         """Parse LLM response and extract JSON."""
-        # Remove markdown code blocks if present
-        response = response.strip()
-        if response.startswith("```json"):
-            response = response[7:]
-        if response.startswith("```"):
-            response = response[3:]
-        if response.endswith("```"):
-            response = response[:-3]
+        # Robustly extract JSON from markdown code blocks
+        import re
+        match = re.search(r"\{.*\}", response, re.DOTALL)
+        if not match:
+            print(f"⚠️ No JSON object found in LLM response: {response}")
+            raise json.JSONDecodeError("No JSON object found in response", response, 0)
         
-        response = response.strip()
+        json_str = match.group(0)
         
         try:
-            return json.loads(response)
+            return json.loads(json_str)
         except json.JSONDecodeError as e:
             print(f"⚠️ JSON parse error: {e}")
-            print(f"Response: {response[:200]}...")
+            print(f"Extracted JSON string: {json_str[:200]}...")
             raise
     
     def _dict_to_decision(self, data: Dict[str, Any]) -> RouterDecision:

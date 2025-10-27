@@ -229,7 +229,8 @@ class OpenRouterLLM(CustomLLM):
             "1) Map MBA domains like Marketing, Finance, HR, Operations, Analytics to roles.specialization (NOT companies.industry).\n"
             "2) To count companies for a specialization, JOIN roles to companies and COUNT(DISTINCT companies.id).\n"
             "3) Prefer explicit qualified columns (table.column).\n"
-            "4) Do not infer new columns; only use listed schema.\n\n"
+            "4) Do not infer new columns; only use listed schema.\n"
+            "5) Do not use any variables or placeholders like 'user_query', '?', or ':param'. Use only literal values and schema names.\n\n"
             "Examples:\n"
             "- Q: How many companies came for Marketing?\n"
             "  SQL: SELECT COUNT(DISTINCT c.id) FROM companies c JOIN roles r ON r.company_id = c.id WHERE r.specialization = 'Marketing';\n"
@@ -1004,12 +1005,14 @@ DATABASE SCHEMA WITH INTENT MAPPING:
 {schema}
 
 CRITICAL RULES:
+
 1.  **Strict Schema Adherence**: Only use the tables and columns provided in the schema. Do not invent columns or assume relationships.
 2.  **Intent Mapping**:
     *   **Job Domains** (e.g., Marketing, Finance, HR, Operations, IT, Analytics): Map to `roles.specialization`. These are stored in UPPERCASE. Use `UPPER()` for matching.
     *   **Company Industries** (e.g., Tech, Healthcare): Map to `companies.industry`.
 3.  **Counting Companies**: When counting companies for a job domain, you MUST `JOIN roles` to `companies` and `COUNT(DISTINCT companies.id)`.
 4.  **Error Condition**: If the user's question CANNOT be answered using the provided schema (e.g., asking for "B2B companies" when there is no 'B2B' category), you MUST return the single phrase **QUERY_ERROR** and nothing else.
+5.  **No Variables**: Do not use any variables, placeholders, or parameters like 'user_query', '?', ':param', or any other substitution. Use only literal values and schema names.
 
 PRIORITY FILTERING:
 - If the input contains "Identified Role:" or "Identified Specialization:", prioritize filtering by `roles.title` (for specific roles) or `roles.specialization` (for domains) BEFORE falling back to other columns.
@@ -1034,7 +1037,6 @@ QUESTION: {query_str}
 Generate ONLY the SQL query or QUERY_ERROR. Do not provide any explanation.
 """
             )
-
             _sql_query_engine = NLSQLTableQueryEngine(
                 sql_database=sql_database,
                 llm=llm,
@@ -1619,13 +1621,13 @@ def execute_structured_query(user_question: str) -> str:
             response = engine.query(user_question)
             sql_gen_ms = (time.perf_counter() - sql_start) * 1000.0
             LAST_TIMINGS['sql_generation_ms'] = sql_gen_ms
-            
+
             # Intercept and correct common column mix-up: industry vs specialization
             corrected = _maybe_rewrite_specialization_answer(user_question, response)
             if corrected is not None:
                 LAST_TIMINGS['summarization_ms'] = 0.0  # skip summarization path
                 LAST_TIMINGS['total_ms'] = sum(v for v in LAST_TIMINGS.values())
-                
+
                 return corrected
 
             summary_start = time.perf_counter()
@@ -1658,6 +1660,25 @@ def execute_structured_query(user_question: str) -> str:
             return summary
         except Exception as e:
             print(f"❌ SQL query failed: {e}")
+            # Check if the error is due to undefined variables in SQL
+            error_str = str(e).lower()
+            if "user_query" in error_str or "name" in error_str and "not defined" in error_str:
+                print("⚠️ Detected undefined variable in SQL query, attempting fallback")
+                # Try to extract meaningful answer from the question
+                spec = _extract_specialization_from_question(user_question)
+                if spec and "how many companies" in user_question.lower():
+                    try:
+                        db = PlacementDatabase()
+                        companies = db.get_companies_by_specialization(spec, batch_year=None)
+                        count = len(set(c.get("company_name", "").strip() for c in companies if c.get("company_name", "").strip()))
+                        if count == 0:
+                            return f"0 companies came for {spec}."
+                        else:
+                            names = ", ".join(sorted(set(c.get("company_name", "").strip() for c in companies if c.get("company_name", "").strip())))
+                            return f"{count} companies came for {spec} — they are: {names}."
+                    except Exception as fallback_e:
+                        print(f"⚠️ Fallback also failed: {fallback_e}")
+                        return f"SQL query failed for company count. Error details: {e}. Check database schema and query syntax."
             return f"SQL query failed for company count. Error details: {e}. Check database schema and query syntax."
     else:
         return "SQL query engine not available."
@@ -2121,8 +2142,8 @@ def _summarize_sql_with_llm(question: str, sql_result: str) -> str:
     """Use LLM to summarize SQL results in natural language."""
     settings = get_settings()
 
-    if not settings.OPENROUTER_API_KEY:
-        return sql_result
+    if not settings.OPENROUTER_API_KEY or "QUERY_ERROR" in sql_result:
+        return "I cannot answer this question with the available data."
 
     prompt = f"""Summarize this SQL query result for the user question.
 

@@ -105,6 +105,7 @@ class QueryOrchestrator:
         
         # Step 4: Execute retrieval based on route
         retrieved_data = await self._execute_retrieval(
+            user_query=user_query,
             decision=router_decision,
             memory_context=memory_context
         )
@@ -159,6 +160,7 @@ class QueryOrchestrator:
     
     async def _execute_retrieval(
         self,
+        user_query: str,
         decision: RouterDecision,
         memory_context: Optional[Dict[str, Any]]
     ) -> Dict[str, Any]:
@@ -176,26 +178,26 @@ class QueryOrchestrator:
         }
         
         if decision.route.value == "structured_db":
-            retrieved_data["sql_results"] = await self._query_sql(decision)
+            retrieved_data["sql_results"] = await self._query_sql(user_query, decision)
         
         elif decision.route.value == "vector_db":
-            retrieved_data["vector_results"] = await self._query_vector(decision)
+            retrieved_data["vector_results"] = await self._query_vector(user_query, decision)
         
         elif decision.route.value == "hybrid":
             # Parallel execution
-            retrieved_data["sql_results"] = await self._query_sql(decision)
-            retrieved_data["vector_results"] = await self._query_vector(decision)
+            retrieved_data["sql_results"] = await self._query_sql(user_query, decision)
+            retrieved_data["vector_results"] = await self._query_vector(user_query, decision)
         
         return retrieved_data
     
-    async def _query_sql(self, decision: RouterDecision) -> Optional[List[Dict[str, Any]]]:
+    async def _query_sql(self, user_query: str, decision: RouterDecision) -> Optional[List[Dict[str, Any]]]:
         """
         Query SQL database using existing SQL tool.
         """
         print("   📊 SQL: Querying structured database...")
         
         try:
-            from app.sql_tool import run_sql_query
+            from app.agent import get_sql_query_engine
             
             # Build natural language query from entities
             query_parts = []
@@ -237,19 +239,25 @@ class QueryOrchestrator:
             print(f"   📝 SQL Query: {natural_query}")
 
             # Call existing SQL tool
-            result = run_sql_query(natural_query)
+            query_engine = get_sql_query_engine()
+            if not query_engine:
+                return [{"error": "SQL query engine not available.", "source": "sql_database"}]
+
+            response = query_engine.query(natural_query)
             
-            if result and isinstance(result, str):
-                # Wrap string result in structured format
-                return [{"answer": result, "source": "sql_database"}]
-            
-            return [{"answer": "No SQL results found", "source": "sql_database"}]
+            result_str = str(response.response)
+            sql_query = response.metadata.get("sql_query", "No SQL query extracted.")
+
+            if result_str and "QUERY_ERROR" not in result_str:
+                 return [{"answer": result_str, "source": "sql_database", "query": sql_query}]
+
+            return [{"answer": "I cannot answer this question with the available data.", "source": "sql_database", "query": sql_query}]
             
         except Exception as e:
             print(f"   ❌ SQL query failed: {e}")
             return [{"error": str(e), "source": "sql_database"}]
     
-    async def _query_vector(self, decision: RouterDecision) -> Optional[List[Dict[str, Any]]]:
+    async def _query_vector(self, user_query: str, decision: RouterDecision) -> Optional[List[Dict[str, Any]]]:
         """
         Query Pinecone vector database using existing RAG tool.
         """
@@ -274,7 +282,7 @@ class QueryOrchestrator:
             if query_parts:
                 vector_query = f"{decision.intent} {' '.join(query_parts)}"
             else:
-                vector_query = decision.intent
+                vector_query = user_query
             
             print(f"   🔍 Vector Query: {vector_query}")
             
