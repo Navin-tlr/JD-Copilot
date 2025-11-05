@@ -1,0 +1,23 @@
+# Extraction Configuration
+# Loaded in modules via yaml.safe_load or Pydantic
+
+specialization_detector:
+  model: "anthropic/claude-3.5-sonnet"  # Or env OPENROUTER_MODEL
+  confidence_threshold: 0.15
+  top_k: 3  # Limit to top 3 specs
+  fallback: true  # Use keyword fallback if LLM fails
+
+level1_mapper:
+  model: "anthropic/claude-3.5-sonnet"
+  confidence_threshold: 0.2
+  return_provenance: true  # Always include specializations list
+
+level2_extractor:
+  model: "anthropic/claude-3.5-sonnet"
+  confidence_threshold: 0.2
+  max_subroles_per_level1: 3  # Limit per Level 1
+
+general:
+  use_fallback_classifier: true  # Global fallback toggle
+  legacy_mode_env: "LEGACY_ROLE_MAP"  # Env var for rollback
+  sampling_rate: 0.01  # 1% for QA logging

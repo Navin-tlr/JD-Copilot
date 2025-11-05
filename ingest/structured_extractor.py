@@ -1,6 +1,7 @@
 """
 Structured Extraction Module - LLM-powered fact extraction from PDFs
 Extracts company, role, salary, and skill information into structured JSON format
+Augmented with role hierarchy extraction (Level 1/2 roles) using sequential LLM calls
 """
 
 import json
@@ -22,6 +23,10 @@ class Role:
     skills: List[str] = None
     requirements: List[str] = None
     responsibilities: List[str] = None
+    level1_roles: Optional[List[str]] = None
+    level2_roles: Optional[List[str]] = None
+    hierarchy_confidence: Optional[float] = None
+    is_hybrid: Optional[bool] = False
 
 @dataclass
 class CompanyExtraction:
@@ -41,6 +46,68 @@ class StructuredExtractor:
         self.settings = get_settings()
         # Debug: Print the loaded model at init
         print(f"[DEBUG] StructuredExtractor loaded OPENROUTER_MODEL: {self.settings.OPENROUTER_MODEL}")
+        
+        # Initialize OpenRouter wrapper for hierarchy extraction
+        self.wrapper = None
+        if self.settings.OPENROUTER_API_KEY:
+            try:
+                from app.openrouter_wrapper import OpenRouterWrapper
+                self.wrapper = OpenRouterWrapper()
+                print(f"[DEBUG] OpenRouterWrapper initialized for hierarchy extraction")
+            except Exception as e:
+                print(f"[WARNING] Failed to initialize OpenRouterWrapper: {e}")
+                self.wrapper = None
+        
+        # Hardcoded Level 1 role maps per specialization (based on MBA hierarchies)
+        self.LEVEL1_MAPS = {
+            "marketing": [
+                "B2B Sales",
+                "FMCG Sales",
+                "Digital Marketing",
+                "Brand Management",
+                "Market Research",
+                "Product Management",
+                "Advertising",
+                "Public Relations"
+            ],
+            "finance": [
+                "Investment Banking",
+                "Corporate Finance",
+                "Financial Planning and Analysis",
+                "Risk Management",
+                "Treasury Management",
+                "Internal Audit",
+                "Taxation"
+            ],
+            "hr": [
+                "Talent Acquisition",
+                "Learning and Development",
+                "Employee Relations",
+                "Compensation and Benefits",
+                "HR Business Partner",
+                "Organizational Development",
+                "Diversity and Inclusion"
+            ],
+            "lean operation and systems": [
+                "Supply Chain Management",
+                "Operations Management",
+                "Lean Manufacturing",
+                "Quality Management",
+                "Project Management",
+                "Logistics and Distribution",
+                "Process Engineering"
+            ],
+            "business analytics": [
+                "Data Analysis",
+                "Business Intelligence",
+                "Predictive Analytics",
+                "Data Visualization",
+                "Machine Learning for Business",
+                "Operations Research",
+                "Analytics Consulting"
+            ]
+        }
+        
         self.extraction_prompt = """You are an expert MBA Placement Analyst. Extract structured information from this job description PDF.
 
 EXTRACT ONLY the following information in valid JSON format:
@@ -91,9 +158,8 @@ PDF TEXT:
 
 EXTRACTED JSON:"""
 
-
     def extract_structured_data(self, text: str) -> Optional[CompanyExtraction]:
-        """Extract structured data using OpenRouter LLM"""
+        """Extract structured data using OpenRouter LLM, augmented with hierarchy"""
         try:
             if not self.settings.OPENROUTER_API_KEY:
                 print("❌ No OpenRouter API key available for structured extraction")
@@ -155,6 +221,12 @@ IMPORTANT:
                 if json_str:
                     print(f"✅ JSON Extracted: {json_str[:200]}...")
                     data = json.loads(json_str)
+                    
+                    # NEW: Augment core extraction with hierarchy for each role
+                    if "roles" in data:
+                        for role_data in data["roles"]:
+                            self._derive_hierarchy(role_data, text)
+                    
                     return self._parse_extraction_data(data)
                 else:
                     print(f"❌ Failed to extract JSON from response")
@@ -171,6 +243,135 @@ IMPORTANT:
             import traceback
             traceback.print_exc()
             return None
+
+    def _derive_hierarchy(self, role_data: Dict[str, Any], text: str) -> None:
+        """Derive Level 1/2 roles sequentially using LLM calls. Modifies role_data in place."""
+        if not self.wrapper:
+            print("[WARNING] No LLM wrapper available for hierarchy extraction")
+            role_data["level1_roles"] = []
+            role_data["level2_roles"] = []
+            role_data["hierarchy_confidence"] = 0.0
+            role_data["is_hybrid"] = False
+            return
+
+        spec = role_data.get("specialization", "").lower().strip()
+        text_lower = text.lower()
+
+        # Hybrid detection (example: financial analytics)
+        is_hybrid = False
+        specs_for_hierarchy = [spec]
+        if "analytics" in spec and "financial" in text_lower:
+            is_hybrid = True
+            specs_for_hierarchy = ["finance", "business analytics"]
+
+        # Get candidate Level 1 roles
+        level1_candidates = []
+        for s in specs_for_hierarchy:
+            if s in self.LEVEL1_MAPS:
+                level1_candidates.extend(self.LEVEL1_MAPS[s])
+        level1_candidates = list(set(level1_candidates))  # Unique
+
+        if not level1_candidates:
+            role_data["level1_roles"] = ["General"]
+            role_data["level2_roles"] = []
+            role_data["hierarchy_confidence"] = 0.5
+            role_data["is_hybrid"] = is_hybrid
+            return
+
+        # Step 2: LLM call to select matching Level 1 roles
+        level1_list_md = "\n".join([f"- {role}" for role in level1_candidates])
+        spec_desc = " and ".join(specs_for_hierarchy) if is_hybrid else spec.upper()
+        level1_prompt = f"""You are an MBA role hierarchy expert.
+
+Specialization: {spec_desc}
+This is a {'hybrid ' if is_hybrid else ''}role.
+
+Available Level 1 roles (use exact names):
+{level1_list_md}
+
+JD Context (select 1-3 most matching based on title, responsibilities, skills):
+{text[:2000]}
+
+Output ONLY valid JSON:
+{{"selected_level1": ["Exact Role Name1", "Exact Role Name2"], "confidence": 0.85}}
+If no close matches, use [] and confidence < 0.5."""
+
+        messages = [
+            {"role": "system", "content": "You are a precise JSON extractor. Return ONLY valid JSON, no additional text."},
+            {"role": "user", "content": level1_prompt}
+        ]
+
+        response = self.wrapper.chat(
+            messages,
+            model=self.settings.OPENROUTER_MODEL,
+            temperature=0.0,
+            max_tokens=200
+        )
+
+        level1_json = self._extract_json_from_response(response)
+        selected_level1 = []
+        level1_conf = 0.5
+        if level1_json:
+            try:
+                level1_data = json.loads(level1_json)
+                selected_level1 = level1_data.get("selected_level1", [])
+                level1_conf = float(level1_data.get("confidence", 0.5))
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        if not selected_level1 and level1_candidates:
+            selected_level1 = [level1_candidates[0]]  # Fallback to first
+            level1_conf = 0.3
+
+        if not selected_level1:
+            selected_level1 = ["General"]
+            level1_conf = 0.2
+
+        role_data["level1_roles"] = selected_level1
+
+        # Step 3: LLM call to derive Level 2 sub-roles
+        level2_candidates = []
+        level2_conf = 0.0
+        if selected_level1:
+            selected_str = ", ".join(selected_level1)
+            level2_prompt = f"""You are an MBA role expert.
+
+For each Level 1 role: {selected_str}
+
+Dynamically extract 1-3 specific Level 2 sub-roles from the JD text (based on responsibilities, requirements, skills). Use descriptive names implied by context.
+
+JD Text:
+{text}
+
+Output ONLY valid JSON:
+{{"level2_dict": {{"Level1A": ["Sub-role1", "Sub-role2"], "Level1B": ["Sub-role3"]}}, "confidence": 0.75}}
+If no sub-roles found for a Level 1, use empty list []. Overall confidence for all extractions."""
+
+            messages2 = [
+                {"role": "system", "content": "You are a precise JSON extractor. Return ONLY valid JSON."},
+                {"role": "user", "content": level2_prompt}
+            ]
+
+            resp2 = self.wrapper.chat(
+                messages2,
+                model=self.settings.OPENROUTER_MODEL,
+                temperature=0.0,
+                max_tokens=300
+            )
+
+            level2_json = self._extract_json_from_response(resp2)
+            if level2_json:
+                try:
+                    level2_data = json.loads(level2_json)
+                    level2_dict = level2_data.get("level2_dict", {})
+                    level2_candidates = [sub for subs in level2_dict.values() for sub in subs]
+                    level2_conf = float(level2_data.get("confidence", 0.5))
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
+        role_data["level2_roles"] = list(set(level2_candidates))  # Unique, all combined
+        role_data["hierarchy_confidence"] = round((level1_conf + level2_conf) / 2, 2)
+        role_data["is_hybrid"] = is_hybrid
 
     def _extract_json_from_response(self, response: str) -> Optional[str]:
         """Extract JSON from LLM response with enhanced parsing"""
@@ -222,7 +423,7 @@ IMPORTANT:
         return None
 
     def _parse_extraction_data(self, data: Dict[str, Any]) -> CompanyExtraction:
-        """Parse extracted data into CompanyExtraction object"""
+        """Parse extracted data into CompanyExtraction object, including hierarchy fields"""
         try:
             roles = []
             if data.get("roles"):
@@ -238,7 +439,11 @@ IMPORTANT:
                         salary_max_lpa=role_data.get("salary_max_lpa"),
                         skills=role_data.get("skills", []),
                         requirements=role_data.get("requirements", []),
-                        responsibilities=role_data.get("responsibilities", [])
+                        responsibilities=role_data.get("responsibilities", []),
+                        level1_roles=role_data.get("level1_roles", []),
+                        level2_roles=role_data.get("level2_roles", []),
+                        hierarchy_confidence=role_data.get("hierarchy_confidence"),
+                        is_hybrid=role_data.get("is_hybrid", False)
                     )
                     roles.append(role)
 

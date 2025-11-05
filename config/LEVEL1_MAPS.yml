@@ -1,0 +1,60 @@
+# Predefined Level 1 Role Mappings per Specialization
+# Loaded in level1_mapper.py for LLM selection from candidates
+# Format: specialization: list of level1 roles
+
+Marketing:
+  - B2B Sales
+  - FMCG Sales
+  - E-commerce
+  - Retailing
+  - Digital Marketing
+  - Event Management
+  - General Marketing
+
+Human Resources:
+  - Talent Acquisition
+  - HR Operations
+  - Learning & Development
+  - HR Analytics
+  - Employee Engagement
+  - Compensation & Benefits
+  - Generalist / HR Business Partner
+
+Lean Operations & Systems:
+  - Supply Chain Management
+  - Operations Excellence
+  - Process Improvement / Six Sigma
+  - Manufacturing / Production
+  - Quality & Compliance
+  - Procurement
+  - Project Management
+  - Systems & Automation
+
+Finance:
+  - Corporate Finance
+  - Financial Planning & Analysis (FP&A)
+  - Investment Banking
+  - Equity Research
+  - Risk Management
+  - Treasury
+  - Audit & Assurance
+  - Taxation
+  - Banking & Financial Services
+
+Business Analytics:
+  - Data Analytics
+  - Business Intelligence
+  - Product Analytics
+  - Financial Analytics
+  - Marketing Analytics
+  - Operations Analytics
+  - Strategy & Insights
+
+# Hybrid Mappings (detect term → assign specs → merge Level 1)
+hybrids:
+  Financial Analytics:
+    specs: [Finance, Business Analytics]
+  Marketing Analytics:
+    specs: [Marketing, Business Analytics]
+  Operations Analytics:
+    specs: [Lean Operations & Systems, Business Analytics]

@@ -192,12 +192,13 @@ class QueryOrchestrator:
     
     async def _query_sql(self, user_query: str, decision: RouterDecision) -> Optional[List[Dict[str, Any]]]:
         """
-        Query SQL database using existing SQL tool.
+        Query SQL database using the NL→SQL engine (LlamaIndex NLSQLTableQueryEngine).
         """
         print("   📊 SQL: Querying structured database...")
         
         try:
-            from app.agent import get_sql_query_engine
+            # Use the dedicated NL→SQL tool with strict timeouts
+            from app.sql_tool import run_sql_query
             
             # Build natural language query from entities
             query_parts = []
@@ -238,20 +239,15 @@ class QueryOrchestrator:
 
             print(f"   📝 SQL Query: {natural_query}")
 
-            # Call existing SQL tool
-            query_engine = get_sql_query_engine()
-            if not query_engine:
-                return [{"error": "SQL query engine not available.", "source": "sql_database"}]
+            # Run NL→SQL with a 12s cap to avoid UI stalls
+            result_str = run_sql_query(natural_query, timeout_sec=12.0)
+            if not isinstance(result_str, str):
+                result_str = str(result_str)
 
-            response = query_engine.query(natural_query)
-            
-            result_str = str(response.response)
-            sql_query = response.metadata.get("sql_query", "No SQL query extracted.")
+            if result_str:
+                return [{"answer": result_str, "source": "sql_database", "engine": "NLSQL"}]
 
-            if result_str and "QUERY_ERROR" not in result_str:
-                 return [{"answer": result_str, "source": "sql_database", "query": sql_query}]
-
-            return [{"answer": "I cannot answer this question with the available data.", "source": "sql_database", "query": sql_query}]
+            return [{"answer": "I cannot answer this question with the available data.", "source": "sql_database", "engine": "NLSQL"}]
             
         except Exception as e:
             print(f"   ❌ SQL query failed: {e}")

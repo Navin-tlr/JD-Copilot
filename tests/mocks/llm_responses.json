@@ -1,0 +1,19 @@
+{
+  "specialization_detector": {
+    "financial_analytics": "[{\"specialization\":\"Finance\",\"confidence\":0.92,\"evidence\":\"financial modeling, FP&A dashboards\"},{\"specialization\":\"Business Analytics\",\"confidence\":0.88,\"evidence\":\"Python, SQL, predictive modeling\"}]",
+    "marketing_analytics": "[{\"specialization\":\"Marketing\",\"confidence\":0.85,\"evidence\":\"campaign performance, growth marketing\"},{\"specialization\":\"Business Analytics\",\"confidence\":0.9,\"evidence\":\"attribution models, ROI analysis\"}]",
+    "pure_hr": "[{\"specialization\":\"HR\",\"confidence\":0.95,\"evidence\":\"talent acquisition, employer branding\"}]",
+    "ambiguous_short": "[]",
+    "general": "[{\"specialization\":\"General\",\"confidence\":0.3,\"evidence\":\"no clear specialization indicators\"}]"
+  },
+  "level1_mapper": {
+    "finance": "[{\"level1\":\"Financial Planning & Analysis\",\"specializations\":[\"Finance\"],\"confidence\":0.9,\"rationale\":\"JD mentions budgeting and forecasting\"},{\"level1\":\"Corporate Finance\",\"specializations\":[\"Finance\"],\"confidence\":0.7,\"rationale\":\"Support treasury and revenue\"}]",
+    "marketing": "[{\"level1\":\"B2B Sales\",\"specializations\":[\"Marketing\"],\"confidence\":0.95,\"rationale\":\"Drive B2B strategies, SDR team\"},{\"level1\":\"Digital Marketing\",\"specializations\":[\"Marketing\"],\"confidence\":0.8,\"rationale\":\"Enterprise software sales channels\"}]",
+    "hybrid_finance_analytics": "[{\"level1\":\"FP&A\",\"specializations\":[\"Finance\"],\"confidence\":0.85,\"rationale\":\"Financial planning dashboards\"},{\"level1\":\"Data Analytics\",\"specializations\":[\"Business Analytics\"],\"confidence\":0.88,\"rationale\":\"Predictive modeling with Python\"},{\"level1\":\"Financial Analytics\",\"specializations\":[\"Finance\",\"Business Analytics\"],\"confidence\":0.8,\"rationale\":\"Hybrid financial data insights\"}]"
+  },
+  "level2_extractor": {
+    "b2b_sales": "[{\"level2\":\"SDR\",\"level1\":\"B2B Sales\",\"confidence\":0.9,\"rationale\":\"Manage SDR team mentioned\"},{\"level2\":\"Account Executive\",\"level1\":\"B2B Sales\",\"confidence\":0.85,\"rationale\":\"Enterprise sales responsibilities\"}]",
+    "fp_a": "[{\"level2\":\"Budget Analyst\",\"level1\":\"FP&A\",\"confidence\":0.92,\"rationale\":\"Budget forecasting tasks\"},{\"level2\":\"Forecasting Specialist\",\"level1\":\"FP&A\",\"confidence\":0.88,\"rationale\":\"Variance analysis and planning\"}]",
+    "data_analytics": "[{\"level2\":\"Data Scientist\",\"level1\":\"Data Analytics\",\"confidence\":0.8,\"rationale\":\"Python and SQL for modeling\"}]"
+  }
+}

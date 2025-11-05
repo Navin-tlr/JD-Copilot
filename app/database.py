@@ -48,6 +48,10 @@ class PlacementDatabase:
                     role_description TEXT,
                     role_types TEXT, -- JSON array of specialization-aware role type tags
                     source_chunk_id TEXT,
+                    level1_roles TEXT NOT NULL DEFAULT '',
+                    level2_roles TEXT NOT NULL DEFAULT '',
+                    hierarchy_confidence REAL,
+                    is_hybrid INTEGER NOT NULL DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (company_id) REFERENCES companies (id)
                 )
@@ -133,7 +137,19 @@ class PlacementDatabase:
                 if "role_types" not in cols:
                     cursor.execute("ALTER TABLE roles ADD COLUMN role_types TEXT")
                     logging.info("Migrated DB: added roles.role_types column")
-                    conn.commit()
+                if "level1_roles" not in cols:
+                    cursor.execute("ALTER TABLE roles ADD COLUMN level1_roles TEXT NOT NULL DEFAULT ''")
+                    logging.info("Migrated DB: added roles.level1_roles column")
+                if "level2_roles" not in cols:
+                    cursor.execute("ALTER TABLE roles ADD COLUMN level2_roles TEXT NOT NULL DEFAULT ''")
+                    logging.info("Migrated DB: added roles.level2_roles column")
+                if "hierarchy_confidence" not in cols:
+                    cursor.execute("ALTER TABLE roles ADD COLUMN hierarchy_confidence REAL")
+                    logging.info("Migrated DB: added roles.hierarchy_confidence column")
+                if "is_hybrid" not in cols:
+                    cursor.execute("ALTER TABLE roles ADD COLUMN is_hybrid INTEGER NOT NULL DEFAULT 0")
+                    logging.info("Migrated DB: added roles.is_hybrid column")
+                conn.commit()
             except Exception:
                 # If ALTER TABLE fails for any reason, continue; insert_company_extraction will still try to insert
                 # and report any errors. We don't want DB migration failures to crash the whole app.
@@ -192,8 +208,8 @@ class PlacementDatabase:
                     role_types = role_data.get("role_types")  # expected list already
                     role_types_json = json.dumps(role_types) if isinstance(role_types, list) else None
                     cursor.execute("""
-                        INSERT INTO roles (company_id, title, specialization, location, role_description, role_types, source_chunk_id)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO roles (company_id, title, specialization, location, role_description, role_types, source_chunk_id, level1_roles, level2_roles, hierarchy_confidence, is_hybrid)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         company_id,
                         role_data.get("title", ""),
@@ -202,6 +218,10 @@ class PlacementDatabase:
                         role_data.get("role_description", ""),
                         role_types_json,
                         source_chunk_id,
+                        role_data.get("level1_roles", ""),
+                        role_data.get("level2_roles", ""),
+                        role_data.get("hierarchy_confidence"),
+                        1 if role_data.get("is_hybrid", False) else 0,
                     ))
                     
                     role_id = cursor.lastrowid
