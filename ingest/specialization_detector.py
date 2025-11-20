@@ -5,6 +5,7 @@ Post-process for known hybrid terms to ensure multi-spec assignment.
 """
 
 import json
+import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 

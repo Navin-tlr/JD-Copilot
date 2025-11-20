@@ -560,6 +560,46 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
     if filters:
         # Remove query-specific keys that shouldn't be Pinecone filters
         pinecone_filter = {k: v for k, v in filters.items() if k not in ['role_contains']}
+
+        # --- Canonical specialization normalization (ingestion now stores singular 'specialization') ---
+        # Accept legacy keys: 'specializations' (list) or 'specialization' (string)
+        spec_norm_map = {
+            'operations': 'Lean Operations & Systems',
+            'lean operations & systems': 'Lean Operations & Systems',
+            'lean operation and systems': 'Lean Operations & Systems',
+            'hr': 'Human Resources',
+            'human resources': 'Human Resources',
+            'marketing & sales': 'Marketing',
+            'marketing and sales': 'Marketing',
+            'sales & marketing': 'Marketing',
+            'analytics': 'Business Analytics',
+            'business analytics': 'Business Analytics',
+            'finance': 'Finance',
+            'financial management': 'Finance',
+            'strategy': 'Strategy',
+            'strategic management': 'Strategy',
+            'it': 'IT & Technology',
+            'technology': 'IT & Technology',
+            'it & technology': 'IT & Technology'
+        }
+
+        # Handle list-based legacy field
+        if 'specializations' in pinecone_filter and isinstance(pinecone_filter['specializations'], list):
+            for val in pinecone_filter['specializations']:
+                if isinstance(val, str):
+                    key = val.strip().lower()
+                    canonical = spec_norm_map.get(key)
+                    if canonical:
+                        pinecone_filter['specialization'] = canonical
+                        break  # Use first mappable value
+            # Remove legacy field to avoid mismatch
+            pinecone_filter.pop('specializations', None)
+
+        # Normalize singular specialization
+        if 'specialization' in pinecone_filter and isinstance(pinecone_filter['specialization'], str):
+            key = pinecone_filter['specialization'].strip().lower()
+            pinecone_filter['specialization'] = spec_norm_map.get(key, pinecone_filter['specialization'])
+
         if pinecone_filter:
             print(f"🔍 Using Pinecone metadata filter: {pinecone_filter}")
 
@@ -573,6 +613,35 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
         filter=pinecone_filter
     )
     matches = res.get("matches", []) if isinstance(res, dict) else getattr(res, "matches", [])
+
+    # Fallback: if no matches and specialization filter applied, retry without specialization
+    if not matches and pinecone_filter and 'specialization' in pinecone_filter:
+        fallback_filter = {k: v for k, v in pinecone_filter.items() if k != 'specialization'}
+        print("⚠️ No matches with specialization filter; retrying without specialization filter.")
+        res = index.query(
+            vector=q_emb.tolist(),
+            top_k=candidate_count,
+            include_metadata=True,
+            include_values=False,
+            filter=fallback_filter or None
+        )
+        matches = res.get("matches", []) if isinstance(res, dict) else getattr(res, "matches", [])
+
+    # Final fallback: if still no matches and we had ANY filter, retry completely unfiltered
+    if not matches and pinecone_filter:
+        print("⚠️ Still no matches after removing specialization; performing unfiltered retry.")
+        res = index.query(
+            vector=q_emb.tolist(),
+            top_k=candidate_count,
+            include_metadata=True,
+            include_values=False,
+            filter=None
+        )
+        matches = res.get("matches", []) if isinstance(res, dict) else getattr(res, "matches", [])
+
+    if not matches:
+        print("🚫 No vector matches found even after fallbacks.")
+        return []
 
     # Process candidates
     candidates = []
@@ -718,6 +787,17 @@ def retrieve_snippets(question: str, top_k: int, filters: Dict[str, Any]) -> Lis
 
 def synthesize_answer(question: str, snippets: List[Dict[str, Any]], filters: Dict[str, Any] = None, context: Dict[str, Any] = None) -> str | None:
     settings = get_settings()
+    # Guard: if no snippets, provide structured fallback guidance instead of KeyError later.
+    if not snippets:
+        return (
+            "### No Matching Context Found\n\n"
+            "I couldn't retrieve any relevant job description snippets for your query.\n\n"
+            "**What you can do next:**\n"
+            "- Rephrase the question with more specific role or company terms\n"
+            "- Remove narrow filters (specialization or company) to broaden search\n"
+            "- Ask for a market-level overview instead of a specific JD\n\n"
+            "If you intended a broader deep-dive, try: *'Give me a market overview of operations roles'*"
+        )
     
     # Build conversation context section with intelligent awareness
     conversation_context = ""

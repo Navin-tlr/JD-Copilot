@@ -256,38 +256,35 @@ class QueryOrchestrator:
     async def _query_vector(self, user_query: str, decision: RouterDecision) -> Optional[List[Dict[str, Any]]]:
         """
         Query Pinecone vector database using existing RAG tool.
+        CRITICAL: Always pass the original user_query for semantic embedding.
+        Metadata filters are built separately and passed via the filters parameter.
         """
         print("   🔮 Vector: Querying Pinecone...")
         
         try:
             from app.rag import retrieve_snippets
             
-            # Build query string
-            query_parts = []
-            
-            if decision.entities.specialization:
-                query_parts.append(', '.join(decision.entities.specialization))
-            
-            if decision.entities.role:
-                query_parts.append(', '.join(decision.entities.role))
-            
-            if decision.entities.company:
-                query_parts.append(', '.join(decision.entities.company))
-            
-            # Construct natural query
-            if query_parts:
-                vector_query = f"{decision.intent} {' '.join(query_parts)}"
-            else:
-                vector_query = user_query
+            # ALWAYS use the original user query for semantic search
+            # The entities extracted by the router should be used for FILTERING, not query construction
+            vector_query = user_query
             
             print(f"   🔍 Vector Query: {vector_query}")
             
-            # Build filters
+            # Build metadata filters from extracted entities
             filters = {}
+            
+            if decision.entities.specialization:
+                # Use the first specialization for metadata filtering
+                filters["specialization"] = decision.entities.specialization[0]
+            
             if decision.entities.company:
                 # Use first company for filtering, lowercase for company_norm in Pinecone
                 company_name = decision.entities.company[0].lower()
                 filters["company_norm"] = company_name
+            
+            if decision.entities.role:
+                # Add role filtering
+                filters["role_contains"] = decision.entities.role[0]
             
             # Retrieve snippets (top_k based on route)
             top_k = 100 if decision.route.value == "vector_db" else 50

@@ -10,6 +10,25 @@ from typing import Dict, List, Optional, Any
 from dataclasses import asdict
 import logging
 
+# Canonical specialization normalization (must match ingestion pipeline)
+_CANONICAL_SPECIALIZATION_MAP = {
+    'marketing': 'Marketing',
+    'marketing and sales': 'Marketing',
+    'human resources': 'Human Resources',
+    'hr': 'Human Resources',
+    'lean operation and systems': 'Lean Operations & Systems',
+    'operations': 'Lean Operations & Systems',
+    'finance': 'Finance',
+    'business analytics': 'Business Analytics',
+    'analytics': 'Business Analytics',
+}
+
+def _canonicalize_specialization(value: Optional[str]) -> str:
+    if not value:
+        return 'General'
+    key = value.strip().lower()
+    return _CANONICAL_SPECIALIZATION_MAP.get(key, value.strip())
+
 class PlacementDatabase:
     """SQLite database for structured placement data"""
     
@@ -202,27 +221,46 @@ class PlacementDatabase:
                 roles = extraction_data.get("roles", [])
                 for role_data in roles:
                     # Insert role with specialization
-                    spec = role_data.get("specialization", "General")
-                    # Normalize specialization: lowercase, replace '&' with 'and', remove symbols
-                    spec_normalized = spec.lower().replace('&', 'and').replace('#', '').strip()
+                    # Prefer canonical specialization from extraction_data.specializations if present
+                    spec_list = extraction_data.get("specializations") or []
+                    primary_spec = None
+                    if isinstance(spec_list, list) and spec_list:
+                        # spec_list may be list of dicts {specialization, confidence}
+                        first = spec_list[0]
+                        if isinstance(first, dict):
+                            primary_spec = first.get("specialization")
+                        elif isinstance(first, str):
+                            primary_spec = first
+                    spec = primary_spec or role_data.get("specialization", "General")
+                    spec_normalized = _canonicalize_specialization(spec)
+
                     role_types = role_data.get("role_types")  # expected list already
                     role_types_json = json.dumps(role_types) if isinstance(role_types, list) else None
-                    cursor.execute("""
+
+                    # Ensure hierarchical fields are stored as JSON strings
+                    level1_raw = role_data.get("level1_roles", "")
+                    level2_raw = role_data.get("level2_roles", "")
+                    level1_json = json.dumps(level1_raw) if isinstance(level1_raw, list) else (level1_raw or "")
+                    level2_json = json.dumps(level2_raw) if isinstance(level2_raw, list) else (level2_raw or "")
+                    cursor.execute(
+                        """
                         INSERT INTO roles (company_id, title, specialization, location, role_description, role_types, source_chunk_id, level1_roles, level2_roles, hierarchy_confidence, is_hybrid)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        company_id,
-                        role_data.get("title", ""),
-                        spec_normalized,
-                        role_data.get("location"),
-                        role_data.get("role_description", ""),
-                        role_types_json,
-                        source_chunk_id,
-                        role_data.get("level1_roles", ""),
-                        role_data.get("level2_roles", ""),
-                        role_data.get("hierarchy_confidence"),
-                        1 if role_data.get("is_hybrid", False) else 0,
-                    ))
+                        """,
+                        (
+                            company_id,
+                            role_data.get("title", ""),
+                            spec_normalized,
+                            role_data.get("location"),
+                            role_data.get("role_description", ""),
+                            role_types_json,
+                            source_chunk_id,
+                            level1_json,
+                            level2_json,
+                            role_data.get("hierarchy_confidence"),
+                            1 if role_data.get("is_hybrid", False) else 0,
+                        ),
+                    )
                     
                     role_id = cursor.lastrowid
                     

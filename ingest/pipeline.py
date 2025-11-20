@@ -32,6 +32,47 @@ from app.llm_role_type_classifier import classify_role_types_llm
 from ingest.metadata_normalize import canonicalize_company
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+# ---------------------------------------------------------------------------
+# Canonical specialization mapping & predefined Level 1 role sets
+# (Single source of truth so SQL + Pinecone use identical naming)
+# ---------------------------------------------------------------------------
+CANONICAL_SPECIALIZATION_MAP = {
+    # Normalizations / aliases
+    'marketing': 'Marketing',
+    'marketing and sales': 'Marketing',
+    'human resources': 'Human Resources',
+    'hr': 'Human Resources',
+    'lean operation and systems': 'Lean Operations & Systems',
+    'operations': 'Lean Operations & Systems',
+    'finance': 'Finance',
+    'business analytics': 'Business Analytics',
+    'analytics': 'Business Analytics',
+}
+
+
+
+HYBRID_TERMS = {
+    # Hybrid specialization phrase -> component specializations
+    'financial analytics': ['Finance', 'Business Analytics'],
+    'marketing analytics': ['Marketing', 'Business Analytics'],
+    'operations analytics': ['Lean Operations & Systems', 'Business Analytics'],
+    'hr analytics': ['Human Resources', 'Business Analytics'],
+}
+
+def canonicalize_specialization(raw: str) -> str:
+    if not raw:
+        return raw
+    return CANONICAL_SPECIALIZATION_MAP.get(raw.lower().strip(), raw.strip())
+
+def expand_hybrids(jd_text: str, specs: list[str]) -> list[str]:
+    text_lower = jd_text.lower()
+    augmented = set(specs)
+    for term, components in HYBRID_TERMS.items():
+        if term in text_lower:
+            for c in components:
+                augmented.add(c)
+    return list(augmented)
+
 
 def _load_repo_dotenv(dotenv_path: str | Path = None) -> None:
     """Load a simple .env file into os.environ if variables are not already set.
@@ -616,136 +657,127 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
     filename_company = _fallback_company_from_filename(path)
     print(f"📝 Filename suggests company: {filename_company}")
 
-    # PRIORITY 2: Extract company from document content using LangExtract
-    content_company: Optional[str] = extract_company(text)
-    if content_company:
-        print(f"📄 Content extraction found: {content_company}")
-    else:
-        print(f"⚠️ No company extracted from content")
-
-    # PRIORITY 3: Structured extraction using LLM
+    # PRIORITY 2: Structured extraction using LLM
     print(f"🔍 Performing structured extraction for {path.name}...")
     structured_extractor = StructuredExtractor()
     extraction = structured_extractor.extract_structured_data(text)
     
+    # Initialize with safe defaults to prevent UnboundLocalError
+    extraction_dict: Dict[str, Any] = {
+        'specializations': [],
+        'level1_roles': [],
+        'level2_roles': [],
+        'hierarchy_confidence': 0.0,
+        'is_hybrid': False,
+        'roles': []
+    }
+    
     structured_company: Optional[str] = None
-    level1_roles = []
-    level2_roles = []
-    hierarchy_confidence = 0.0
-    is_hybrid = False
-    specializations = []
     if extraction and extraction.company_name:
         structured_company = extraction.company_name
         print(f"✅ Structured extraction successful: {structured_company}")
-        # Save structured data to JSON
+        # Save structured data to JSON to get the base dictionary
         json_path = structured_extractor.save_structured_data(extraction, path.name)
         if json_path:
             print(f"💾 Saved structured data to: {json_path}")
-            # Insert structured extraction into the local database so UI reflects new companies
-            try:
-                db = PlacementDatabase()
-                # Read back the saved JSON and insert
-                with open(json_path, 'r', encoding='utf-8') as jf:
-                    extraction_dict = json.load(jf)
-                    level1_roles = extraction_dict.get('level1_roles', [])
-                    level2_roles = extraction_dict.get('level2_roles', [])
-                    hierarchy_confidence = extraction_dict.get('hierarchy_confidence', 0.0)
-                    is_hybrid = extraction_dict.get('is_hybrid', False)
-                
-                # NEW DYNAMIC HIERARCHY EXTRACTION
-                # Check for legacy mode
-                legacy_mode = os.getenv('LEGACY_ROLE_MAP', 'false').lower() == 'true'
-                if legacy_mode:
-                    print("   ⚠️ Using legacy role mapping (LEGACY_ROLE_MAP=true)")
-                else:
-                    print("   🚀 Using dynamic LLM-driven hierarchy extraction...")
-                    # 1. Detect specializations (multi-label)
-                    specializations = detect_specializations(text)
-                    print(f"   📊 Detected specializations: {[s['specialization'] for s in specializations]}")
-                    
-                    # 2. Map to Level 1 roles
-                    spec_names = [s['specialization'] for s in specializations]
-                    level1_candidates = map_level1_roles(spec_names, text)
-                    level1_roles = [l['level1'] for l in level1_candidates]
-                    print(f"   🏢 Level 1 roles: {level1_roles}")
-                    
-                    # 3. Extract Level 2 roles
-                    level2_candidates = extract_level2_roles(text, level1_roles)
-                    level2_roles = [l['level2'] for l in level2_candidates]
-                    print(f"   🔍 Level 2 roles: {level2_roles}")
-                    
-                    # Compute overall confidence (average from detections)
-                    if specializations:
-                        avg_conf = sum(s.get('confidence', 0) for s in specializations) / len(specializations)
-                        hierarchy_confidence = round(avg_conf, 2)
-                    is_hybrid = len(specializations) > 1
-                
-                # Augment extraction_dict with new dynamic fields
-                extraction_dict['specializations'] = specializations
-                extraction_dict['level1_roles'] = level1_candidates  # Full with provenance
-                extraction_dict['level2_roles'] = level2_candidates  # Full with ties
-                extraction_dict['hierarchy_confidence'] = hierarchy_confidence
-                extraction_dict['is_hybrid'] = is_hybrid
-                
-                # Augment roles with role_types (multi-label) before DB insert
-                # LLM multi-role batch classification (primary)
-                try:
-                    llm_map = classify_role_types_llm(extraction_dict.get("roles", []), text)
-                except Exception as e:
-                    print(f"⚠️ LLM role type batch classification failed: {e}")
-                    llm_map = {}
-
-                for role_obj in extraction_dict.get("roles", []):
-                    title = role_obj.get("title", "")
-                    specialization = role_obj.get("specialization", "")
-                    # Collect description material
-                    desc_parts = []
-                    for k in ("role_description", "responsibilities", "requirements"):
-                        v = role_obj.get(k)
-                        if isinstance(v, list):
-                            desc_parts.extend(v)
-                        elif isinstance(v, str):
-                            desc_parts.append(v)
-                    description = "\n".join(desc_parts)
-
-                    # Augment with dynamic hierarchy fields (full provenance)
-                    role_obj['specializations'] = specializations
-                    role_obj['level1_roles'] = level1_candidates
-                    role_obj['level2_roles'] = level2_candidates
-                    role_obj['hierarchy_confidence'] = hierarchy_confidence
-                    role_obj['is_hybrid'] = is_hybrid
-
-                    role_types = llm_map.get(title)
-                    source = "llm"
-                    if not role_types:
-                        # Fallback to deterministic rule-based
-                        classifications = classify_role_types_rule(title, specialization, description)
-                        role_types = [c["classification"] for c in classifications]
-                        source = "rules" if role_types else None
-                        if role_types:
-                            role_obj.setdefault("_role_type_debug", classifications)
-                    if role_types:
-                        role_obj["role_types"] = role_types
-                        if source:
-                            role_obj.setdefault("_role_type_source", source)
-                success = db.insert_company_extraction(extraction_dict)
-                if success:
-                    print(f"🗄️ Inserted structured extraction into DB: {extraction.company_name}")
-                else:
-                    print(f"⚠️ Failed to insert structured extraction into DB for: {extraction.company_name}")
-            except Exception as e:
-                print(f"❌ Error inserting structured extraction into DB: {e}")
+            with open(json_path, 'r', encoding='utf-8') as jf:
+                extraction_dict = json.load(jf) # Overwrite with loaded data
     else:
         print(f"⚠️ Structured extraction failed for {path.name}")
 
+    # ALWAYS perform dynamic hierarchy extraction, even if company name extraction failed.
+    # This ensures the hierarchy is processed and `extraction_dict` is populated.
+    try:
+        print("   🚀 Using dynamic LLM-driven hierarchy extraction...")
+        # 1. Detect raw specializations
+        raw_specs = detect_specializations(text)
+        print(f"   📊 Raw detected specializations: {[s['specialization'] for s in raw_specs]}")
+
+        # 2. Canonicalize & hybrid expansion
+        canonical_specs = [canonicalize_specialization(s['specialization']) for s in raw_specs if s.get('specialization')]
+        canonical_specs = expand_hybrids(text, canonical_specs)
+        print(f"   ✅ Canonical / expanded specializations: {canonical_specs}")
+
+        # 3. Level 1 roles
+        # Use LLM-based mapper to select relevant candidates instead of all possible ones
+        level1_roles = map_level1_roles(canonical_specs, text)
+        print(f"   🏢 Level 1 role set (LLM selected): {level1_roles}")
+
+        # 4. Dynamic Level 2 roles
+        level2_objs = extract_level2_roles(text, level1_roles)
+        level2_roles = sorted(set(o.get('level2') for o in level2_objs if o.get('level2')))
+        print(f"   🔍 Level 2 dynamic roles: {level2_roles}")
+
+        # 5. Confidence and hybrid status
+        hierarchy_confidence = round(sum(s.get('confidence', 0) for s in raw_specs) / len(raw_specs), 2) if raw_specs else 0.0
+        is_hybrid = len(canonical_specs) > 1
+        specializations = [{"specialization": s, "confidence": None} for s in canonical_specs]
+
+        # Augment extraction_dict with new dynamic fields
+        extraction_dict['specializations'] = specializations
+        extraction_dict['level1_roles'] = level1_roles
+        extraction_dict['level2_roles'] = level2_roles
+        extraction_dict['hierarchy_confidence'] = hierarchy_confidence
+        extraction_dict['is_hybrid'] = is_hybrid
+
+        # Augment roles with role_types (multi-label) before DB insert
+        try:
+            llm_map = classify_role_types_llm(extraction_dict.get("roles", []), text)
+        except Exception as e:
+            print(f"⚠️ LLM role type batch classification failed: {e}")
+            llm_map = {}
+
+        for role_obj in extraction_dict.get("roles", []):
+            title = role_obj.get("title", "")
+            specialization = role_obj.get("specialization", "")
+            desc_parts = [str(role_obj.get(k, '')) for k in ("role_description", "responsibilities", "requirements")]
+            description = "\n".join(desc_parts)
+
+            # Augment with dynamic hierarchy fields
+            role_obj['specializations'] = specializations
+            role_obj['level1_roles'] = level1_roles
+            role_obj['level2_roles'] = level2_roles
+            role_obj['hierarchy_confidence'] = hierarchy_confidence
+            role_obj['is_hybrid'] = is_hybrid
+
+            role_types = llm_map.get(title)
+            source = "llm"
+            if not role_types:
+                classifications = classify_role_types_rule(title, specialization, description)
+                role_types = [c["classification"] for c in classifications]
+                source = "rules" if role_types else None
+                if role_types:
+                    role_obj.setdefault("_role_type_debug", classifications)
+            if role_types:
+                role_obj["role_types"] = role_types
+                if source:
+                    role_obj.setdefault("_role_type_source", source)
+        
+        # If structured extraction was successful, insert into DB
+        if structured_company:
+            db = PlacementDatabase()
+            success = db.insert_company_extraction(extraction_dict)
+            if success:
+                print(f"🗄️ Inserted structured extraction into DB: {structured_company}")
+            else:
+                print(f"⚠️ Failed to insert structured extraction into DB for: {structured_company}")
+
+    except Exception as e:
+        print(f"❌ Error during dynamic hierarchy extraction: {e}")
+        # Ensure safe defaults on error
+        extraction_dict.setdefault('specializations', [])
+        extraction_dict.setdefault('level1_roles', [])
+        extraction_dict.setdefault('level2_roles', [])
+        extraction_dict.setdefault('hierarchy_confidence', 0.0)
+        extraction_dict.setdefault('is_hybrid', False)
+
     # SMART COMPANY NAME RESOLUTION
-    # Priority order: Structured > Content > Filename > Vision (Logo Detection)
+    # Priority order: Structured > Filename > Vision (Logo Detection)
     # Use the most reliable source available
     
     print("\n🎯 Company Name Resolution:")
     print(f"   1. Structured extraction: {structured_company or 'None'}")
-    print(f"   2. Content extraction: {content_company or 'None'}")
-    print(f"   3. Filename suggests: {filename_company}")
+    print(f"   2. Filename suggests: {filename_company}")
     
     # Decide final company name with priority logic
     final_company_name = None
@@ -754,11 +786,6 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
     if structured_company and not _is_placeholder_company(structured_company):
         final_company_name = structured_company
         print(f"   ✅ Using structured extraction: {final_company_name}")
-    
-    # Otherwise, use content extraction if valid
-    elif content_company and not _is_placeholder_company(content_company):
-        final_company_name = content_company
-        print(f"   ✅ Using content extraction: {final_company_name}")
     
     # Try filename if it looks valid (not "Unknown" or placeholder)
     elif filename_company and not _is_placeholder_company(filename_company) and filename_company.lower() != "unknown":
@@ -801,8 +828,8 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
     print(f"   ✅ Specializations (from dynamic): {[s.get('specialization') for s in specializations]}")
     
     # Hierarchical classification now dynamic via new modules; use from extraction_dict
-    industry_level1 = ", ".join([l.get('level1', 'General') for l in extraction_dict.get('level1_roles', [])]) or "General"
-    industry_level2 = ", ".join([l.get('level2', 'General') for l in extraction_dict.get('level2_roles', [])]) or "General"
+    industry_level1 = ", ".join(extraction_dict.get('level1_roles', []) or []) or "General"
+    industry_level2 = ", ".join(extraction_dict.get('level2_roles', []) or []) or "General"
     industry_full = f"{', '.join([s.get('specialization') for s in specializations])} > {industry_level1} > {industry_level2}"
     
     print(f"   ✅ Dynamic hierarchy extracted (see above)")
@@ -820,7 +847,7 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
     
     # Update enhanced hierarchical navigation map
     if not is_general and industry_level1 != "General":
-        primary_specialization = list(specializations)[0] if len(specializations) == 1 else "General"
+        primary_specialization = specializations[0]['specialization'] if specializations else "General"
         if primary_specialization != "General":
             hierarchical_navigation_map.add_entry(
                 company_name=final_company_name,
@@ -847,6 +874,9 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
             end_char=0,
         )
         
+        # Choose a primary specialization (first canonical) for filtering
+        primary_specialization = specializations[0]['specialization'] if specializations else "General"
+
         meta: Dict[str, Any] = {
             "chunk_text": chunk_text,
             "text": chunk_text,
@@ -854,13 +884,15 @@ def process_file(path: Path) -> Tuple[int, Optional[str]]:
             "chunk_index": idx,
             "company": final_company_name,
             "company_norm": company_norm,
+            # For DB/debugging keep the full list, but also store a canonical single field used by retrieval filters
             "specializations": json.dumps(specializations),  # JSON string for DB
+            "specialization": primary_specialization,       # Canonical singular for Pinecone filter
             "is_general": is_general,
             "industry_level1": industry_level1,
             "industry_level2": industry_level2,
             "industry_full": industry_full,
-            "level1_roles": json.dumps(level1_candidates),
-            "level2_roles": json.dumps(level2_candidates),
+            "level1_roles": json.dumps(level1_roles),
+            "level2_roles": json.dumps(level2_roles),
             "hierarchy_confidence": hierarchy_confidence,
             "is_hybrid": is_hybrid,
             "year": datetime.now().year,
